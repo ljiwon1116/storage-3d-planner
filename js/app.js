@@ -32,9 +32,9 @@
     },
 
     plans: [
-      { id: 'plan-a', name: '시안 A', boxes: [] },
-      { id: 'plan-b', name: '시안 B', boxes: [] },
-      { id: 'plan-c', name: '시안 C', boxes: [] }
+      { id: 'plan-a', name: '계획 A', boxes: [] },
+      { id: 'plan-b', name: '계획 B', boxes: [] },
+      { id: 'plan-c', name: '계획 C', boxes: [] }
     ],
     activePlanId: 'plan-a',
 
@@ -48,7 +48,8 @@
     selectedBoxIds: [],
     selectedCatalogModelId: 'muji-pp-drawer-wide-s',
     uiMode: 'mobile',             // 'mobile' | 'pc' (기본값: 'mobile'!)
-    activeMobileTab: 'shelves',   // 'shelves' | 'space' | 'shelfpos' | 'errors'
+    activeMobileTab: 'none',      // 'none'(순수 3D) | 'errors'(문제)
+    mobileStep: 'setup',          // 'setup'(장 설정) | 'build'(3D 상자 배치)
     mobileSheetCollapsed: false,  // 모바일 하단 패널 접힘 여부
     rightSubTab: 'placed', // 'placed' | 'combos'
     autofillPanelOpen: false, // 자동 채우기 섹션 펼침 여부 (기본 접힘!)
@@ -74,7 +75,10 @@
     modelsMap: {},
     savedCombos: [],
     pickerBrand: 'ALL',
-    pickerSearch: ''
+    pickerSearch: '',
+    pickerBrandListOpen: false, // 브랜드 글자 눌렀을 때 목록 펼침
+    pickerCart: {},      // { modelId: 수량 } 담기 바구니
+    pickerTargetComp: 0  // 담을 선반 칸
   };
 
   function mergeUniqueById(arr) {
@@ -196,8 +200,8 @@
     // 2) Vercel + Neon DB (/api/bootstrap) 동기화
     if (window.location.protocol === 'file:') {
       if (badgeEl) {
-        badgeEl.textContent = '⚪ 로컬 파일 모드';
-        badgeEl.title = 'Vercel 배포 및 Neon DB 연결 시 자동으로 클라우드 DB와 동기화됩니다.';
+        badgeEl.textContent = '⚪ 내 기기에 저장';
+        badgeEl.title = '인터넷에 올리면 저절로 같이 저장돼요.';
       }
       return;
     }
@@ -220,7 +224,7 @@
         }
 
         if (badgeEl) {
-          badgeEl.textContent = '🟢 Neon DB 연동됨';
+          badgeEl.textContent = '🟢 인터넷에 저장됨';
           badgeEl.style.background = '#e6f4ea';
           badgeEl.style.color = '#137333';
           badgeEl.style.borderColor = '#a8dab5';
@@ -228,13 +232,13 @@
         refreshAll();
       } else {
         if (badgeEl) {
-          badgeEl.textContent = '🟡 로컬 저장 모드';
-          badgeEl.title = data.message || 'Vercel에 Neon DB 환경변수(DATABASE_URL)를 연결하면 클라우드 DB가 활성화됩니다.';
+          badgeEl.textContent = '🟡 내 기기에 저장';
+          badgeEl.title = data.message || '인터넷에 연결하면 어디서나 볼 수 있어요.';
         }
       }
     } catch (e) {
       if (badgeEl) {
-        badgeEl.textContent = '⚪ 로컬 저장 모드';
+        badgeEl.textContent = '⚪ 내 기기에 저장';
       }
     }
   }
@@ -280,9 +284,9 @@
 
     try {
       await navigator.clipboard.writeText(shareUrl);
-      alert(`🔗 현재 3D 수납 배치 공유 링크가 복사되었습니다!\n\n${shareUrl}\n\n이 링크를 다른 사람에게 보내면 동일한 3D 가구와 수납함 배치가 바로 열립니다.`);
+      alert(`🔗 링크를 복사했어요!\n\n${shareUrl}\n\n이 링크를 보내면 똑같은 화면이 바로 열려요.`);
     } catch (e) {
-      prompt('아래 공유 링크를 복사하여 전달하세요:', shareUrl);
+      prompt('이 링크를 복사해서 보내세요:', shareUrl);
     }
   }
 
@@ -321,6 +325,7 @@
   }
 
   function refreshAll() {
+    document.body.classList.toggle('space-drawer', state.spaceConfig.type === 'drawer');
     renderLeftAccordionCards();
     renderPlanTabs();
     renderShelfCalloutCards();
@@ -399,6 +404,44 @@
   // 3D 가구 선반의 2D 화면 좌표와 우측 선반 콜아웃 카드를 잇는 리더라인(연결선) 그리기
   function handleShelfAnchors(anchors) {
     const svgEl = document.getElementById('shelf-leader-svg');
+    const btnLayer = document.getElementById('mobile-shelf-buttons');
+
+    // 모바일 3D 단계: 선반 옆 ＋버튼을 앵커 위치에 배치
+    const isMobileBuild = state.uiMode === 'mobile' && state.mobileStep === 'build';
+    if (isMobileBuild && btnLayer) {
+      if (svgEl) svgEl.innerHTML = '';
+      // 버튼은 매 프레임 새로 만들지 않고 위치만 갱신 (클릭 유지)
+      const existing = btnLayer.querySelectorAll('.mobile-shelf-add-btn');
+      if (existing.length !== anchors.length) {
+        btnLayer.innerHTML = '';
+        anchors.forEach((anc) => {
+          const btn = document.createElement('button');
+          btn.className = 'mobile-shelf-add-btn';
+          btn.type = 'button';
+          btn.innerHTML = `<span class="msab-num">${anc.index + 1}</span><span class="msab-plus">+</span>`;
+          btn.dataset.idx = anc.index;
+          btn.style.left = `${anc.x.toFixed(1)}px`;
+          btn.style.top = `${anc.y.toFixed(1)}px`;
+          btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openShelfSheet(Number(btn.dataset.idx));
+          });
+          btnLayer.appendChild(btn);
+        });
+      } else {
+        anchors.forEach((anc, i) => {
+          const btn = existing[i];
+          btn.dataset.idx = anc.index;
+          const numEl = btn.querySelector('.msab-num');
+          if (numEl) numEl.textContent = anc.index + 1;
+          btn.style.left = `${anc.x.toFixed(1)}px`;
+          btn.style.top = `${anc.y.toFixed(1)}px`;
+        });
+      }
+      return;
+    }
+    if (btnLayer) btnLayer.innerHTML = '';
     if (!svgEl) return;
 
     const svgRect = svgEl.getBoundingClientRect();
@@ -429,6 +472,172 @@
     svgEl.innerHTML = linesHtml;
   }
 
+  // 선반 ＋버튼 → 바텀시트 메뉴 열기
+  function openShelfSheet(compIdx) {
+    state.activeCompartmentIdx = compIdx;
+    const compartments = window.PackerEngine.getCompartments(state.spaceConfig);
+    const comp = compartments[compIdx] || compartments[0];
+    const activePlan = getActivePlan();
+    const compBoxes = activePlan.boxes.filter((b) => b.compartmentIndex === compIdx);
+
+    document.getElementById('mobile-shelf-sheet-title').textContent =
+      `${comp.name} · 상자 ${compBoxes.length}개`;
+
+    const body = document.getElementById('mobile-shelf-sheet-body');
+    body.innerHTML = '';
+
+    const makeBtn = (icon, label, cls, onClick) => {
+      const b = document.createElement('button');
+      b.className = 'sheet-action-btn' + (cls ? ' ' + cls : '');
+      b.innerHTML = `<span>${label}</span>`;
+      b.addEventListener('click', onClick);
+      return b;
+    };
+
+    // 1. 상자 넣기 (고르기 창 열기)
+    body.appendChild(makeBtn('📦', '상자 넣기', 'primary', () => {
+      closeShelfSheet();
+      state.pickerBrand = 'ALL';
+      state.pickerCart = {};
+      renderPickerModalContent();
+      document.getElementById('modal-box-picker').classList.add('open');
+    }));
+
+    // 2. 저장한 묶음 넣기
+    body.appendChild(makeBtn('⭐', '저장한 묶음 넣기', '', () => {
+      closeShelfSheet();
+      state.pickerBrand = 'COMBOS';
+      renderPickerModalContent();
+      document.getElementById('modal-box-picker').classList.add('open');
+    }));
+
+    // 3. 한 번에 채우기
+    body.appendChild(makeBtn('⚡', '한 번에 채우기', '', () => {
+      const generated = window.PackerEngine.autoFill(
+        state.spaceConfig,
+        {
+          mode: state.autofillMode,
+          modelId: state.selectedCatalogModelId,
+          brand: state.autofillBrand,
+          compartmentIndex: compIdx,
+          avoidDeadzone: state.autofillAvoidDeadzone,
+          allowRotation: state.autofillRotate,
+          allowStacking: state.autofillStack
+        },
+        state.catalogModels,
+        state.modelsMap
+      );
+      activePlan.boxes = activePlan.boxes.filter((b) => b.compartmentIndex !== compIdx).concat(generated);
+      state.selectedBoxIds = generated.length > 0 ? [generated[0].id] : [];
+      closeShelfSheet();
+      refreshAll();
+    }));
+
+    // 4. 지금 놓은 것 보기/빼기
+    if (compBoxes.length > 0) {
+      const listWrap = document.createElement('div');
+      listWrap.style.cssText = 'margin-top:4px;border-top:1px solid var(--border);padding-top:10px;';
+      listWrap.innerHTML = `<div style="font-size:0.78rem;font-weight:700;color:var(--text-sub);margin-bottom:6px;">지금 놓은 것</div>`;
+      compBoxes.forEach((box) => {
+        const model = state.modelsMap[box.modelId];
+        if (!model) return;
+        const row = document.createElement('div');
+        row.className = 'placed-mini-item';
+        row.innerHTML = `
+          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            <strong>[${model.brand}]</strong> ${model.name}
+          </div>
+          <button class="btn btn-danger btn-sm" title="빼기">✕</button>`;
+        row.querySelector('button').addEventListener('click', () => {
+          activePlan.boxes = activePlan.boxes.filter((b) => b.id !== box.id);
+          refreshAll();
+          openShelfSheet(compIdx); // 목록 갱신
+        });
+        listWrap.appendChild(row);
+      });
+      body.appendChild(listWrap);
+    }
+
+    // 5. 이 칸 비우기
+    if (compBoxes.length > 0) {
+      body.appendChild(makeBtn('🗑️', '이 칸 비우기', 'danger', () => {
+        activePlan.boxes = activePlan.boxes.filter((b) => b.compartmentIndex !== compIdx);
+        state.selectedBoxIds = [];
+        closeShelfSheet();
+        refreshAll();
+      }));
+    }
+
+    document.body.classList.add('mobile-shelf-sheet-open');
+    refreshAll();
+  }
+
+  function closeShelfSheet() {
+    document.body.classList.remove('mobile-shelf-sheet-open');
+  }
+
+  // 3D 화면 위 '선반 높이' 팝업 내용 그리기
+  function renderShelfHeightPopup() {
+    const body = document.getElementById('mobile-shelfh-body');
+    if (!body) return;
+    if (state.spaceConfig.type !== 'cabinet') {
+      body.innerHTML = `<div class="hint-text">서랍은 선반이 없어요.</div>`;
+      return;
+    }
+    const c = state.spaceConfig.cabinet;
+    body.innerHTML = `
+      <div class="sub-block-title" style="margin-bottom:8px;">
+        <span>선반 높이 (바닥에서 mm)</span>
+        <button id="shelfh-add" class="btn btn-primary btn-sm">+ 선반 넣기</button>
+      </div>
+      <div id="shelfh-list" class="shelf-list"></div>
+    `;
+
+    const listEl = body.querySelector('#shelfh-list');
+    c.shelves.forEach((sh, idx) => {
+      const row = document.createElement('div');
+      row.className = 'shelf-item';
+      row.innerHTML = `
+        <span>선반 ${idx + 1}</span>
+        <input type="number" class="input-box shelfh-y" data-idx="${idx}" value="${sh.bottomY}" step="10" />
+        <span style="display:flex;align-items:center;gap:4px;">두께 <input type="number" class="input-box shelfh-t" data-idx="${idx}" value="${sh.thickness}" step="2" style="width:48px;" /></span>
+        <button class="btn btn-danger btn-sm shelfh-del" data-idx="${idx}">✕</button>
+      `;
+      listEl.appendChild(row);
+    });
+
+    listEl.querySelectorAll('.shelfh-y').forEach((inp) => {
+      inp.addEventListener('change', (e) => {
+        const i = Number(e.target.dataset.idx);
+        c.shelves[i].bottomY = Math.max(30, Math.min(c.h - 30, Number(e.target.value) || 100));
+        refreshAll();
+      });
+    });
+    listEl.querySelectorAll('.shelfh-t').forEach((inp) => {
+      inp.addEventListener('change', (e) => {
+        const i = Number(e.target.dataset.idx);
+        c.shelves[i].thickness = Math.max(5, Math.min(60, Number(e.target.value) || 18));
+        refreshAll();
+      });
+    });
+    listEl.querySelectorAll('.shelfh-del').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const i = Number(e.target.dataset.idx);
+        c.shelves.splice(i, 1);
+        if (state.activeCompartmentIdx > c.shelves.length) state.activeCompartmentIdx = c.shelves.length;
+        refreshAll();
+        renderShelfHeightPopup();
+      });
+    });
+    body.querySelector('#shelfh-add').addEventListener('click', () => {
+      const lastY = c.shelves.length > 0 ? c.shelves[c.shelves.length - 1].bottomY : 0;
+      const nextY = Math.min(c.h - 80, lastY + 350);
+      c.shelves.push({ id: 'sh-' + Date.now(), bottomY: Math.max(80, nextY), thickness: 18 });
+      refreshAll();
+      renderShelfHeightPopup();
+    });
+  }
+
   function handleBundleScreenPos(posInfo) {
     const popupEl = document.getElementById('bundle-floating-popup');
     if (!popupEl) return;
@@ -442,7 +651,7 @@
     popupEl.style.left = `${posInfo.x}px`;
     popupEl.style.top = `${posInfo.y - 12}px`;
     document.getElementById('bundle-popup-label').textContent =
-      `📦 ${posInfo.count}개 수납함 묶음 선택됨`;
+      `📦 상자 ${posInfo.count}개 골랐어요`;
 
     const isCab = state.spaceConfig.type === 'cabinet';
     document.getElementById('btn-bundle-up').style.display = isCab ? 'inline-flex' : 'none';
@@ -454,8 +663,8 @@
     const selBoxes = activePlan.boxes.filter((b) => state.selectedBoxIds.includes(b.id));
     if (selBoxes.length === 0) return;
 
-    const defaultName = `나만의 수납 조합 (${selBoxes.length}개 묶음)`;
-    const name = prompt('저장할 수납함 묶음 조합의 이름을 입력하세요:', defaultName);
+    const defaultName = `내 묶음 (${selBoxes.length}개)`;
+    const name = prompt('이 묶음 이름을 정해주세요:', defaultName);
     if (!name) return;
 
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, minY = Infinity, maxTopY = 0;
@@ -721,7 +930,7 @@
     const currentCompIdx = selBoxes[0].compartmentIndex;
     const targetCompIdx = currentCompIdx + deltaIdx;
     if (targetCompIdx < 0 || targetCompIdx >= compartments.length) {
-      alert(deltaIdx > 0 ? '더 이상 위에 선반 공간이 없습니다.' : '이미 가장 아래(1단) 선반 공간입니다.');
+      alert(deltaIdx > 0 ? '위에 칸이 더 없어요.' : '이미 맨 아래 칸이에요.');
       return;
     }
 
@@ -871,7 +1080,7 @@
     const spaceCard = document.getElementById('floating-space-card');
     spaceCard.classList.toggle('open', state.spaceCardOpen);
     document.getElementById('space-card-chevron').textContent = state.spaceCardOpen ? '∧' : '∨';
-    document.getElementById('space-card-type-badge').textContent = isCab ? '장 형식' : '슬라이딩 서랍';
+    document.getElementById('space-card-type-badge').textContent = isCab ? '문 달린 장' : '빼는 서랍';
 
     const shelfCard = document.getElementById('floating-shelf-card');
     shelfCard.style.display = isCab ? 'flex' : 'none';
@@ -901,7 +1110,7 @@
       const isNoFrame = c.leftFrameW === 0 && c.rightFrameW === 0 && c.topFrameH === 0 && c.bottomFrameH === 0;
       const clearFrameBtn = document.getElementById('btn-clear-doorframe');
       if (clearFrameBtn) {
-        clearFrameBtn.textContent = isNoFrame ? '🔄 기본 문틀 복원' : '문틀 없음(0)';
+        clearFrameBtn.textContent = isNoFrame ? '🔄 문틀 되돌리기' : '문틀 없음(0)';
       }
 
       const hasDoors = c.doorType && c.doorType !== 'none';
@@ -930,8 +1139,8 @@
 
       const cabConst = window.PackerEngine.getCabinetConstraints(state.spaceConfig);
       document.getElementById('cab-opening-summary').innerHTML =
-        `유효 문 개구부: <strong>${cabConst.doorClearW} × ${cabConst.doorClearH} mm</strong> ` +
-        `(좌 사각지대 ${cabConst.leftDeadW}mm / 우 사각지대 ${cabConst.rightDeadW}mm)`;
+        `들어가는 문 크기: <strong>${cabConst.doorClearW} × ${cabConst.doorClearH} mm</strong> ` +
+        `(왼쪽 걸림 ${cabConst.leftDeadW}mm / 오른쪽 걸림 ${cabConst.rightDeadW}mm)`;
 
       const shelfListEl = document.getElementById('shelf-list');
       shelfListEl.innerHTML = '';
@@ -984,8 +1193,8 @@
       const drwConst = window.PackerEngine.getDrawerConstraints(state.spaceConfig);
       const ratioPct = Math.round((drwConst.exposedD / drwConst.totalD) * 100);
       document.getElementById('drw-exposure-summary').innerHTML =
-        `노출 구간: <strong style="color:#3b8a64">${drwConst.exposedD}mm (${ratioPct}%)</strong> / ` +
-        `안쪽 미노출 구간: <strong style="color:#d97706">${drwConst.unexposedD}mm (${100 - ratioPct}%)</strong>`;
+        `보이는 곳: <strong style="color:#3b8a64">${drwConst.exposedD}mm (${ratioPct}%)</strong> / ` +
+        `안 보이는 곳: <strong style="color:#d97706">${drwConst.unexposedD}mm (${100 - ratioPct}%)</strong>`;
     }
   }
 
@@ -1027,10 +1236,8 @@
     displayComps.forEach((comp) => {
       const compBoxes = activePlan.boxes.filter((b) => b.compartmentIndex === comp.index);
       const isSelected = comp.index === state.activeCompartmentIdx;
-      // 모바일 모드에서는 현재 활성화된 칸이 기본적으로 패널에 펼쳐져 직관적으로 조작 가능
-      const isExpanded = (state.uiMode === 'mobile')
-        ? isSelected
-        : comp.index === state.expandedCompartmentIdx;
+      // 누른 칸만 아래로 펴짐 (PC·모바일 동일) — 팝업처럼 동작
+      const isExpanded = comp.index === state.expandedCompartmentIdx;
 
       const wrapper = document.createElement('div');
       wrapper.className = 'shelf-callout-wrapper' +
@@ -1045,9 +1252,9 @@
           <div class="shelf-callout-title">
             <span>📁 ${comp.name}</span>
           </div>
-          <span class="badge">${compBoxes.length}개 배치됨</span>
+          <span class="badge">${compBoxes.length}개 놓음</span>
         </div>
-        <div class="shelf-callout-dims">내경 가로 ${comp.w} × 깊이 ${comp.d} × 유효높이 ${comp.clearH} mm</div>
+        <div class="shelf-callout-dims">가로 ${comp.w} × 깊이 ${comp.d} × 높이 ${comp.clearH} mm</div>
       `;
 
       card.addEventListener('click', () => {
@@ -1079,17 +1286,17 @@
 
         panel.innerHTML = `
           <button class="btn btn-primary btn-lg-cta exp-open-picker-btn">
-            ➕ 이 공간에 수납함 / 저장 조합 추가
+            ➕ 이 칸에 상자 넣기
           </button>
 
           <div class="right-subtabs">
-            <button class="subtab-btn exp-tab-placed ${isPlacedTab ? 'active' : ''}">📋 현재 공간 배치 목록</button>
-            <button class="subtab-btn exp-tab-combos ${!isPlacedTab ? 'active' : ''}">⭐ 저장된 조합 탭 (${state.savedCombos.length})</button>
+            <button class="subtab-btn exp-tab-placed ${isPlacedTab ? 'active' : ''}">📋 지금 놓은 것</button>
+            <button class="subtab-btn exp-tab-combos ${!isPlacedTab ? 'active' : ''}">저장한 묶음 (${state.savedCombos.length})</button>
           </div>
 
           <div class="exp-placed-section" style="display:${isPlacedTab ? 'block' : 'none'};">
             <div style="font-size:0.7rem;color:var(--text-sub);margin-bottom:4px;">
-              💡 목록에서도 <strong>Shift + 클릭</strong>으로 여러 개를 묶음 선택할 수 있습니다.
+              💡 <strong>Shift + 클릭</strong>으로 여러 개 고르기.
             </div>
             <div class="placed-mini-list exp-placed-list"></div>
           </div>
@@ -1100,28 +1307,28 @@
 
           <div style="border-top:1px solid var(--border);padding-top:8px;">
             <button type="button" class="btn exp-toggle-autofill-btn" style="width:100%;justify-content:space-between;background:${state.autofillPanelOpen ? '#f3e5d3' : '#faf5eb'};border-color:#d5c3aa;color:#5c4228;font-weight:700;">
-              <span>⚡ 자동 채우기 기능 (조건별 일괄 배치)</span>
+              <span>⚡ 한 번에 채우기</span>
               <span style="color:#b86b43;font-weight:800;">${state.autofillPanelOpen ? '접기 ∧' : '열기 ∨'}</span>
             </button>
 
             <div class="exp-autofill-body" style="display:${state.autofillPanelOpen ? 'flex' : 'none'};flex-direction:column;gap:7px;margin-top:8px;padding:10px;background:#faf5ec;border:1px solid #e3d5c1;border-radius:8px;">
               <div class="form-group">
-                <label>자동 채우기 방식</label>
+                <label>채우는 방법</label>
                 <select class="exp-autofill-mode">
-                  <option value="single" ${state.autofillMode === 'single' ? 'selected' : ''}>특정 수납함 1종류로 이 공간 최대 채우기</option>
-                  <option value="brand_mix" ${state.autofillMode === 'brand_mix' ? 'selected' : ''}>특정 브랜드 다중 사이즈 조합으로 채우기</option>
+                  <option value="single" ${state.autofillMode === 'single' ? 'selected' : ''}>상자 한 종류로 채우기</option>
+                  <option value="brand_mix" ${state.autofillMode === 'brand_mix' ? 'selected' : ''}>한 브랜드 여러 크기로 채우기</option>
                 </select>
               </div>
 
               <div class="exp-single-group" style="display:${state.autofillMode === 'single' ? 'flex' : 'none'};flex-direction:column;gap:6px;">
                 <div class="form-group">
-                  <label>1. 채울 수납함 브랜드 선택</label>
+                  <label>1. 브랜드</label>
                   <select class="exp-autofill-single-brand">
                     ${brands.map((b) => `<option value="${b}" ${b === state.autofillSingleBrand ? 'selected' : ''}>${b}</option>`).join('')}
                   </select>
                 </div>
                 <div class="form-group">
-                  <label>2. 상세 규격 선택 (${state.autofillSingleBrand})</label>
+                  <label>2. 상자 (${state.autofillSingleBrand})</label>
                   <select class="exp-autofill-model">
                     ${singleBrandModels.map((m) => `<option value="${m.id}" ${m.id === state.selectedCatalogModelId ? 'selected' : ''}>[${m.lineup}] ${m.name} (${m.wTop}×${m.dTop}×H${m.h}mm)</option>`).join('')}
                   </select>
@@ -1129,7 +1336,7 @@
               </div>
 
               <div class="form-group exp-brand-group" style="display:${state.autofillMode === 'brand_mix' ? 'flex' : 'none'};">
-                <label>조합할 브랜드 선택</label>
+                <label>브랜드</label>
                 <select class="exp-autofill-brand">
                   ${brands.map((b) => `<option value="${b}" ${b === state.autofillBrand ? 'selected' : ''}>${b}</option>`).join('')}
                 </select>
@@ -1137,19 +1344,19 @@
 
               <label class="checkbox-row">
                 <input type="checkbox" class="exp-chk-deadzone" ${state.autofillAvoidDeadzone ? 'checked' : ''} />
-                <span>${state.spaceConfig.type === 'cabinet' ? '문설주 및 경첩 사각지대 피해서 채우기' : '서랍 안쪽 미노출 구역 피해서 채우기'}</span>
+                <span>${state.spaceConfig.type === 'cabinet' ? '문에 걸리는 곳 빼기' : '안 보이는 곳 빼기'}</span>
               </label>
               <label class="checkbox-row">
                 <input type="checkbox" class="exp-chk-rotate" ${state.autofillRotate ? 'checked' : ''} />
-                <span>90° 회전 배치 허용 (자투리 공간 활용)</span>
+                <span>필요하면 돌려서 넣기</span>
               </label>
               <label class="checkbox-row">
                 <input type="checkbox" class="exp-chk-stack" ${state.autofillStack ? 'checked' : ''} />
-                <span>적층 가능 모델은 높이 한도까지 위로 자동 쌓기</span>
+                <span>위로 쌓기</span>
               </label>
 
               <button class="btn exp-run-autofill-btn" style="width:100%;margin-top:4px;border-color:var(--accent);background:#fff;color:var(--accent);font-weight:800;">
-                ⚡ 현재 선택된 공간에 자동 채우기 실행
+                ⚡ 이 칸 채우기
               </button>
             </div>
           </div>
@@ -1175,14 +1382,14 @@
         const miniListEl = panel.querySelector('.exp-placed-list');
         const isMultiBundle = state.selectedBoxIds.length >= 2;
         if (compBoxes.length === 0) {
-          miniListEl.innerHTML = `<div style="font-size:0.72rem;color:var(--text-muted);padding:4px;">배치된 수납함이 없습니다.</div>`;
+          miniListEl.innerHTML = `<div style="font-size:0.72rem;color:var(--text-muted);padding:4px;">아직 놓은 상자가 없어요.</div>`;
         } else {
           compBoxes.forEach((box) => {
             const model = state.modelsMap[box.modelId];
             if (!model) return;
             const dims = window.PackerEngine.getOrientedDims(model, box.rot || 0);
             const isSel = state.selectedBoxIds.includes(box.id);
-            const layerTag = (box.y || 0) > 5 ? ` · 높이+${box.y}mm` : '';
+            const layerTag = (box.y || 0) > 5 ? ` · 위로 +${box.y}mm` : '';
 
             const item = document.createElement('div');
             item.className = 'placed-mini-item' + (isSel ? (isMultiBundle ? ' in-bundle' : ' active') : '');
@@ -1191,8 +1398,8 @@
                 <strong>[${model.brand}]</strong> ${model.name} <span style="color:var(--text-muted);">(${dims.w}×${dims.d}${layerTag})</span>
               </div>
               <div style="display:flex;gap:4px;flex-shrink:0;">
-                <button class="btn btn-sm mini-rot-btn" title="90° 회전">↻</button>
-                <button class="btn btn-danger btn-sm mini-del-btn" title="삭제">✕</button>
+                <button class="btn btn-sm mini-rot-btn" title="돌리기">↻</button>
+                <button class="btn btn-danger btn-sm mini-del-btn" title="빼기">✕</button>
               </div>
             `;
             item.addEventListener('click', (e) => {
@@ -1223,7 +1430,7 @@
         // 저장된 조합 탭 채우기
         const comboListEl = panel.querySelector('.exp-combo-list');
         if (state.savedCombos.length === 0) {
-          comboListEl.innerHTML = `<div style="font-size:0.72rem;color:var(--text-muted);padding:4px;">저장된 조합이 없습니다.</div>`;
+          comboListEl.innerHTML = `<div style="font-size:0.72rem;color:var(--text-muted);padding:4px;">저장한 묶음이 없어요.</div>`;
         } else {
           state.savedCombos.forEach((combo) => {
             const fitsSize = combo.totalW <= comp.w && combo.totalD <= comp.d && combo.maxH <= comp.clearH;
@@ -1231,14 +1438,14 @@
             cCard.className = 'saved-combo-card';
             cCard.innerHTML = `
               <div style="flex:1;min-width:0;">
-                <div style="font-weight:700;font-size:0.75rem;">⭐ ${combo.name}</div>
+                <div style="font-weight:700;font-size:0.75rem;">${combo.name}</div>
                 <div style="font-size:0.68rem;color:var(--text-sub);">
                   ${combo.items.length}개 · ${combo.totalW}×${combo.totalD}×H${combo.maxH}mm
-                  <span style="color:${fitsSize ? '#047857' : '#b91c1c'};font-weight:700;">${fitsSize ? '(적합)' : '(초과)'}</span>
+                  <span style="color:${fitsSize ? '#047857' : '#b91c1c'};font-weight:700;">${fitsSize ? '(들어감)' : '(안 들어감)'}</span>
                 </div>
               </div>
               <div style="display:flex;gap:4px;">
-                <button class="btn btn-primary btn-sm c-ins-btn">+ 투입</button>
+                <button class="btn btn-primary btn-sm c-ins-btn">+ 넣기</button>
                 <button class="btn btn-danger btn-sm c-del-btn">✕</button>
               </div>
             `;
@@ -1315,31 +1522,58 @@
     const activeComp = compartments[compIdx] || compartments[0];
 
     document.getElementById('picker-target-space-badge').textContent =
-      `배치할 위치: ${activeComp.name} (내경 ${activeComp.w}×${activeComp.d}×높이 ${activeComp.clearH}mm)`;
+      `놓을 곳: ${activeComp.name} (${activeComp.w}×${activeComp.d}×높이 ${activeComp.clearH}mm)`;
 
     const tabsEl = document.getElementById('picker-brand-tabs');
     tabsEl.innerHTML = '';
 
-    const comboTabBtn = document.createElement('button');
-    comboTabBtn.className = 'brand-tab-btn combo-tab' + (state.pickerBrand === 'COMBOS' ? ' active' : '');
-    comboTabBtn.textContent = `⭐ 저장된 조합 (${state.savedCombos.length})`;
-    comboTabBtn.addEventListener('click', () => {
-      state.pickerBrand = 'COMBOS';
+    // 브랜드 목록: ◀ 전체/브랜드 ▶ 화살표로 넘기기, 글자 누르면 목록 펼침
+    const brandList = ['ALL', ...new Set(state.catalogModels.map((m) => m.brand)), 'COMBOS'];
+    const labelOf = (b) => b === 'ALL' ? '전체' : b === 'COMBOS' ? '저장한 묶음' : b;
+    let curIdx = brandList.indexOf(state.pickerBrand);
+    if (curIdx < 0) curIdx = 0;
+
+    const nav = document.createElement('div');
+    nav.className = 'brand-nav';
+    nav.innerHTML = `
+      <button class="brand-nav-arrow" data-dir="-1" title="이전">◀</button>
+      <button class="brand-nav-label">${labelOf(brandList[curIdx])}</button>
+      <button class="brand-nav-arrow" data-dir="1" title="다음">▶</button>
+    `;
+    const goTo = (idx) => {
+      const n = brandList.length;
+      state.pickerBrand = brandList[((idx % n) + n) % n];
+      state.pickerBrandListOpen = false;
+      renderPickerModalContent();
+    };
+    nav.querySelectorAll('.brand-nav-arrow').forEach((btn) => {
+      btn.addEventListener('click', () => goTo(curIdx + Number(btn.dataset.dir)));
+    });
+    nav.querySelector('.brand-nav-label').addEventListener('click', () => {
+      state.pickerBrandListOpen = !state.pickerBrandListOpen;
       renderPickerModalContent();
     });
-    tabsEl.appendChild(comboTabBtn);
+    tabsEl.appendChild(nav);
+
+    // 글자 누르면 펼쳐지는 전체 목록
+    if (state.pickerBrandListOpen) {
+      const dd = document.createElement('div');
+      dd.className = 'brand-dropdown';
+      brandList.forEach((b) => {
+        const row = document.createElement('button');
+        row.className = 'brand-dropdown-item' + (b === state.pickerBrand ? ' active' : '');
+        row.textContent = labelOf(b);
+        row.addEventListener('click', () => {
+          state.pickerBrand = b;
+          state.pickerBrandListOpen = false;
+          renderPickerModalContent();
+        });
+        dd.appendChild(row);
+      });
+      tabsEl.appendChild(dd);
+    }
 
     const brands = ['ALL', ...new Set(state.catalogModels.map((m) => m.brand))];
-    brands.forEach((b) => {
-      const btn = document.createElement('button');
-      btn.className = 'brand-tab-btn' + (state.pickerBrand === b ? ' active' : '');
-      btn.textContent = b === 'ALL' ? '전체 브랜드' : b;
-      btn.addEventListener('click', () => {
-        state.pickerBrand = b;
-        renderPickerModalContent();
-      });
-      tabsEl.appendChild(btn);
-    });
 
     const gridEl = document.getElementById('picker-cards-grid');
     gridEl.innerHTML = '';
@@ -1351,7 +1585,7 @@
       });
 
       if (filteredCombos.length === 0) {
-        gridEl.innerHTML = `<div style="grid-column:1/-1;padding:24px;text-align:center;color:var(--text-sub);">저장된 조합이 없습니다.</div>`;
+        gridEl.innerHTML = `<div style="grid-column:1/-1;padding:24px;text-align:center;color:var(--text-sub);">저장한 묶음이 없어요.</div>`;
         return;
       }
 
@@ -1362,25 +1596,24 @@
           .map((it) => state.modelsMap[it.modelId]?.name || it.modelId)
           .slice(0, 3)
           .join(', ') + (combo.items.length > 3 ? ` 외 ${combo.items.length - 3}개` : '');
-
         const card = document.createElement('div');
         card.className = 'picker-card';
         card.innerHTML = `
           <div class="picker-thumb">
-            <span class="picker-brand-badge" style="background:#b45309;">⭐ 저장된 묶음 조합</span>
-            <span class="picker-fit-badge ${fits ? 'fit-ok' : 'fit-warn'}">${fits ? '✓ 현재 공간 투입 가능' : '⚠️ 공간 크기 확인'}</span>
+            <span class="picker-brand-badge" style="background:#b45309;">저장한 묶음</span>
+            <span class="picker-fit-badge ${fits ? 'fit-ok' : 'fit-warn'}">${fits ? '들어감' : '크기 확인'}</span>
             ${svgHtml}
           </div>
           <div class="picker-body">
-            <div class="picker-lineup">총 ${combo.items.length}개 수납함 구성</div>
+            <div class="picker-lineup">상자 ${combo.items.length}개</div>
             <div class="picker-title">${combo.name}</div>
             <div class="picker-spec-box">
-              <strong>묶음 전체 규격:</strong> 가로 ${combo.totalW} × 깊이 ${combo.totalD} × 최대높이 ${combo.maxH} mm<br>
-              <span style="font-size:0.7rem;color:var(--text-muted);">구성: ${itemNames}</span>
+              <strong>묶음 크기:</strong> 가로 ${combo.totalW} × 깊이 ${combo.totalD} × 높이 ${combo.maxH} mm<br>
+              <span style="font-size:0.7rem;color:var(--text-muted);">들어있는 것: ${itemNames}</span>
             </div>
             <div style="display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:8px;">
-              <button class="btn btn-primary btn-sm combo-pick-insert">+ 이 공간에 조합 투입</button>
-              <button class="btn btn-danger btn-sm combo-pick-del">삭제</button>
+              <button class="btn btn-primary btn-sm combo-pick-insert">+ 이 칸에 넣기</button>
+              <button class="btn btn-danger btn-sm combo-pick-del">빼기</button>
             </div>
           </div>
         `;
@@ -1416,48 +1649,115 @@
       const fitInfo = window.PackerEngine.checkModelFitForCompartment(state.spaceConfig, compIdx, model);
       const isTapered = model.shapeType === 'tapered' && (model.wBot !== model.wTop || model.dBot !== model.dTop);
       const specHtml = isTapered
-        ? `<strong>외경 규격:</strong> 가로 ${model.wTop} × 깊이 ${model.dTop} × 높이 ${model.h} mm<br><span style="font-size:0.7rem;">(바닥 하단: ${model.wBot} × ${model.dBot} mm)</span>`
-        : `<strong>외경 규격:</strong> 가로 ${model.wTop} × 깊이 ${model.dTop} × 높이 ${model.h} mm`;
+        ? `<strong>크기:</strong> 가로 ${model.wTop} × 깊이 ${model.dTop} × 높이 ${model.h} mm<br><span style="font-size:0.7rem;">(바닥: ${model.wBot} × ${model.dBot} mm)</span>`
+        : `<strong>크기:</strong> 가로 ${model.wTop} × 깊이 ${model.dTop} × 높이 ${model.h} mm`;
 
       const svgHtml = window.getProductThumbnailSVG ? window.getProductThumbnailSVG(model) : '';
+      const qty = state.pickerCart[model.id] || 0;
 
       const card = document.createElement('div');
-      card.className = 'picker-card';
+      card.className = 'picker-card pick-slide-card pick-row-card';
+      card.dataset.modelId = model.id;
+      const sizeLine = `${model.wTop}×${model.dTop}×${model.h}`;
       card.innerHTML = `
-        <div class="picker-thumb">
-          <span class="picker-brand-badge">${model.brand}</span>
-          <span class="picker-fit-badge ${fitInfo.ok ? 'fit-ok' : 'fit-warn'}">${fitInfo.reason}</span>
+        <div class="pick-row-thumb">
           ${svgHtml}
+          <span class="pick-qty-badge" style="display:${qty > 0 ? 'flex' : 'none'};">${qty}</span>
         </div>
-        <div class="picker-body">
-          <div class="picker-lineup">${model.lineup}</div>
-          <div class="picker-title">${model.name}</div>
-          <div class="picker-spec-box">${specHtml}</div>
-          <div class="picker-tags">
-            <span class="mini-tag">${window.SHAPE_TYPE_LABELS[model.shapeType] || '직육면체'}</span>
-            <span class="mini-tag">${window.ACCESS_TYPE_LABELS[model.accessType] || '상단 오픈형'}</span>
+        <div class="pick-row-main">
+          <div class="pick-row-top">
+            <span class="pick-row-brand">${model.brand}</span>
+            <span class="picker-fit-badge ${fitInfo.ok ? 'fit-ok' : 'fit-warn'}">${fitInfo.reason}</span>
           </div>
-          <div style="display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:8px;">
-            <button class="btn btn-primary btn-sm pick-add-normal">+ 이 공간에 추가</button>
-            <button class="btn btn-sm pick-add-rot" title="90도 회전한 상태로 추가">↻ 90° 회전 추가</button>
-          </div>
+          <div class="pick-row-name">${model.name}</div>
+          <div class="pick-row-size">${sizeLine} mm</div>
+        </div>
+        <div class="pick-row-qty">
+          <button class="pick-minus" title="빼기">−</button>
+          <span class="pick-row-qtynum">${qty}</span>
+          <button class="pick-plus" title="담기">＋</button>
         </div>
       `;
 
-      card.querySelector('.pick-add-normal').addEventListener('click', () => {
-        state.selectedCatalogModelId = model.id;
-        addBoxToActiveSpace(model.id, 0);
-        document.getElementById('modal-box-picker').classList.remove('open');
-      });
+      const syncQty = () => {
+        const n = state.pickerCart[model.id] || 0;
+        const badge = card.querySelector('.pick-qty-badge');
+        badge.textContent = n;
+        badge.style.display = n > 0 ? 'flex' : 'none';
+        card.querySelector('.pick-row-qtynum').textContent = n;
+      };
 
-      card.querySelector('.pick-add-rot').addEventListener('click', () => {
-        state.selectedCatalogModelId = model.id;
-        addBoxToActiveSpace(model.id, 90);
-        document.getElementById('modal-box-picker').classList.remove('open');
+      const addOne = () => {
+        state.pickerCart[model.id] = (state.pickerCart[model.id] || 0) + 1;
+        updatePickerCartBar();
+        syncQty();
+        card.classList.add('pick-bump');
+        setTimeout(() => card.classList.remove('pick-bump'), 180);
+      };
+      const removeOne = () => {
+        const cur = state.pickerCart[model.id] || 0;
+        if (cur <= 0) return;
+        if (cur - 1 <= 0) delete state.pickerCart[model.id];
+        else state.pickerCart[model.id] = cur - 1;
+        updatePickerCartBar();
+        syncQty();
+      };
+
+      card.querySelector('.pick-plus').addEventListener('click', addOne);
+      card.querySelector('.pick-minus').addEventListener('click', removeOne);
+
+      // 가로 슬라이드: 오른쪽 +1, 왼쪽 -1
+      let startX = null, moved = false;
+      card.addEventListener('pointerdown', (e) => { startX = e.clientX; moved = false; });
+      card.addEventListener('pointermove', (e) => {
+        if (startX === null) return;
+        const dx = e.clientX - startX;
+        if (Math.abs(dx) > 6) e.preventDefault();
+        card.style.transform = `translateX(${Math.max(-50, Math.min(50, dx))}px)`;
+        if (Math.abs(dx) > 44 && !moved) {
+          moved = true;
+          if (dx > 0) addOne(); else removeOne();
+          startX = e.clientX;
+        }
       });
+      const endSlide = () => { startX = null; card.style.transform = ''; };
+      card.addEventListener('pointerup', endSlide);
+      card.addEventListener('pointercancel', endSlide);
+      card.addEventListener('pointerleave', endSlide);
 
       gridEl.appendChild(card);
     });
+
+    updatePickerCartBar();
+  }
+
+  // 담기 바구니 하단 바 갱신
+  function updatePickerCartBar() {
+    const countEl = document.getElementById('picker-cart-count');
+    const btn = document.getElementById('btn-picker-cart-add');
+    const bar = document.getElementById('picker-cart-bar');
+    if (!countEl || !btn || !bar) return;
+    // 저장한 묶음 탭에서는 담기 바 숨김
+    bar.style.display = state.pickerBrand === 'COMBOS' ? 'none' : 'flex';
+    const total = Object.values(state.pickerCart).reduce((a, b) => a + b, 0);
+    countEl.textContent = `담은 상자 ${total}개`;
+    btn.textContent = total > 0 ? `${total}개 담기` : '담기';
+    btn.disabled = total === 0;
+  }
+
+  // 바구니에 담은 상자들을 현재 칸에 한 번에 넣기
+  function applyPickerCart() {
+    const entries = Object.entries(state.pickerCart);
+    if (entries.length === 0) return;
+    entries.forEach(([modelId, qty]) => {
+      for (let i = 0; i < qty; i++) {
+        addBoxToActiveSpace(modelId, 0);
+      }
+    });
+    state.pickerCart = {};
+    updatePickerCartBar();
+    document.getElementById('modal-box-picker').classList.remove('open');
+    refreshAll();
   }
 
   function renderSelectedBoxInspector() {
@@ -1483,14 +1783,14 @@
       const model = state.modelsMap[box.modelId];
       if (!model) return;
       const dims = window.PackerEngine.getOrientedDims(model, box.rot || 0);
-      const yInfo = (box.y || 0) > 0 ? ` · 바닥에서 +${box.y}mm 적층됨` : '';
+      const yInfo = (box.y || 0) > 0 ? ` · 바닥에서 +${box.y}mm 위` : '';
       document.getElementById('sel-box-title').innerHTML =
         `<strong>[${model.brand}] ${model.name}</strong> ` +
         `<span style="color:var(--text-sub);font-size:0.74rem;">(${dims.w}×${dims.d}×H${dims.h}mm, ${box.rot || 0}°${yInfo})</span>`;
     } else {
       saveComboBtn.style.display = 'inline-flex';
       document.getElementById('sel-box-title').innerHTML =
-        `<strong style="color:#b45309;">📦 묶음 선택됨 (${selBoxes.length}개)</strong>`;
+        `<strong style="color:#b45309;">📦 상자 ${selBoxes.length}개 골랐어요</strong>`;
     }
   }
 
@@ -1504,21 +1804,21 @@
     const mobileErrLabel = document.getElementById('mobile-nav-err-label');
 
     if (val.messages.length === 0) {
-      tabTitle.textContent = `에러코드 (이상 없음 ✓)`;
-      if (mobileErrLabel) mobileErrLabel.textContent = `에러(0)`;
+      tabTitle.textContent = `문제 알림 (괜찮아요)`;
+      if (mobileErrLabel) mobileErrLabel.textContent = `문제(0)`;
       const okDiv = document.createElement('div');
       okDiv.className = 'alert-item alert-ok';
-      okDiv.textContent = `✓ 모든 수납함이 문설주·경첩·높이 간섭 없이 정상 배치되었습니다.`;
+      okDiv.textContent = `걸리는 곳 없이 잘 놓였어요.`;
       container.appendChild(okDiv);
       return;
     }
 
-    tabTitle.textContent = `에러코드 (${val.messages.length})`;
-    if (mobileErrLabel) mobileErrLabel.textContent = `에러(${val.messages.length})`;
+    tabTitle.textContent = `문제 알림 (${val.messages.length})`;
+    if (mobileErrLabel) mobileErrLabel.textContent = `문제(${val.messages.length})`;
     val.messages.forEach((m) => {
       const div = document.createElement('div');
       div.className = 'alert-item ' + (m.severity === 'error' ? 'alert-error' : 'alert-warn');
-      div.textContent = (m.severity === 'error' ? '⛔ ' : '⚠️ ') + m.text;
+      div.textContent = (m.severity === 'error' ? '[문제] ' : '[주의] ') + m.text;
       div.style.cursor = 'pointer';
       div.addEventListener('click', () => {
         if (m.boxId) {
@@ -1545,15 +1845,15 @@
       if (plan.id === state.activePlanId) tr.className = 'active-row';
 
       const statusBadge = metrics.errorCount > 0
-        ? `<span style="color:#c94a4a;font-weight:700;">오류 ${metrics.errorCount}</span>`
+        ? `<span style="color:#c94a4a;font-weight:700;">문제 ${metrics.errorCount}</span>`
         : metrics.warnCount > 0
         ? `<span style="color:#d97706;font-weight:700;">주의 ${metrics.warnCount}</span>`
-        : `<span style="color:#3b8a64;font-weight:700;">적합</span>`;
+        : `<span style="color:#3b8a64;font-weight:700;">괜찮음</span>`;
 
       tr.innerHTML = `
         <td style="text-align:left;cursor:pointer;font-weight:700;">${plan.name}</td>
         <td>${metrics.totalCount}개</td>
-        <td><strong>${metrics.areaPercent}%</strong> (체적 ${metrics.volPercent}%)</td>
+        <td><strong>${metrics.areaPercent}%</strong> (부피 ${metrics.volPercent}%)</td>
         <td>가로 ${metrics.remW} / 깊이 ${metrics.remD}</td>
         <td>${statusBadge}</td>
       `;
@@ -1574,11 +1874,13 @@
     document.getElementById('btn-mode-mobile')?.classList.toggle('active', mode === 'mobile');
     document.getElementById('btn-mode-pc')?.classList.toggle('active', mode === 'pc');
 
-    // 모바일 모드 진입 시 선반 탭 기본 활성화
     if (mode === 'mobile') {
-      document.body.setAttribute('data-active-mtab', state.activeMobileTab || 'shelves');
+      // 3D 단계의 기본은 순수 3D 화면(오버레이 없음), 단계는 저장된 상태(처음엔 설정)
+      document.body.setAttribute('data-active-mtab', state.activeMobileTab || 'none');
+      setMobileStep(state.mobileStep || 'setup');
     } else {
       document.body.removeAttribute('data-active-mtab');
+      document.body.classList.remove('mobile-step-setup', 'mobile-step-build');
     }
 
     renderShelfCalloutCards();
@@ -1587,18 +1889,43 @@
     }, 60);
   }
 
+  // 모바일 단계 전환: 'setup'(장 설정만) <-> 'build'(3D 상자 배치)
+  function setMobileStep(step) {
+    state.mobileStep = step;
+    document.body.classList.toggle('mobile-step-setup', step === 'setup');
+    document.body.classList.toggle('mobile-step-build', step === 'build');
+
+    const spaceCard = document.getElementById('floating-space-card');
+    const shelfBody = document.querySelector('#floating-shelf-card .accordion-body');
+    const spaceBody = document.querySelector('#floating-space-card .accordion-body');
+
+    if (step === 'setup') {
+      // 설정 단계: 선반 설정 내용을 가구 카드 본문 끝에 이어 붙여 한 화면에서 전부 보이게
+      if (shelfBody && spaceBody && state.spaceConfig.type === 'cabinet' && !spaceBody.contains(shelfBody)) {
+        spaceBody.appendChild(shelfBody);
+      }
+      state.spaceCardOpen = true;
+    } else {
+      // 3D 단계: 선반 본문을 원래 선반 카드로 되돌림
+      const shelfCard = document.getElementById('floating-shelf-card');
+      if (shelfBody && shelfCard && !shelfCard.contains(shelfBody)) {
+        shelfCard.appendChild(shelfBody);
+      }
+    }
+
+    renderLeftAccordionCards();
+    setTimeout(() => {
+      window.Scene3DManager.resize();
+    }, 60);
+  }
+
   function setActiveMobileTab(tabKey) {
     state.activeMobileTab = tabKey;
-    state.mobileSheetCollapsed = false;
-    document.body.classList.remove('mobile-sheet-collapsed');
     document.body.setAttribute('data-active-mtab', tabKey);
 
     document.querySelectorAll('.mobile-nav-tab[data-mtab]').forEach((t) => {
       t.classList.toggle('active', t.dataset.mtab === tabKey);
     });
-
-    const chevron = document.getElementById('mobile-sheet-chevron');
-    if (chevron) chevron.textContent = '🔽';
 
     renderShelfCalloutCards();
     setTimeout(() => {
@@ -1607,15 +1934,8 @@
   }
 
   function toggleMobileSheet() {
-    state.mobileSheetCollapsed = !state.mobileSheetCollapsed;
-    document.body.classList.toggle('mobile-sheet-collapsed', state.mobileSheetCollapsed);
-    const chevron = document.getElementById('mobile-sheet-chevron');
-    if (chevron) {
-      chevron.textContent = state.mobileSheetCollapsed ? '🔼' : '🔽';
-    }
-    setTimeout(() => {
-      window.Scene3DManager.resize();
-    }, 60);
+    // 3D 단계에서 열린 탭 오버레이(상자/문제)를 닫고 순수 3D로 돌아감
+    setActiveMobileTab('none');
   }
 
   function bindEvents() {
@@ -1628,6 +1948,31 @@
       btn.addEventListener('click', () => setActiveMobileTab(btn.dataset.mtab));
     });
     document.getElementById('btn-mobile-sheet-toggle')?.addEventListener('click', toggleMobileSheet);
+
+    // 모바일 단계 전환 버튼
+    document.getElementById('btn-mobile-setup-done')?.addEventListener('click', () => {
+      setMobileStep('build');
+      setActiveMobileTab('none');
+    });
+    document.getElementById('btn-mobile-edit-setup')?.addEventListener('click', () => {
+      setMobileStep('setup');
+    });
+
+    // 선반 높이 팝업 열기/닫기
+    document.getElementById('btn-mobile-shelf-height')?.addEventListener('click', () => {
+      renderShelfHeightPopup();
+      document.body.classList.add('mobile-shelfh-open');
+    });
+    document.getElementById('btn-mobile-shelfh-close')?.addEventListener('click', () => {
+      document.body.classList.remove('mobile-shelfh-open');
+    });
+
+    // 선반 바텀시트 닫기
+    document.getElementById('mobile-shelf-sheet-close')?.addEventListener('click', closeShelfSheet);
+    document.getElementById('mobile-shelf-sheet-backdrop')?.addEventListener('click', closeShelfSheet);
+
+    // 상자 고르기 창의 '담기' 버튼
+    document.getElementById('btn-picker-cart-add')?.addEventListener('click', applyPickerCart);
 
     // 좌상단 & 좌하단 아코디언 토글
     document.getElementById('btn-toggle-space-card').addEventListener('click', () => {
@@ -1662,7 +2007,7 @@
     const touchBtn = document.getElementById('btn-touch-multiselect');
     touchBtn.addEventListener('click', () => {
       state.touchMultiSelectMode = !state.touchMultiSelectMode;
-      touchBtn.textContent = state.touchMultiSelectMode ? '🔗 터치 묶음선택: ON' : '🔗 터치 묶음선택: OFF';
+      touchBtn.textContent = state.touchMultiSelectMode ? '여러 개 고르기: 켜짐' : '여러 개 고르기: 꺼짐';
       touchBtn.classList.toggle('btn-warning', state.touchMultiSelectMode);
       refreshAll();
     });
@@ -1805,7 +2150,7 @@
 
     // 5. 시안(Plan) 추가 / 비우기 / 비교표 모달
     document.getElementById('btn-add-plan').addEventListener('click', () => {
-      const name = prompt('새 비교 시안의 이름을 입력하세요:', `시안 ${String.fromCharCode(65 + state.plans.length)}`);
+      const name = prompt('새 계획 이름을 정해주세요:', `계획 ${String.fromCharCode(65 + state.plans.length)}`);
       if (!name) return;
       const newPlan = {
         id: 'plan-' + Date.now(),
@@ -1937,9 +2282,9 @@
     });
 
     document.getElementById('btn-save-custom-box').addEventListener('click', () => {
-      const brand = document.getElementById('new-box-brand').value.trim() || '내 커스텀';
-      const lineup = document.getElementById('new-box-lineup').value.trim() || '기본 라인업';
-      const name = document.getElementById('new-box-name').value.trim() || '커스텀 수납함';
+      const brand = document.getElementById('new-box-brand').value.trim() || '내 상자';
+      const lineup = document.getElementById('new-box-lineup').value.trim() || '내 종류';
+      const name = document.getElementById('new-box-name').value.trim() || '내 상자';
       const wTop = Math.max(20, Number(document.getElementById('new-box-wtop').value) || 200);
       const dTop = Math.max(20, Number(document.getElementById('new-box-dtop').value) || 200);
       const h = Math.max(20, Number(document.getElementById('new-box-h').value) || 120);

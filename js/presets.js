@@ -360,15 +360,15 @@ window.DEFAULT_SAVED_COMBOS = [
 ];
 
 window.ACCESS_TYPE_LABELS = {
-  front_drawer: '전면 서랍형',
-  top_open: '상단 오픈형',
-  top_lid: '상단 뚜껑형',
-  front_open: '전면 손잡이형'
+  front_drawer: '앞으로 빼는 서랍',
+  top_open: '위가 열린 통',
+  top_lid: '위 뚜껑',
+  front_open: '앞 손잡이'
 };
 
 window.SHAPE_TYPE_LABELS = {
-  box: '직육면체',
-  tapered: '테이퍼드(바구니형)'
+  box: '네모 반듯',
+  tapered: '바구니 모양'
 };
 
 // 개별 수납함 입체 예시 일러스트(SVG) 생성기

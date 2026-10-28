@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>StorageFit 3D - 우리집 옷장·서랍 수납함 3D 시뮬레이터</title>
+  <title>수납 공간 꾸미기 - 옷장·서랍 3D로 짜보기</title>
   <link rel="stylesheet" href="styles.css" />
   <!-- Three.js & OrbitControls CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -13,25 +13,25 @@
   <!-- ==================== 상단 헤더 ==================== -->
   <header class="app-header">
     <div class="brand-title">
-      <span>🏡 StorageFit 3D</span>
-      <div class="ui-mode-switch" role="group" aria-label="인터페이스 모드 선택">
-        <button id="btn-mode-mobile" type="button" class="mode-switch-btn active" title="스마트폰 화면에 맞춘 분할형 깔끔한 UI">📱 모바일</button>
-        <button id="btn-mode-pc" type="button" class="mode-switch-btn" title="넓은 화면용 플로팅 다중 패널 UI">🖥️ PC</button>
+      <span>수납 공간 꾸미기</span>
+      <div class="ui-mode-switch" role="group" aria-label="화면 종류 고르기">
+        <button id="btn-mode-mobile" type="button" class="mode-switch-btn active" title="폰 화면에 맞춘 화면">폰</button>
+        <button id="btn-mode-pc" type="button" class="mode-switch-btn" title="큰 화면에 맞춘 화면">큰 화면</button>
       </div>
     </div>
 
     <!-- 중앙 시안 탭 바 -->
     <div class="header-plan-tabs">
       <div id="plan-tabs-list" style="display:flex;gap:6px;"></div>
-      <button id="btn-add-plan" class="plan-tab" title="새 비교 시안 추가" style="padding:5px 12px;">＋</button>
-      <button id="btn-open-report-modal" class="btn btn-sm" style="margin-left:4px;">📊 시안 비교표</button>
+      <button id="btn-add-plan" class="plan-tab" title="새 계획 추가" style="padding:5px 12px;">＋</button>
+      <button id="btn-open-report-modal" class="btn btn-sm" style="margin-left:4px;">계획 비교</button>
     </div>
 
     <div class="header-actions">
-      <span id="db-status-badge" class="badge" style="background:#f3ebd9;color:#6e5236;border:1px solid #d5c3aa;font-size:0.7rem;" title="클라우드 DB 연결 상태">⚪ 로컬 모드</span>
-      <button id="btn-share-plan-link" class="btn btn-primary" title="현재 옷장/서랍 치수와 3D 수납함 배치를 링크로 공유합니다">🔗 링크 공유</button>
-      <button id="btn-open-compare-modal" class="btn">🔍 1:1 비교</button>
-      <button id="btn-open-custom-modal" class="btn">+ 수납함 등록</button>
+      <span id="db-status-badge" class="badge" style="background:#f3ebd9;color:#6e5236;border:1px solid #d5c3aa;font-size:0.7rem;" title="지금 내 기기에 저장 중">내 기기에 저장</span>
+      <button id="btn-share-plan-link" class="btn btn-primary" title="지금 짠 걸 링크로 보내기">링크로 보내기</button>
+      <button id="btn-open-compare-modal" class="btn">둘이 나란히 보기</button>
+      <button id="btn-open-custom-modal" class="btn">내 상자 만들기</button>
     </div>
   </header>
 
@@ -40,27 +40,53 @@
     <!-- 3D 캔버스 -->
     <div id="canvas-wrapper"></div>
 
+    <!-- [모바일 전용] 3D 화면 위 '장 설정' 돌아가기 버튼 -->
+    <button id="btn-mobile-edit-setup" class="mobile-edit-setup-btn" type="button">장 설정</button>
+
+    <!-- [모바일 전용] 3D 화면 오른쪽 위 '선반 높이' 버튼 + 상단 팝업 -->
+    <button id="btn-mobile-shelf-height" class="mobile-shelfh-btn" type="button">선반 높이</button>
+    <div id="mobile-shelfh-popup" class="mobile-shelfh-popup">
+      <div class="mobile-shelfh-head">
+        <span>선반 높이</span>
+        <button id="btn-mobile-shelfh-close" class="btn btn-sm">✕</button>
+      </div>
+      <div id="mobile-shelfh-body"></div>
+    </div>
+
     <!-- 3D 가구 선반과 우측 선반 공간 카드를 연결하는 리더라인 SVG -->
     <svg id="shelf-leader-svg"></svg>
 
+    <!-- [모바일 전용] 각 선반 옆 ＋버튼 레이어 -->
+    <div id="mobile-shelf-buttons"></div>
+
+    <!-- [모바일 전용] 선반 메뉴 바텀시트 (＋버튼 누르면 아래에서 올라옴) -->
+    <div id="mobile-shelf-sheet-backdrop" class="mobile-sheet-backdrop"></div>
+    <div id="mobile-shelf-sheet" class="mobile-shelf-sheet">
+      <div class="mobile-shelf-sheet-head">
+        <span id="mobile-shelf-sheet-title">칸</span>
+        <button id="mobile-shelf-sheet-close" class="btn btn-sm">✕</button>
+      </div>
+      <div id="mobile-shelf-sheet-body"></div>
+    </div>
+
     <!-- [중앙 상단] How to use 헬프 버튼 & 팝오버 -->
     <div class="how-to-use-wrap">
-      <button id="btn-how-to-use" class="btn-how-to-use">How to use</button>
+      <button id="btn-how-to-use" class="btn-how-to-use">사용법</button>
       <div id="how-to-use-popover" class="how-to-use-popover">
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <strong style="font-size:0.88rem;">묶음 선택 & 조작 팁 (PC / 스마트폰 공통)</strong>
+          <strong style="font-size:0.88rem;">상자 고르고 옮기기</strong>
           <button id="btn-close-howto" class="btn btn-sm">✕</button>
         </div>
         <div class="hint-text" style="color:var(--text-main);font-size:0.76rem;line-height:1.5;">
-          • <strong>자동 위로 적층:</strong> 수납함을 다른 수납함 위치로 드래그하거나 새로 추가하면 <strong>자동으로 그 위로 차곡차곡 쌓입니다.</strong><br>
-          • <strong>묶음 선택 (PC Shift+클릭 / 모바일 '🔗묶음모드'):</strong> 여러 수납함을 묶음 선택합니다.<br>
-          • <strong>묶음 드래그:</strong> 묶인 상태에서 드래그하면 대형 그대로 함께 이동합니다.<br>
-          • <strong>묶음 내 재클릭:</strong> 묶인 상태에서 특정 수납함을 한 번 더 클릭(탭)하면 묶음이 풀리고 해당 수납함만 단독 선택됩니다.
+          • <strong>위에 쌓기:</strong> 상자를 다른 상자 위로 끌면 <strong>차곡차곡 쌓여요.</strong><br>
+          • <strong>여러 개 고르기 (큰 화면은 Shift+클릭, 폰은 '여러 개'):</strong> 상자 여러 개를 한 번에 골라요.<br>
+          • <strong>함께 옮기기:</strong> 여러 개 고른 채 끌면 같이 움직여요.<br>
+          • <strong>하나만 고르기:</strong> 고른 상태에서 상자를 다시 누르면 그것만 골라져요.
         </div>
         <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:0.73rem;padding-top:4px;border-top:1px solid var(--border);">
-          <span><i class="legend-dot" style="background:#dc2626;"></i>문설주 사각지대/오류</span>
-          <span><i class="legend-dot" style="background:#f59e0b;"></i>묶음 선택 & 미노출 구간</span>
-          <span><i class="legend-dot" style="background:#3b8a64;"></i>서랍 완전 노출 구간</span>
+          <span><i class="legend-dot" style="background:#dc2626;"></i>문에 걸림 / 문제</span>
+          <span><i class="legend-dot" style="background:#f59e0b;"></i>여러 개 고름 / 안 보이는 곳</span>
+          <span><i class="legend-dot" style="background:#3b8a64;"></i>서랍 다 보이는 곳</span>
         </div>
       </div>
     </div>
@@ -70,22 +96,20 @@
       <button id="btn-toggle-space-card" class="accordion-trigger" type="button">
         <div id="space-card-chevron" class="accordion-brown-bar">∨</div>
         <div class="accordion-title-row">
-          <span>우리집 수납 가구 유형 선택</span>
-          <span id="space-card-type-badge" class="badge">장 형식</span>
+          <span>가구 종류</span>
+          <span id="space-card-type-badge" class="badge">문 달린 장</span>
         </div>
       </button>
 
       <div class="accordion-body">
         <div class="space-type-grid">
           <div id="card-type-cabinet" class="type-card active">
-            <div class="type-card-icon">🚪</div>
-            <div class="type-card-title">1. 장 형식 (여닫이)</div>
-            <div class="type-card-desc">옷장·벽장·주방장<br>다단 선반 & 문설주·경첩</div>
+            <div class="type-card-title">문 달린 장</div>
+            <div class="type-card-desc">옷장·벽장·주방장<br>선반 칸, 문틀</div>
           </div>
           <div id="card-type-drawer" class="type-card">
-            <div class="type-card-icon">🗄️</div>
-            <div class="type-card-title">2. 슬라이딩 서랍</div>
-            <div class="type-card-desc">손잡이 인출식 서랍장<br>실제 깊이 vs 노출 깊이</div>
+            <div class="type-card-title">빼는 서랍</div>
+            <div class="type-card-desc">손잡이로 빼는 서랍<br>보이는 깊이</div>
           </div>
         </div>
 
@@ -93,19 +117,19 @@
         <div id="cabinet-config-section">
           <div class="sub-block">
             <div class="sub-block-title">
-              <span>장 내부 전체 치수 (mm)</span>
+              <span>장 안쪽 크기 (mm)</span>
             </div>
             <div class="form-grid-3">
               <div class="form-group">
-                <label>내부 너비(W)</label>
+                <label>가로</label>
                 <input id="cab-w" type="number" class="input-box" value="800" step="10" />
               </div>
               <div class="form-group">
-                <label>내부 깊이(D)</label>
+                <label>세로(깊이)</label>
                 <input id="cab-d" type="number" class="input-box" value="450" step="10" />
               </div>
               <div class="form-group">
-                <label>내부 높이(H)</label>
+                <label>높이</label>
                 <input id="cab-h" type="number" class="input-box" value="1450" step="10" />
               </div>
             </div>
@@ -113,39 +137,39 @@
 
           <div class="sub-block">
             <div class="sub-block-title">
-              <span>문설주(문틀) 및 여닫이 경첩 설정</span>
-              <button id="btn-clear-doorframe" class="btn btn-sm" title="0으로 설정하면 문 너비 = 내부 너비로 가정합니다">문틀 없음(0)</button>
+              <span>문틀과 문 걸림</span>
+              <button id="btn-clear-doorframe" class="btn btn-sm" title="0으로 하면 문 너비 = 장 너비로 봐요">문틀 없음(0)</button>
             </div>
             <div class="form-grid-2">
               <div class="form-group">
-                <label>좌측 문설주 폭(mm)</label>
+                <label>왼쪽 문틀</label>
                 <input id="cab-left-frame" type="number" class="input-box" value="35" step="5" />
               </div>
               <div class="form-group">
-                <label>우측 문설주 폭(mm)</label>
+                <label>오른쪽 문틀</label>
                 <input id="cab-right-frame" type="number" class="input-box" value="35" step="5" />
               </div>
               <div class="form-group">
-                <label>상단 문틀 높이(mm)</label>
+                <label>위 문틀</label>
                 <input id="cab-top-frame" type="number" class="input-box" value="30" step="5" />
               </div>
               <div class="form-group">
-                <label>하단 문틀 높이(mm)</label>
+                <label>아래 문틀</label>
                 <input id="cab-bot-frame" type="number" class="input-box" value="20" step="5" />
               </div>
             </div>
             <div class="form-grid-2">
               <div class="form-group">
-                <label>여닫이 문 방향</label>
+                <label>문 여는 방향</label>
                 <select id="cab-door-type">
-                  <option value="none">문 없음 (오픈장)</option>
-                  <option value="double" selected>양문형 (좌+우 경첩)</option>
-                  <option value="left">좌여닫이 (좌측 경첩)</option>
-                  <option value="right">우여닫이 (우측 경첩)</option>
+                  <option value="none">문 없음 (열린 장)</option>
+                  <option value="double" selected>양쪽 문 (좌+우)</option>
+                  <option value="left">왼쪽으로 열림</option>
+                  <option value="right">오른쪽으로 열림</option>
                 </select>
               </div>
               <div class="form-group">
-                <label>경첩 돌출 간섭폭(mm)</label>
+                <label>문 걸리는 폭(mm)</label>
                 <input id="cab-hinge-w" type="number" class="input-box" value="22" step="2" />
               </div>
             </div>
@@ -154,13 +178,13 @@
             <div id="door-angle-wrapper" style="display:flex;flex-direction:column;gap:6px;margin-top:2px;">
               <div style="display:flex;align-items:center;gap:6px;">
                 <button id="btn-door-angle-toggle" type="button" class="btn btn-sm" style="flex:1;justify-content:space-between;border-color:#c29c74;background:#fffaf0;color:#5c4228;font-weight:700;">
-                  <span>🚪 문 개방각도</span>
+                  <span>문 열리는 각도</span>
                   <span id="door-angle-badge" style="color:#b86b43;font-weight:800;">75° ▾</span>
                 </button>
               </div>
               <div id="door-angle-panel" style="display:flex;flex-direction:column;gap:6px;background:#f8f1e3;border:1px solid #e2d5c1;border-radius:8px;padding:8px 10px;">
                 <div style="display:flex;align-items:center;gap:8px;">
-                  <span style="font-size:0.72rem;font-weight:700;color:#6e5236;white-space:nowrap;">각도 조절</span>
+                  <span style="font-size:0.72rem;font-weight:700;color:#6e5236;white-space:nowrap;">각도 맞추기</span>
                   <input id="cab-door-angle-slider" type="range" min="0" max="120" value="75" step="1" style="flex:1;accent-color:#b86b43;cursor:pointer;" />
                   <strong id="cab-door-angle-val" style="font-size:0.75rem;color:#b86b43;min-width:34px;text-align:right;">75°</strong>
                 </div>
@@ -180,28 +204,28 @@
         <!-- 하위 항목 (슬라이딩 서랍 선택 시: 서랍 치수 + 노출 깊이) -->
         <div id="drawer-config-section" style="display:none;">
           <div class="sub-block">
-            <div class="sub-block-title">슬라이딩 서랍 치수 및 노출 깊이 (mm)</div>
+            <div class="sub-block-title">서랍 크기와 보이는 깊이 (mm)</div>
             <div class="form-grid-2">
               <div class="form-group">
-                <label>서랍 내부 너비(W)</label>
+                <label>서랍 가로</label>
                 <input id="drw-w" type="number" class="input-box" value="720" step="10" />
               </div>
               <div class="form-group">
-                <label>실제 내부 깊이(D)</label>
+                <label>진짜 깊이</label>
                 <input id="drw-d" type="number" class="input-box" value="480" step="10" />
               </div>
             </div>
             <div class="form-group">
-              <label>최대한 열었을 때 노출되는 깊이 (Exposed D)</label>
+              <label>다 뺐을 때 보이는 깊이</label>
               <input id="drw-exposed-d" type="number" class="input-box" value="350" step="10" />
             </div>
             <div class="form-grid-2">
               <div class="form-group">
-                <label>서랍 측판 높이(H)</label>
+                <label>서랍 옆벽 높이</label>
                 <input id="drw-h" type="number" class="input-box" value="140" step="5" />
               </div>
               <div class="form-group">
-                <label>상단 유효 입구 높이</label>
+                <label>넣을 수 있는 높이</label>
                 <input id="drw-clearance-h" type="number" class="input-box" value="175" step="5" />
               </div>
             </div>
@@ -216,15 +240,15 @@
       <button id="btn-toggle-shelf-card" class="accordion-trigger" type="button">
         <div id="shelf-card-chevron" class="accordion-brown-bar">∨</div>
         <div class="accordion-title-row">
-          <span>중간 선반 위치 설정</span>
+          <span>선반 높이</span>
           <span id="shelf-count-badge" class="badge">선반 2개</span>
         </div>
       </button>
 
       <div class="accordion-body">
         <div class="sub-block-title">
-          <span>중간 선반 위치 설정 (바닥 기준 mm)</span>
-          <button id="btn-add-shelf" class="btn btn-primary btn-sm">+ 선반 추가</button>
+          <span>선반 높이 (바닥에서 mm)</span>
+          <button id="btn-add-shelf" class="btn btn-primary btn-sm">+ 선반 넣기</button>
         </div>
         <div id="shelf-list" class="shelf-list"></div>
       </div>
@@ -236,15 +260,15 @@
     <!-- [3D 묶음 바로 위] 묶음 선택 시 뜨는 플로팅 액션 팝업 -->
     <div id="bundle-floating-popup" class="bundle-floating-popup">
       <div class="bundle-popup-title">
-        <span id="bundle-popup-label">📦 2개 수납함 묶음 선택됨</span>
-        <span style="font-size:0.67rem;color:#fde68a;font-weight:400;">내부 수납함 재클릭 시 개별 선택</span>
+        <span id="bundle-popup-label">상자 2개 골랐어요</span>
+        <span style="font-size:0.67rem;color:#fde68a;font-weight:400;">상자 다시 누르면 하나만</span>
       </div>
       <div class="bundle-popup-actions">
-        <button id="btn-bundle-save" class="btn btn-warning btn-sm">💾 조합 저장</button>
-        <button id="btn-bundle-up" class="btn btn-sm">⬆️ 위 선반으로 이동</button>
-        <button id="btn-bundle-down" class="btn btn-sm">⬇️ 아래 선반으로 이동</button>
-        <button id="btn-bundle-rot" class="btn btn-sm">↻ 묶음 90° 회전</button>
-        <button id="btn-bundle-del" class="btn btn-danger btn-sm">🗑️ 제거</button>
+        <button id="btn-bundle-save" class="btn btn-warning btn-sm">이 묶음 저장</button>
+        <button id="btn-bundle-up" class="btn btn-sm">위 선반으로</button>
+        <button id="btn-bundle-down" class="btn btn-sm">아래 선반으로</button>
+        <button id="btn-bundle-rot" class="btn btn-sm">통째로 돌리기</button>
+        <button id="btn-bundle-del" class="btn btn-danger btn-sm">빼기</button>
       </div>
     </div>
 
@@ -255,74 +279,68 @@
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
           <div id="sel-box-title" style="font-size:0.79rem;"></div>
           <div style="display:flex;gap:5px;flex-wrap:wrap;">
-            <button id="btn-box-save-combo" class="btn btn-warning btn-sm" style="display:none;">💾 조합 저장</button>
-            <button id="btn-box-rot-ccw" class="btn btn-primary btn-sm">↺ 좌 90°</button>
-            <button id="btn-box-rot" class="btn btn-primary btn-sm" title="단축키: R">↻ 우 90° 회전</button>
-            <button id="btn-box-stack-more" class="btn btn-sm" title="이 수납함 위에 같은 수납함을 1개 더 쌓습니다">➕ 위로 1단 더 쌓기</button>
-            <button id="btn-box-shelf-up" class="btn btn-sm">⬆️ 위 선반</button>
-            <button id="btn-box-shelf-down" class="btn btn-sm">⬇️ 아래 선반</button>
+            <button id="btn-box-save-combo" class="btn btn-warning btn-sm" style="display:none;">이 묶음 저장</button>
+            <button id="btn-box-rot-ccw" class="btn btn-primary btn-sm">↺ 왼쪽 돌리기</button>
+            <button id="btn-box-rot" class="btn btn-primary btn-sm" title="단축키: R">↻ 오른쪽 돌리기</button>
+            <button id="btn-box-stack-more" class="btn btn-sm" title="이 상자 위에 같은 상자 하나 더">위에 하나 더</button>
+            <button id="btn-box-shelf-up" class="btn btn-sm">↑ 위 선반</button>
+            <button id="btn-box-shelf-down" class="btn btn-sm">↓ 아래 선반</button>
             <button id="btn-box-left" class="btn btn-sm">◀</button>
             <button id="btn-box-right" class="btn btn-sm">▶</button>
             <button id="btn-box-back" class="btn btn-sm">▲</button>
             <button id="btn-box-front" class="btn btn-sm">▼</button>
-            <button id="btn-box-del" class="btn btn-danger btn-sm">삭제</button>
+            <button id="btn-box-del" class="btn btn-danger btn-sm">빼기</button>
           </div>
         </div>
       </div>
 
       <!-- 시점 전환 & 모바일 묶음선택 토글 캡슐 바 -->
       <div class="hud-pill-bar">
-        <button class="btn btn-sm" data-cam="iso">3D뷰</button>
-        <button class="btn btn-sm" data-cam="front">정면</button>
-        <button class="btn btn-sm" data-cam="top">위(평면)</button>
-        <button class="btn btn-sm" data-cam="side">측면</button>
-        <button id="btn-touch-multiselect" class="btn btn-sm" title="스마트폰/태블릿에서 Shift 키 없이 여러 수납함을 터치해 묶음 선택합니다">
-          🔗 터치 묶음선택: OFF
+        <button class="btn btn-sm" data-cam="iso">입체로</button>
+        <button class="btn btn-sm" data-cam="front">앞에서</button>
+        <button class="btn btn-sm" data-cam="top">위에서</button>
+        <button class="btn btn-sm" data-cam="side">옆에서</button>
+        <button id="btn-touch-multiselect" class="btn btn-sm" title="폰·태블릿에서 상자 여러 개를 손가락으로 한 번에 고르기">
+          여러 개 고르기: 꺼짐
         </button>
         <div id="hud-drawer-controls" style="display:none;align-items:center;gap:4px;">
-          <span style="font-size:0.72rem;color:#3b8a64;font-weight:700;">서랍열림:</span>
+          <span style="font-size:0.72rem;color:#3b8a64;font-weight:700;">서랍 열기:</span>
           <input id="slider-drawer-open" type="range" min="0" max="100" value="100" style="width:75px;" />
           <span id="drawer-open-pct" style="font-size:0.72rem;font-weight:600;">100%</span>
         </div>
         <label class="checkbox-row" style="margin:0;">
           <input id="chk-show-deadzones" type="checkbox" checked />
-          <span style="font-size:0.72rem;">사각지대</span>
+          <span style="font-size:0.72rem;">안 보이는 곳</span>
         </label>
-        <button id="btn-clear-plan" class="btn btn-danger btn-sm">시안 비우기</button>
+        <button id="btn-clear-plan" class="btn btn-danger btn-sm">다 비우기</button>
       </div>
     </div>
 
     <!-- [우측 하단] 에러코드 (간섭/충돌 알림 플로팅 카드 - 샘플 이미지 구현) -->
     <div id="error-code-dock" class="error-code-dock">
       <button id="btn-toggle-error-dock" class="error-code-tab" type="button">
-        <span id="error-code-tab-title">에러코드</span>
+        <span id="error-code-tab-title">문제 알림</span>
       </button>
       <div class="error-code-body">
         <div id="warnings-list" style="display:flex;flex-direction:column;gap:5px;"></div>
       </div>
     </div>
 
+    <!-- [모바일 설정 단계 전용] 맨 위 안내 + 맨 아래 '3D로 가기' 큰 버튼 -->
+    <div id="mobile-setup-header" class="mobile-setup-header">
+      <span>먼저 장 크기를 정해요</span>
+    </div>
+    <div id="mobile-setup-footer" class="mobile-setup-footer">
+      <button id="btn-mobile-setup-done" class="btn btn-primary" type="button">다 됐어요, 3D로 ▶</button>
+    </div>
+
     <!-- [모바일 모드 전용 하단 탭 네비게이션 바] -->
     <nav id="mobile-nav-bar" class="mobile-nav-bar">
-      <button class="mobile-nav-tab active" data-mtab="shelves">
-        <span class="m-nav-icon">📦</span>
-        <span class="m-nav-label">선반·수납함</span>
-      </button>
-      <button class="mobile-nav-tab" data-mtab="space">
-        <span class="m-nav-icon">🚪</span>
-        <span class="m-nav-label">가구·치수</span>
-      </button>
-      <button class="mobile-nav-tab" data-mtab="shelfpos">
-        <span class="m-nav-icon">📏</span>
-        <span class="m-nav-label">선반위치</span>
+      <button class="mobile-nav-tab" data-mtab="none">
+        <span class="m-nav-label">3D 화면</span>
       </button>
       <button class="mobile-nav-tab" data-mtab="errors">
-        <span class="m-nav-icon">⚠️</span>
-        <span class="m-nav-label" id="mobile-nav-err-label">에러(0)</span>
-      </button>
-      <button id="btn-mobile-sheet-toggle" class="mobile-nav-tab toggle-tab" title="하단 패널 접기/펼치기">
-        <span class="m-nav-icon" id="mobile-sheet-chevron">🔽</span>
-        <span class="m-nav-label">접기</span>
+        <span class="m-nav-label" id="mobile-nav-err-label">문제(0)</span>
       </button>
     </nav>
   </main>
@@ -332,7 +350,7 @@
     <div class="modal-box modal-box-wide">
       <div class="modal-header">
         <div>
-          <span>📦 수납함 및 저장된 조합 고르기</span>
+          <span>상자 고르기 (저장한 묶음도)</span>
           <span id="picker-target-space-badge" class="badge" style="margin-left:8px;"></span>
         </div>
         <button id="btn-close-picker-modal" class="btn btn-sm">✕ 닫기</button>
@@ -341,11 +359,16 @@
       <div class="brand-tabs-row">
         <div id="picker-brand-tabs" class="brand-tab-group"></div>
         <div style="display:flex;gap:6px;align-items:center;">
-          <input id="picker-search-input" type="text" class="input-box" placeholder="수납함 또는 조합 이름 검색..." style="width:200px;" />
+          <input id="picker-search-input" type="text" class="input-box" placeholder="상자나 묶음 이름 찾기..." style="width:200px;" />
         </div>
       </div>
 
       <div id="picker-cards-grid" class="picker-grid"></div>
+
+      <div id="picker-cart-bar" class="picker-cart-bar">
+        <span id="picker-cart-count">담은 상자 0개</span>
+        <button id="btn-picker-cart-add" class="btn btn-primary" disabled>담기</button>
+      </div>
     </div>
   </div>
 
@@ -353,87 +376,87 @@
   <div id="modal-custom-box" class="modal-backdrop">
     <div class="modal-box">
       <div class="modal-header">
-        <span>+ 새 수납함 모델 직접 등록 (브랜드·라인업·사이즈)</span>
+        <span>+ 내 상자 만들기</span>
         <button id="btn-close-custom-modal" class="btn btn-sm">✕</button>
       </div>
       <div class="form-grid-3">
         <div class="form-group">
-          <label>브랜드명</label>
-          <input id="new-box-brand" type="text" class="input-box" value="내 커스텀" />
+          <label>브랜드 이름</label>
+          <input id="new-box-brand" type="text" class="input-box" value="내 상자" />
         </div>
         <div class="form-group">
-          <label>라인업/시리즈</label>
-          <input id="new-box-lineup" type="text" class="input-box" value="커스텀 시리즈" />
+          <label>종류 이름</label>
+          <input id="new-box-lineup" type="text" class="input-box" value="내 종류" />
         </div>
         <div class="form-group">
-          <label>제품명</label>
-          <input id="new-box-name" type="text" class="input-box" value="나만의 수납함 1호" />
+          <label>상자 이름</label>
+          <input id="new-box-name" type="text" class="input-box" value="내 상자 1호" />
         </div>
       </div>
 
       <div class="form-grid-2">
         <div class="form-group">
-          <label>수납함 외형 형태</label>
+          <label>상자 모양</label>
           <select id="new-box-shape">
-            <option value="box">직육면체 (상단=하단 동일)</option>
-            <option value="tapered">테이퍼드/바구니형 (위가 넓고 바닥이 좁음)</option>
+            <option value="box">네모 반듯</option>
+            <option value="tapered">바구니 모양 (위 넓고 아래 좁음)</option>
           </select>
         </div>
         <div class="form-group">
-          <label>개폐/인출 방식 (간섭 검증 기준)</label>
+          <label>여는 방식</label>
           <select id="new-box-access">
-            <option value="front_drawer">전면 서랍형 (문설주 걸림 시 열림 불가 경고)</option>
-            <option value="top_open">상단 오픈형 (서랍 미노출 구역 배치 시 주의)</option>
-            <option value="top_lid">상단 뚜껑형</option>
-            <option value="front_open">전면 손잡이 바구니형</option>
+            <option value="front_drawer">앞으로 빼는 서랍</option>
+            <option value="top_open">위가 열린 통</option>
+            <option value="top_lid">위 뚜껑</option>
+            <option value="front_open">앞 손잡이 바구니</option>
           </select>
         </div>
       </div>
 
       <div class="form-grid-3">
         <div class="form-group">
-          <label>상단 가로(W_top, mm)</label>
+          <label>위쪽 가로(mm)</label>
           <input id="new-box-wtop" type="number" class="input-box" value="260" />
         </div>
         <div class="form-group">
-          <label>상단 깊이(D_top, mm)</label>
+          <label>위쪽 깊이(mm)</label>
           <input id="new-box-dtop" type="number" class="input-box" value="360" />
         </div>
         <div class="form-group">
-          <label>전체 높이(H, mm)</label>
+          <label>높이(mm)</label>
           <input id="new-box-h" type="number" class="input-box" value="150" />
         </div>
       </div>
 
       <div id="tapered-bot-inputs" class="form-grid-2" style="display:none;">
         <div class="form-group">
-          <label>하단 바닥 가로(W_bot, mm)</label>
+          <label>아래쪽 가로(mm)</label>
           <input id="new-box-wbot" type="number" class="input-box" value="235" />
         </div>
         <div class="form-group">
-          <label>하단 바닥 깊이(D_bot, mm)</label>
+          <label>아래쪽 깊이(mm)</label>
           <input id="new-box-dbot" type="number" class="input-box" value="335" />
         </div>
       </div>
 
       <div class="form-grid-2">
         <div class="form-group">
-          <label>표시 색상</label>
+          <label>색깔</label>
           <input id="new-box-color" type="color" class="input-box" value="#efe7da" style="height:34px;padding:2px;" />
         </div>
         <div class="form-group" style="justify-content:center;padding-top:14px;">
           <label class="checkbox-row">
             <input id="new-box-stackable" type="checkbox" checked />
-            <span>위로 적층 가능</span>
+            <span>위에 쌓을 수 있음</span>
           </label>
           <label class="checkbox-row">
             <input id="new-box-handle" type="checkbox" checked />
-            <span>전면 손잡이 있음</span>
+            <span>앞에 손잡이 있음</span>
           </label>
         </div>
       </div>
 
-      <button id="btn-save-custom-box" class="btn btn-primary" style="padding:10px;">저장 후 카탈로그에 추가</button>
+      <button id="btn-save-custom-box" class="btn btn-primary" style="padding:10px;">저장</button>
     </div>
   </div>
 
@@ -441,24 +464,24 @@
   <div id="modal-compare-3d" class="modal-backdrop">
     <div class="modal-box">
       <div class="modal-header">
-        <span>🔍 브랜드별 수납함 1:1 3D 겹쳐보기 비교 뷰어</span>
+        <span>상자 둘 겹쳐 보기</span>
         <button id="btn-close-compare-modal" class="btn btn-sm">✕</button>
       </div>
       <div class="form-grid-2">
         <div class="form-group">
-          <label style="color:#b86b43;font-weight:700;">비교 수납함 A (테라코타 브라운)</label>
+          <label style="color:#b86b43;font-weight:700;">상자 A (갈색)</label>
           <select id="cmp-select-a"></select>
         </div>
         <div class="form-group">
-          <label style="color:#3b8a64;font-weight:700;">비교 수납함 B (세이지 그린)</label>
+          <label style="color:#3b8a64;font-weight:700;">상자 B (초록)</label>
           <select id="cmp-select-b"></select>
         </div>
       </div>
       <div class="form-group">
-        <label>정렬 기준점</label>
+        <label>어디에 맞춰 볼까요</label>
         <select id="cmp-align-mode">
-          <option value="corner">모서리 정렬 (한쪽 구석에 맞췄을 때 크기 차이 비교)</option>
-          <option value="center">바닥 중심점 일치 정렬</option>
+          <option value="corner">한쪽 구석에 맞춰 보기</option>
+          <option value="center">가운데에 맞춰 보기</option>
         </select>
       </div>
       <div id="compare-3d-canvas"></div>
@@ -470,22 +493,22 @@
   <div id="modal-report-table" class="modal-backdrop">
     <div class="modal-box">
       <div class="modal-header">
-        <span>📊 시안별(브랜드 조합별) 공간 활용률 비교표</span>
+        <span>계획별 공간 채운 정도</span>
         <button id="btn-close-report-modal" class="btn btn-sm">✕</button>
       </div>
       <table class="comp-table">
         <thead>
           <tr>
-            <th>시안명</th>
-            <th>수납함 수량</th>
-            <th>바닥 면적률 (체적률)</th>
-            <th>남는 여백(mm)</th>
-            <th>간섭 상태</th>
+            <th>계획 이름</th>
+            <th>상자 개수</th>
+            <th>공간 채운 정도</th>
+            <th>남는 틈(mm)</th>
+            <th>걸림 여부</th>
           </tr>
         </thead>
         <tbody id="comparison-tbody"></tbody>
       </table>
-      <div class="hint-text">행을 클릭하면 해당 시안으로 즉시 전환됩니다.</div>
+      <div class="hint-text">줄을 누르면 그 계획으로 바로 바뀌어요.</div>
     </div>
   </div>
 

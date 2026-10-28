@@ -9,7 +9,7 @@ window.PackerEngine = (function () {
       return [
         {
           index: 0,
-          name: '슬라이딩 서랍 내부 공간',
+          name: '서랍 안 공간',
           yStart: 0,
           yEnd: clearH,
           clearH: clearH,
@@ -29,7 +29,7 @@ window.PackerEngine = (function () {
       const topY = Math.min(c.h, Math.max(currentY + 20, shelf.bottomY));
       compartments.push({
         index: idx,
-        name: `${idx + 1}단 선반 공간`,
+        name: `${idx + 1}번째 칸`,
         yStart: currentY,
         yEnd: topY,
         clearH: Math.max(0, topY - currentY),
@@ -41,7 +41,7 @@ window.PackerEngine = (function () {
 
     compartments.push({
       index: sortedShelves.length,
-      name: `${sortedShelves.length + 1}단 선반 공간 (최상단)`,
+      name: `${sortedShelves.length + 1}번째 칸 (맨 위)`,
       yStart: currentY,
       yEnd: c.h,
       clearH: Math.max(0, c.h - currentY),
@@ -132,23 +132,23 @@ window.PackerEngine = (function () {
     const comp = compartments[compIdx] || compartments[0];
 
     if (model.h > comp.clearH) {
-      return { ok: false, reason: `높이 초과 (칸 높이 ${comp.clearH}mm)` };
+      return { ok: false, reason: `너무 높아요 (칸 높이 ${comp.clearH}mm)` };
     }
     const fitsNormal = model.wTop <= comp.w && model.dTop <= comp.d;
     const fitsRotated = model.dTop <= comp.w && model.wTop <= comp.d;
     if (!fitsNormal && !fitsRotated) {
-      return { ok: false, reason: `바닥 크기 초과` };
+      return { ok: false, reason: `바닥에 안 들어가요` };
     }
     if (spaceConfig.type === 'cabinet') {
       const cabConst = getCabinetConstraints(spaceConfig);
       if (!canPassThroughDoor(model, cabConst.doorClearW, cabConst.doorClearH)) {
-        return { ok: false, reason: `문 입구보다 큼` };
+        return { ok: false, reason: `문보다 커요` };
       }
     }
     if (!fitsNormal && fitsRotated) {
-      return { ok: true, reason: `✓ 90° 회전 시 수납 가능` };
+      return { ok: true, reason: `돌리면 들어가요` };
     }
-    return { ok: true, reason: `✓ 수납 가능` };
+    return { ok: true, reason: `들어가요` };
   }
 
   // 7. 자동 적층(Auto-Stacking) Y 좌표 계산:
@@ -217,16 +217,16 @@ window.PackerEngine = (function () {
       // (A) 공간 외곽 경계 이탈 검사
       if (xMin < -0.5 || zMin < -0.5 || xMax > comp.w + 0.5 || zMax > comp.d + 0.5) {
         setSeverity('error');
-        issues.push(`[경계 초과] '${model.name}' 수납함이 선반 내경을 벗어났습니다.`);
+        issues.push(`[밖으로 나감] '${model.name}' 상자가 칸 밖으로 나갔어요.`);
       }
 
       // (B) 높이 초과 검사 (위로 적층되어 선반 칸 높이를 넘긴 경우 포함)
       if (relYMax > comp.clearH + 0.5) {
         setSeverity('error');
         if (spaceConfig.type === 'drawer') {
-          issues.push(`[상단 걸림] '${model.name}' 상단 높이(${Math.round(relYMax)}mm)가 서랍 유효 입구 높이(${comp.clearH}mm)를 초과하여 서랍이 열리지 않습니다.`);
+          issues.push(`[서랍 안 닫힘] '${model.name}'이 너무 높아서(${Math.round(relYMax)}mm) 서랍이 안 닫혀요. (들어가는 높이 ${comp.clearH}mm)`);
         } else {
-          issues.push(`[선반 높이 초과] '${model.name}' 상단 높이(${Math.round(relYMax)}mm)가 ${comp.name} 유효 높이(${comp.clearH}mm)를 초과합니다.`);
+          issues.push(`[너무 높음] '${model.name}'이 ${comp.name}보다 높아요. 상자 ${Math.round(relYMax)}mm > 칸 ${comp.clearH}mm`);
         }
       }
 
@@ -234,7 +234,7 @@ window.PackerEngine = (function () {
       if (spaceConfig.type === 'cabinet' && cabConst) {
         if (!canPassThroughDoor(model, cabConst.doorClearW, cabConst.doorClearH)) {
           setSeverity('error');
-          issues.push(`[입구 진입 불가] '${model.name}' 크기가 문 개구부(${cabConst.doorClearW}×${cabConst.doorClearH}mm)보다 커서 장 안으로 넣을 수 없습니다.`);
+          issues.push(`[문으로 못 들어감] '${model.name}'이 문(${cabConst.doorClearW}×${cabConst.doorClearH}mm)보다 커서 장 안에 못 넣어요.`);
         }
 
         const inLeftDead = cabConst.leftDeadW > 0 && xMin < cabConst.leftDeadW - 0.5;
@@ -242,13 +242,13 @@ window.PackerEngine = (function () {
         const inBottomDead = cabConst.bottomFrameH > 0 && (comp.yStart + relYMin) < cabConst.bottomFrameH - 0.5;
 
         if (inLeftDead || inRightDead || inBottomDead) {
-          const zoneName = inLeftDead ? '좌측 문설주/경첩' : inRightDead ? '우측 문설주/경첩' : '하단 문틀';
+          const zoneName = inLeftDead ? '왼쪽 문틀' : inRightDead ? '오른쪽 문틀' : '아래 문틀';
           if (model.accessType === 'front_drawer') {
             setSeverity('error');
-            issues.push(`[서랍 열림 불가] 전면 서랍형 '${model.name}'이(가) ${zoneName} 사각지대에 걸려 서랍을 앞으로 당겨 열 수 없습니다.`);
+            issues.push(`[서랍 못 뺌] 서랍형 '${model.name}'이 ${zoneName}에 걸려서 앞으로 못 빼요.`);
           } else {
             setSeverity('warn');
-            issues.push(`[사각지대 주의] '${model.name}'이(가) ${zoneName} 뒤쪽 사각지대에 걸쳐 있어 일직선으로 바로 빼기 어렵습니다.`);
+            issues.push(`[빼기 불편] '${model.name}'이 ${zoneName} 뒤에 걸쳐 있어서 똑바로 빼기 힘들어요.`);
           }
         }
       }
@@ -259,10 +259,10 @@ window.PackerEngine = (function () {
           const hiddenDepth = Math.min(dims.d, drwConst.unexposedD - zMin);
           if (model.accessType === 'top_open' || model.accessType === 'top_lid') {
             setSeverity('warn');
-            issues.push(`[미노출 구간 주의] '${model.name}'의 안쪽 ${Math.round(hiddenDepth)}mm가 서랍을 끝까지 열어도 윗판에 가려져 위에서 꺼내기 불편합니다.`);
+            issues.push(`[안 보이는 곳 주의] '${model.name}'의 안쪽 ${Math.round(hiddenDepth)}mm가 서랍을 다 열어도 가려져서 위로 꺼내기 불편해요.`);
           } else {
             setSeverity('warn');
-            issues.push(`[미노출 구간 배치] '${model.name}' 일부(${Math.round(hiddenDepth)}mm)가 서랍 안쪽 미노출 구간에 위치합니다.`);
+            issues.push(`[안 보이는 곳] '${model.name}'의 일부(${Math.round(hiddenDepth)}mm)가 서랍 안쪽 안 보이는 곳에 있어요.`);
           }
         }
       }
@@ -294,7 +294,7 @@ window.PackerEngine = (function () {
         if (overlapX && overlapZ && overlapY) {
           boxStatuses[a.id].severity = 'error';
           boxStatuses[b.id].severity = 'error';
-          const msg = `[수납함 겹침] '${modA.name}'와(과) '${modB.name}'이(가) 서로 겹쳐 있습니다.`;
+          const msg = `[상자 겹침] '${modA.name}'와 '${modB.name}'이 서로 겹쳐 있어요.`;
           boxStatuses[a.id].issues.push(msg);
           boxStatuses[b.id].issues.push(msg);
           messages.push({ boxId: a.id, severity: 'error', text: msg });
