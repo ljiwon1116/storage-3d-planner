@@ -1017,34 +1017,300 @@ body {
   vertical-align: middle;
 }
 
-/* ==================== 스마트폰 / 태블릿 반응형 최적화 ==================== */
-@media (max-width: 900px) {
-  .app-header {
-    height: auto;
-    flex-wrap: wrap;
-    padding: 8px 12px;
-  }
-  .floating-accordion-card {
-    left: 10px;
-    width: 280px;
-  }
-  .floating-top-left {
-    top: 10px;
-  }
-  .floating-bottom-left {
-    bottom: 64px;
-  }
-  .shelf-callouts-area {
-    right: 10px;
-    width: 265px;
-    top: 46%;
-  }
-  .error-code-dock {
-    right: 10px;
-    bottom: 64px;
-    width: 300px;
-  }
-  #shelf-leader-svg {
-    display: none;
-  }
+/* ==================== PC vs 모바일 UI 모드 스위처 ==================== */
+.ui-mode-switch {
+  display: inline-flex;
+  background: #ebe0cf;
+  border-radius: 999px;
+  padding: 2px;
+  gap: 2px;
+  margin-left: 6px;
+  border: 1px solid var(--border-strong);
 }
+
+.mode-switch-btn {
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--text-sub);
+  transition: all 0.16s ease;
+}
+
+.mode-switch-btn.active {
+  background: #ffffff;
+  color: var(--accent);
+  box-shadow: 0 1px 4px rgba(61, 49, 42, 0.18);
+}
+
+/* ==================== 모바일 전용 하단 탭 바 (PC 모드에선 숨김) ==================== */
+.mobile-nav-bar {
+  display: none;
+}
+
+/* ==================== [모바일 전용 레이아웃] body.ui-mode-mobile (디폴트) ==================== */
+body.ui-mode-mobile .app-header {
+  height: auto;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 6px 10px;
+  gap: 6px;
+}
+
+body.ui-mode-mobile .app-header .brand-title {
+  justify-content: space-between;
+  width: 100%;
+}
+
+body.ui-mode-mobile .header-plan-tabs {
+  width: 100%;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+body.ui-mode-mobile .header-actions {
+  display: flex;
+  overflow-x: auto;
+  gap: 4px;
+  width: 100%;
+  padding-bottom: 2px;
+}
+
+body.ui-mode-mobile .header-actions .btn {
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+/* 상하 분할 레이아웃: 상단은 3D 뷰포트, 하단은 탭 패널 */
+body.ui-mode-mobile .stage-container {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+body.ui-mode-mobile #shelf-leader-svg {
+  display: none !important;
+}
+
+body.ui-mode-mobile #canvas-wrapper {
+  position: relative !important;
+  inset: auto !important;
+  width: 100% !important;
+  flex: 1 1 50%;
+  min-height: 240px;
+  height: 50% !important;
+  background: var(--bg-stage);
+}
+
+body.ui-mode-mobile.mobile-sheet-collapsed #canvas-wrapper {
+  flex: 1 1 100%;
+  height: calc(100% - 44px) !important;
+}
+
+/* 3D 뷰포트 내 상단 How to use 버튼 컴팩트화 */
+body.ui-mode-mobile .how-to-use-wrap {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  transform: none;
+  z-index: 25;
+}
+
+body.ui-mode-mobile .btn-how-to-use {
+  font-size: 0.72rem;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+body.ui-mode-mobile .how-to-use-popover {
+  left: 0;
+  width: calc(100vw - 20px);
+}
+
+/* 3D 캔버스 하단 미니 HUD */
+body.ui-mode-mobile .bottom-center-hud {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 16px);
+  max-width: 440px;
+}
+
+body.ui-mode-mobile .hud-pill-bar {
+  padding: 4px 8px;
+  gap: 4px;
+  font-size: 0.7rem;
+  width: 100%;
+  justify-content: space-around;
+}
+
+body.ui-mode-mobile .hud-pill-bar .btn-sm {
+  padding: 3px 6px;
+  font-size: 0.7rem;
+}
+
+body.ui-mode-mobile .selected-box-pill {
+  width: 100%;
+  padding: 6px 10px;
+}
+
+/* 모바일 전용 탭 네비게이션 바 */
+body.ui-mode-mobile .mobile-nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  background: #fdfbf7;
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border);
+  height: 44px;
+  flex-shrink: 0;
+  z-index: 35;
+  box-shadow: 0 -2px 8px rgba(61, 49, 42, 0.06);
+}
+
+.mobile-nav-tab {
+  flex: 1;
+  height: 100%;
+  background: transparent;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  cursor: pointer;
+  color: var(--text-sub);
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.mobile-nav-tab .m-nav-icon {
+  font-size: 0.88rem;
+}
+
+.mobile-nav-tab .m-nav-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.mobile-nav-tab.active {
+  background: #fff6ee;
+  color: var(--accent);
+  border-bottom: 2px solid var(--accent);
+}
+
+.mobile-nav-tab.toggle-tab {
+  flex: 0 0 54px;
+  border-left: 1px solid var(--border);
+  background: #f4ece0;
+}
+
+/* 모바일 모드에서 모든 플로팅 패널들을 하단 탭 시트 형식으로 정렬 (절대 겹치지 않음!) */
+body.ui-mode-mobile .floating-accordion-card,
+body.ui-mode-mobile .shelf-callouts-area,
+body.ui-mode-mobile .error-code-dock {
+  position: static !important;
+  transform: none !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  border-radius: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  background: #fdfbf7;
+  overflow-y: auto !important;
+  display: none !important;
+  flex: 1 1 50%;
+  height: 50%;
+  z-index: 30;
+}
+
+body.ui-mode-mobile.mobile-sheet-collapsed .floating-accordion-card,
+body.ui-mode-mobile.mobile-sheet-collapsed .shelf-callouts-area,
+body.ui-mode-mobile.mobile-sheet-collapsed .error-code-dock {
+  display: none !important;
+}
+
+/* 모바일 활성 탭에 해당하는 패널만 하단 영역에 노출 */
+body.ui-mode-mobile[data-active-mtab="shelves"] .shelf-callouts-area {
+  display: flex !important;
+}
+
+body.ui-mode-mobile[data-active-mtab="space"] #floating-space-card {
+  display: flex !important;
+}
+
+body.ui-mode-mobile[data-active-mtab="shelfpos"] #floating-shelf-card {
+  display: flex !important;
+}
+
+body.ui-mode-mobile[data-active-mtab="errors"] #error-code-dock {
+  display: flex !important;
+}
+
+/* 모바일에서 아코디언 바 숨기고 바로 내용 표시 */
+body.ui-mode-mobile .accordion-trigger {
+  display: none !important;
+}
+
+body.ui-mode-mobile .accordion-body {
+  display: block !important;
+  padding: 12px 14px 24px !important;
+}
+
+body.ui-mode-mobile #error-code-dock .error-code-tab {
+  display: none !important;
+}
+
+body.ui-mode-mobile #error-code-dock .error-code-body {
+  display: flex !important;
+  max-height: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 14px !important;
+}
+
+/* 모바일 선반 공간 콜아웃 영역 스타일: 상단 가로 탭 바 + 하단 관리 패널 */
+body.ui-mode-mobile .shelf-callouts-area {
+  flex-direction: column !important;
+  padding: 10px 12px 24px !important;
+  gap: 8px !important;
+}
+
+body.ui-mode-mobile .shelf-callout-wrapper {
+  margin-bottom: 6px;
+}
+
+body.ui-mode-mobile .shelf-callout-card {
+  padding: 8px 12px !important;
+}
+
+/* ==================== [PC 모드 레이아웃] body.ui-mode-pc ==================== */
+body.ui-mode-pc .mobile-nav-bar {
+  display: none !important;
+}
+
+body.ui-mode-pc .stage-container {
+  display: block;
+}
+
+body.ui-mode-pc #canvas-wrapper {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+body.ui-mode-pc .floating-accordion-card,
+body.ui-mode-pc .shelf-callouts-area,
+body.ui-mode-pc .error-code-dock {
+  display: flex;
+}
+

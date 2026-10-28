@@ -47,6 +47,9 @@
 
     selectedBoxIds: [],
     selectedCatalogModelId: 'muji-pp-drawer-wide-s',
+    uiMode: 'mobile',             // 'mobile' | 'pc' (기본값: 'mobile'!)
+    activeMobileTab: 'shelves',   // 'shelves' | 'space' | 'shelfpos' | 'errors'
+    mobileSheetCollapsed: false,  // 모바일 하단 패널 접힘 여부
     rightSubTab: 'placed', // 'placed' | 'combos'
     autofillPanelOpen: false, // 자동 채우기 섹션 펼침 여부 (기본 접힘!)
     autofillMode: 'single',
@@ -1024,7 +1027,10 @@
     displayComps.forEach((comp) => {
       const compBoxes = activePlan.boxes.filter((b) => b.compartmentIndex === comp.index);
       const isSelected = comp.index === state.activeCompartmentIdx;
-      const isExpanded = comp.index === state.expandedCompartmentIdx;
+      // 모바일 모드에서는 현재 활성화된 칸이 기본적으로 패널에 펼쳐져 직관적으로 조작 가능
+      const isExpanded = (state.uiMode === 'mobile')
+        ? isSelected
+        : comp.index === state.expandedCompartmentIdx;
 
       const wrapper = document.createElement('div');
       wrapper.className = 'shelf-callout-wrapper' +
@@ -1495,8 +1501,11 @@
     const tabTitle = document.getElementById('error-code-tab-title');
     container.innerHTML = '';
 
+    const mobileErrLabel = document.getElementById('mobile-nav-err-label');
+
     if (val.messages.length === 0) {
       tabTitle.textContent = `에러코드 (이상 없음 ✓)`;
+      if (mobileErrLabel) mobileErrLabel.textContent = `에러(0)`;
       const okDiv = document.createElement('div');
       okDiv.className = 'alert-item alert-ok';
       okDiv.textContent = `✓ 모든 수납함이 문설주·경첩·높이 간섭 없이 정상 배치되었습니다.`;
@@ -1505,6 +1514,7 @@
     }
 
     tabTitle.textContent = `에러코드 (${val.messages.length})`;
+    if (mobileErrLabel) mobileErrLabel.textContent = `에러(${val.messages.length})`;
     val.messages.forEach((m) => {
       const div = document.createElement('div');
       div.className = 'alert-item ' + (m.severity === 'error' ? 'alert-error' : 'alert-warn');
@@ -1557,7 +1567,68 @@
     });
   }
 
+  function setUIMode(mode) {
+    state.uiMode = mode;
+    document.body.classList.toggle('ui-mode-mobile', mode === 'mobile');
+    document.body.classList.toggle('ui-mode-pc', mode === 'pc');
+    document.getElementById('btn-mode-mobile')?.classList.toggle('active', mode === 'mobile');
+    document.getElementById('btn-mode-pc')?.classList.toggle('active', mode === 'pc');
+
+    // 모바일 모드 진입 시 선반 탭 기본 활성화
+    if (mode === 'mobile') {
+      document.body.setAttribute('data-active-mtab', state.activeMobileTab || 'shelves');
+    } else {
+      document.body.removeAttribute('data-active-mtab');
+    }
+
+    renderShelfCalloutCards();
+    setTimeout(() => {
+      window.Scene3DManager.resize();
+    }, 60);
+  }
+
+  function setActiveMobileTab(tabKey) {
+    state.activeMobileTab = tabKey;
+    state.mobileSheetCollapsed = false;
+    document.body.classList.remove('mobile-sheet-collapsed');
+    document.body.setAttribute('data-active-mtab', tabKey);
+
+    document.querySelectorAll('.mobile-nav-tab[data-mtab]').forEach((t) => {
+      t.classList.toggle('active', t.dataset.mtab === tabKey);
+    });
+
+    const chevron = document.getElementById('mobile-sheet-chevron');
+    if (chevron) chevron.textContent = '🔽';
+
+    renderShelfCalloutCards();
+    setTimeout(() => {
+      window.Scene3DManager.resize();
+    }, 60);
+  }
+
+  function toggleMobileSheet() {
+    state.mobileSheetCollapsed = !state.mobileSheetCollapsed;
+    document.body.classList.toggle('mobile-sheet-collapsed', state.mobileSheetCollapsed);
+    const chevron = document.getElementById('mobile-sheet-chevron');
+    if (chevron) {
+      chevron.textContent = state.mobileSheetCollapsed ? '🔼' : '🔽';
+    }
+    setTimeout(() => {
+      window.Scene3DManager.resize();
+    }, 60);
+  }
+
   function bindEvents() {
+    // 0. PC / 모바일 UI 모드 스위처 (디폴트: 모바일!)
+    document.getElementById('btn-mode-mobile')?.addEventListener('click', () => setUIMode('mobile'));
+    document.getElementById('btn-mode-pc')?.addEventListener('click', () => setUIMode('pc'));
+
+    // 모바일 탭 네비게이션 바 바인딩
+    document.querySelectorAll('.mobile-nav-tab[data-mtab]').forEach((btn) => {
+      btn.addEventListener('click', () => setActiveMobileTab(btn.dataset.mtab));
+    });
+    document.getElementById('btn-mobile-sheet-toggle')?.addEventListener('click', toggleMobileSheet);
+
     // 좌상단 & 좌하단 아코디언 토글
     document.getElementById('btn-toggle-space-card').addEventListener('click', () => {
       state.spaceCardOpen = !state.spaceCardOpen;
@@ -1988,6 +2059,9 @@
     bindEvents();
     refreshAll();
     window.Scene3DManager.setCameraView('iso');
+
+    // 디폴트 인터페이스: 모바일 모드로 초기화 (PC 모드로 즉시 전환 가능!)
+    setUIMode('mobile');
 
     // Vercel + Neon DB 및 공유 URL 동기화
     syncWithCloudDatabase();

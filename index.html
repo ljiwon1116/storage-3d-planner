@@ -10,13 +10,17 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
-  <!-- ==================== 상단 헤더 (시안 A / B / C 중앙 배치) ==================== -->
+  <!-- ==================== 상단 헤더 ==================== -->
   <header class="app-header">
     <div class="brand-title">
       <span>🏡 StorageFit 3D</span>
+      <div class="ui-mode-switch" role="group" aria-label="인터페이스 모드 선택">
+        <button id="btn-mode-mobile" type="button" class="mode-switch-btn active" title="스마트폰 화면에 맞춘 분할형 깔끔한 UI">📱 모바일</button>
+        <button id="btn-mode-pc" type="button" class="mode-switch-btn" title="넓은 화면용 플로팅 다중 패널 UI">🖥️ PC</button>
+      </div>
     </div>
 
-    <!-- 중앙 시안 탭 바 (샘플 이미지 3 상단 구성) -->
+    <!-- 중앙 시안 탭 바 -->
     <div class="header-plan-tabs">
       <div id="plan-tabs-list" style="display:flex;gap:6px;"></div>
       <button id="btn-add-plan" class="plan-tab" title="새 비교 시안 추가" style="padding:5px 12px;">＋</button>
@@ -25,9 +29,9 @@
 
     <div class="header-actions">
       <span id="db-status-badge" class="badge" style="background:#f3ebd9;color:#6e5236;border:1px solid #d5c3aa;font-size:0.7rem;" title="클라우드 DB 연결 상태">⚪ 로컬 모드</span>
-      <button id="btn-share-plan-link" class="btn btn-primary" title="현재 옷장/서랍 치수와 3D 수납함 배치를 링크로 공유합니다">🔗 배치 링크 공유</button>
-      <button id="btn-open-compare-modal" class="btn">🔍 브랜드 1:1 비교</button>
-      <button id="btn-open-custom-modal" class="btn">+ 새 수납함 등록</button>
+      <button id="btn-share-plan-link" class="btn btn-primary" title="현재 옷장/서랍 치수와 3D 수납함 배치를 링크로 공유합니다">🔗 링크 공유</button>
+      <button id="btn-open-compare-modal" class="btn">🔍 1:1 비교</button>
+      <button id="btn-open-custom-modal" class="btn">+ 수납함 등록</button>
     </div>
   </header>
 
@@ -297,6 +301,30 @@
         <div id="warnings-list" style="display:flex;flex-direction:column;gap:5px;"></div>
       </div>
     </div>
+
+    <!-- [모바일 모드 전용 하단 탭 네비게이션 바] -->
+    <nav id="mobile-nav-bar" class="mobile-nav-bar">
+      <button class="mobile-nav-tab active" data-mtab="shelves">
+        <span class="m-nav-icon">📦</span>
+        <span class="m-nav-label">선반·수납함</span>
+      </button>
+      <button class="mobile-nav-tab" data-mtab="space">
+        <span class="m-nav-icon">🚪</span>
+        <span class="m-nav-label">가구·치수</span>
+      </button>
+      <button class="mobile-nav-tab" data-mtab="shelfpos">
+        <span class="m-nav-icon">📏</span>
+        <span class="m-nav-label">선반위치</span>
+      </button>
+      <button class="mobile-nav-tab" data-mtab="errors">
+        <span class="m-nav-icon">⚠️</span>
+        <span class="m-nav-label" id="mobile-nav-err-label">에러(0)</span>
+      </button>
+      <button id="btn-mobile-sheet-toggle" class="mobile-nav-tab toggle-tab" title="하단 패널 접기/펼치기">
+        <span class="m-nav-icon" id="mobile-sheet-chevron">🔽</span>
+        <span class="m-nav-label">접기</span>
+      </button>
+    </nav>
   </main>
 
   <!-- ==================== 팝업 모달 1: 브랜드별 수납함 & ⭐ 저장된 조합 고르기 ==================== -->

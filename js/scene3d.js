@@ -1221,6 +1221,9 @@ window.Scene3DManager = (function () {
     setCameraView,
     initCompareViewer,
     renderCompareModels,
-    createFrustumGeometry
+    createFrustumGeometry,
+    resize: () => {
+      if (containerEl) onWindowResize(containerEl);
+    }
   };
 })();
