@@ -1606,7 +1606,7 @@
 
     document.getElementById('cabinet-config-section').style.display = isCab ? 'block' : 'none';
     document.getElementById('drawer-config-section').style.display = !isCab ? 'block' : 'none';
-    document.getElementById('hud-drawer-controls').style.display = !isCab ? 'flex' : 'none';
+    updateOpenCtrlButton();
 
     if (isCab) {
       const c = state.spaceConfig.cabinet;
@@ -2565,6 +2565,73 @@
       close();
       renderPickerModalContent();
       showToast('목록에 추가했어요. 담기를 누르면 칸에 들어가요');
+    });
+  }
+
+  // ---------- 문 열기 / 서랍 열기: 버튼 → 작은 창 + 슬라이드바 ----------
+  function openCtrlMode() {
+    const sc = state.spaceConfig;
+    if (sc.type === 'drawer') return 'drawer';
+    if (sc.type === 'cabinet' && sc.cabinet.doorType !== 'none') return 'door';
+    return null;   // 팬트리 · 문 없는 장은 없음
+  }
+  function updateOpenCtrlButton() {
+    const btn = document.getElementById('btn-open-ctrl');
+    if (!btn) return;
+    const mode = openCtrlMode();
+    btn.style.display = mode ? '' : 'none';
+    btn.textContent = mode === 'door' ? '문 열기' : '서랍 열기';
+    if (!mode) setOpenCtrl(false);
+  }
+  function syncOpenCtrlPop() {
+    const mode = openCtrlMode();
+    const slider = document.getElementById('ocp-slider');
+    const val = document.getElementById('ocp-val');
+    if (!slider || !mode) return;
+    if (mode === 'door') {
+      document.getElementById('ocp-title').textContent = '문 열기';
+      slider.min = 0; slider.max = 110; slider.step = 5;
+      slider.value = state.doorOpenAngle;
+      val.textContent = `${state.doorOpenAngle}°`;
+      document.getElementById('ocp-max').textContent = '활짝';
+    } else {
+      document.getElementById('ocp-title').textContent = '서랍 열기';
+      slider.min = 0; slider.max = 100; slider.step = 5;
+      slider.value = Math.round(state.drawerOpenRatio * 100);
+      val.textContent = `${Math.round(state.drawerOpenRatio * 100)}%`;
+      document.getElementById('ocp-max').textContent = '다 열림';
+    }
+  }
+  function setOpenCtrl(open) {
+    const pop = document.getElementById('open-ctrl-pop');
+    const bd = document.getElementById('open-ctrl-backdrop');
+    const btn = document.getElementById('btn-open-ctrl');
+    if (!pop) return;
+    if (open) syncOpenCtrlPop();
+    pop.hidden = !open;
+    bd.hidden = !open;
+    if (btn) { btn.classList.toggle('active', open); btn.setAttribute('aria-expanded', open ? 'true' : 'false'); }
+  }
+  let openCtrlRaf = 0;
+  function bindOpenCtrl() {
+    const btn = document.getElementById('btn-open-ctrl');
+    const slider = document.getElementById('ocp-slider');
+    if (!btn || !slider) return;
+    btn.addEventListener('click', (e) => { e.stopPropagation(); setOpenCtrl(document.getElementById('open-ctrl-pop').hidden); });
+    document.getElementById('open-ctrl-backdrop').addEventListener('pointerdown', (e) => { e.preventDefault(); setOpenCtrl(false); });
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpenCtrl(false); });
+    slider.addEventListener('input', () => {
+      const v = Number(slider.value);
+      if (openCtrlMode() === 'door') {
+        state.doorOpenAngle = v;
+        document.getElementById('ocp-val').textContent = `${v}°`;
+      } else {
+        state.drawerOpenRatio = v / 100;
+        document.getElementById('ocp-val').textContent = `${v}%`;
+      }
+      // 끄는 동안 화면마다 한 번만 다시 그림
+      if (openCtrlRaf) return;
+      openCtrlRaf = requestAnimationFrame(() => { openCtrlRaf = 0; refreshAll(); });
     });
   }
 
@@ -4003,6 +4070,7 @@
     document.getElementById('box-guide-ok')?.addEventListener('click', closeBoxGuide);
     setupResizableSheets();
     bindAddBoxModal();
+    bindOpenCtrl();
     document.getElementById('box-guide')?.addEventListener('click', (e) => {
       if (e.target.id === 'box-guide') closeBoxGuide();
     });
