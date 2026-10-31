@@ -2634,6 +2634,13 @@
     const el = document.getElementById('box-guide');
     const drag = document.getElementById('drag-guide');
     if (!el || seen || (drag && !drag.hidden)) return;
+    const li = el.querySelectorAll('.drag-guide-list li');
+    if (li.length >= 3) {
+      const wide = state.layout === 'pc';
+      li[0].innerHTML = wide ? '<b>한 번 클릭</b> 상자를 골라요' : '<b>한 번 누르기</b> 상자를 골라요';
+      li[1].innerHTML = wide ? '<b>고른 상자를 한 번 더 클릭</b> 상자 안에 물건을 채워요' : '<b>고른 상자를 한 번 더 누르기</b> 상자 안에 물건을 채워요';
+      li[2].innerHTML = wide ? '<b>고른 상자를 누른 채 끌기</b> 상자를 옮겨요 · 방향키로 조금씩' : '<b>고른 상자를 꾹 누른 채 끌기</b> 상자를 옮겨요';
+    }
     el.hidden = false;
     document.getElementById('box-guide-ok')?.focus();
   }

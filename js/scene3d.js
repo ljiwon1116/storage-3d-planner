@@ -1235,7 +1235,7 @@ window.Scene3DManager = (function () {
 
   // 마우스 좌클릭 및 스마트폰 터치(pointerdown) 통합 처리
   const HOLD_MS = 380;              // 이만큼 꾹 누르면 옮기기 시작
-  let holdTimer = null, holdPending = false, selectOnlyPending = false;
+  let holdTimer = null, holdPending = false, selectOnlyPending = false, holdStart = null;
   let gesturePointerId = null;      // 지금 동작을 시작한 손가락
   const activePointers = new Set(); // 화면에 닿아 있는 손가락들
   let contextLost = false, lastRenderArgs = null;
@@ -1329,6 +1329,7 @@ window.Scene3DManager = (function () {
             // 이미 고른 상자: 톡 = 안 채우기(자세히 보기), 꾹 누른 채 끌기 = 옮기기
             tapBoxId = hitBoxId;
             holdPending = true;
+            holdStart = { boxId: hitBoxId, planeY };
             controls.enabled = false;
             clearTimeout(holdTimer);
             holdTimer = setTimeout(() => {
@@ -1362,7 +1363,14 @@ window.Scene3DManager = (function () {
     // 꾹 누르기 전에 손가락이 움직이면 옮기기 취소 (화면 돌리기도 안 함)
     if (holdPending && pointerDownScreenPos) {
       const d0 = Math.hypot(event.clientX - pointerDownScreenPos.x, event.clientY - pointerDownScreenPos.y);
-      if (d0 > 8) { holdPending = false; clearTimeout(holdTimer); tapBoxId = null; if (controls) controls.enabled = true; }
+      if (d0 > 8 && event.pointerType === 'mouse' && holdStart) {
+        // 마우스는 기다리지 않음: 고른 상자를 누른 채 끌면 바로 옮기기
+        holdPending = false;
+        clearTimeout(holdTimer);
+        tapBoxId = null;
+        prepareGroupDrag(holdStart.boxId, holdStart.planeY);
+        hasDraggedBeyondThreshold = true;
+      } else if (d0 > 8) { holdPending = false; clearTimeout(holdTimer); tapBoxId = null; if (controls) controls.enabled = true; }
     }
     if (!isDragging || !dragAnchorBoxId || !currentSpaceConfig) return;
 

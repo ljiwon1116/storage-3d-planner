@@ -4230,3 +4230,77 @@ body.ui-mode-mobile .sheet-action-btn { margin: 0 !important; }
 .app-confirm-yes { border: none; background: var(--danger, #c0392b); color: #fff; }
 .app-confirm-yes:hover { filter: brightness(0.95); }
 .app-confirm-btns button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+
+/* =====================================================================
+   데스크탑·태블릿 (화면 종류 '데스크탑'): 모바일에서 바꾼 것들을 넓은 화면에 맞게
+   ===================================================================== */
+/* 아래 탭바 → 왼쪽 아래 작은 떠 있는 칩 */
+body.ui-wide .mobile-nav-bar {
+  left: 24px !important;
+  right: auto !important;
+  bottom: 24px !important;
+  width: auto !important;
+  height: 44px !important;
+  padding: 0 4px !important;
+  gap: 4px;
+  border: none !important;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(28, 25, 22, 0.06), 0 0 0 1px #e7e0d5 !important;
+}
+body.ui-wide .mobile-nav-tab { flex-direction: row !important; gap: 6px !important; padding: 0 12px !important; height: 36px; border-radius: 8px; }
+body.ui-wide .mobile-nav-tab:hover { background: #faf7f2 !important; }
+body.ui-wide .m-nav-svg { width: 18px; height: 18px; }
+
+/* 아래 옵션 바 · 상자 팝업: 가운데, 너무 넓지 않게 */
+body.ui-wide .bottom-center-hud {
+  bottom: 24px !important;
+  width: min(640px, calc(100% - 2 * var(--wide-panel, 440px) * 0)) !important;
+  max-width: calc(100% - 320px) !important;
+}
+body.ui-wide .hud-pill-bar { padding: 4px 6px !important; gap: 4px !important; justify-content: center; }
+body.ui-wide .hud-pill-bar .btn-sm:hover { background: #faf7f2; }
+body.ui-wide .selected-box-pill { padding: 8px 12px !important; gap: 6px !important; }
+body.ui-wide .sel-box-title { font-size: 0.85rem; }
+body.ui-wide .sel-actions .btn,
+body.ui-wide .sel-actions .btn-sm { font-size: 0.82rem !important; height: 36px; padding: 0 12px !important; flex: 1 1 auto; }
+body.ui-wide .sel-actions .btn:hover { filter: brightness(0.97); }
+body.ui-wide .box-fine-pad { right: 12px; }
+body.ui-wide .fine-keys { grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(2, 44px); }
+
+/* 상자 고르기 (오른쪽 아래 떠 있는 창) */
+body.ui-wide #modal-box-picker .modal-box { padding: 0 16px !important; }
+body.ui-wide .picker-head-title { font-size: 1.05rem; }
+body.ui-wide #modal-box-picker .picker-target-line { font-size: 0.8rem !important; }
+body.ui-wide .picker-top-row .brand-nav-arrow:hover,
+body.ui-wide .picker-top-row .brand-nav-label:hover { background: #f3eee6 !important; }
+body.ui-wide .picker-cart-bar { margin: 0 -16px !important; }
+
+/* 칸 메뉴 (오른쪽 아래 떠 있는 창) */
+body.ui-wide #mobile-shelf-sheet-body { padding: 4px 16px 16px !important; }
+body.ui-wide .sheet-menu-btn:hover { filter: brightness(0.98); }
+body.ui-wide .sheet-menu-btn .smb-sub { font-size: 0.78rem; }
+
+/* 팬트리 ＋ 버튼: 마우스로 누르기 쉽게 조금만 크게 */
+body.ui-wide.space-pantry #mobile-shelf-buttons .mobile-shelf-add-btn { width: 30px !important; min-width: 30px !important; height: 30px !important; border-radius: 15px !important; }
+body.ui-wide #mobile-shelf-buttons .mobile-shelf-add-btn:hover { transform: scale(1.08); }
+
+/* 알림·확인 창 */
+body.ui-wide .app-toast { bottom: 96px; }
+body.ui-wide .app-confirm-card { max-width: 360px; }
+
+/* 첫 설정: 오른쪽 질문 칸 안에서 재는 법 그림을 조금 크게 */
+body.ui-wide .wiz-measure-fig { width: 112px; height: 79px; }
+body.ui-wide .wiz-measure-list { font-size: 0.85rem; }
+
+/* 태블릿 가로 (900~1200px): 떠 있는 창을 조금 좁게 */
+@media (max-width: 1200px) {
+  body.ui-wide .mobile-shelf-sheet { width: 360px; }
+  body.ui-wide #modal-box-picker .modal-box { width: 420px !important; }
+  body.ui-wide .bottom-center-hud { max-width: calc(100% - 200px) !important; }
+}
+/* 데스크탑을 골랐지만 좁은 창(태블릿 세로): 아래 바는 모바일처럼 */
+@media (max-width: 760px) {
+  body.ui-wide .mobile-nav-bar { left: 0 !important; right: 0 !important; bottom: 0 !important; height: 52px !important; border-radius: 0; box-shadow: none !important; border-top: 1px solid #e7e0d5 !important; justify-content: space-around; }
+  body.ui-wide .bottom-center-hud { bottom: 64px !important; max-width: none !important; width: calc(100% - 24px) !important; }
+}
