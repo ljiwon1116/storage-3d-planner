@@ -6,7 +6,7 @@
   <title>수납 공간 꾸미기 - 옷장·서랍 3D로 짜보기</title>
   <meta name="theme-color" content="#f7f3ec" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <link rel="stylesheet" href="styles.css?v=1101b" />
+  <link rel="stylesheet" href="styles.css?v=1101c" />
   <script>
     // 실제로 보이는 화면 높이를 --vh 로 넣어요 (주소창·툴바가 생기고 없어질 때마다).
     // 브라우저마다 100vh 가 툴바를 포함해서 위아래가 잘리는 문제를 막아요.
@@ -475,6 +475,73 @@
     </div>
   </div>
 
+  <!-- ==================== 팝업: 목록에 없는 상자 직접 추가 ==================== -->
+  <div id="modal-add-box" class="modal-backdrop">
+    <div class="modal-box add-box-modal" role="dialog" aria-modal="true" aria-labelledby="add-box-title">
+      <div class="modal-header picker-head">
+        <div class="picker-head-text">
+          <span id="add-box-title" class="picker-head-title">상자 직접 추가</span>
+          <span class="picker-target-line">목록에 없는 상자를 이름과 크기로 넣어요</span>
+        </div>
+        <button id="btn-close-add-box" class="btn btn-sm picker-close-btn" type="button" aria-label="닫기">✕ 닫기</button>
+      </div>
+
+      <div class="ab-body">
+        <div class="ab-photo-row">
+          <label class="ab-photo" for="ab-photo-input">
+            <img id="ab-photo-preview" alt="" hidden />
+            <span id="ab-photo-empty" class="ab-photo-empty">
+              <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="10" r="1.8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+              <span>사진</span>
+            </span>
+          </label>
+          <input id="ab-photo-input" type="file" accept="image/*" hidden />
+          <div class="ab-photo-help">
+            <div class="ab-label">썸네일 <span class="ab-opt">선택</span></div>
+            <div class="ab-hint">상품 사진을 고르거나 찍어요. 없으면 크기로 그린 그림이 나와요.</div>
+            <button id="ab-photo-clear" class="pp-text-btn" type="button" hidden>사진 빼기</button>
+          </div>
+        </div>
+
+        <label class="ab-field">
+          <span class="ab-label">제품 이름</span>
+          <input id="ab-name" class="ab-input" type="text" maxlength="40" placeholder="예: 투명 서랍 정리함 대" />
+          <span id="ab-name-err" class="ab-err" hidden>제품 이름을 적어 주세요.</span>
+        </label>
+        <label class="ab-field">
+          <span class="ab-label">브랜드 <span class="ab-opt">선택</span></span>
+          <input id="ab-brand" class="ab-input" type="text" maxlength="20" placeholder="예: 다이소 (비우면 '내 상자')" />
+        </label>
+
+        <div class="ab-field">
+          <span class="ab-label">종류</span>
+          <div class="ab-chips" id="ab-kind" role="radiogroup" aria-label="상자 종류">
+            <button type="button" class="sp-chip selected" data-kind="front_drawer" role="radio" aria-checked="true">서랍형</button>
+            <button type="button" class="sp-chip" data-kind="top_open" role="radio" aria-checked="false">바구니형</button>
+            <button type="button" class="sp-chip" data-kind="top_lid" role="radio" aria-checked="false">뚜껑형</button>
+          </div>
+        </div>
+
+        <div class="ab-field">
+          <span class="ab-label">크기 <span class="ab-opt">mm · 바깥 크기</span></span>
+          <div class="ab-dims">
+            <label class="ab-dim"><span>가로</span><input id="ab-w" class="ab-input" type="number" inputmode="numeric" min="20" max="2000" placeholder="260" /></label>
+            <label class="ab-dim"><span>깊이</span><input id="ab-d" class="ab-input" type="number" inputmode="numeric" min="20" max="2000" placeholder="360" /></label>
+            <label class="ab-dim"><span>높이</span><input id="ab-h" class="ab-input" type="number" inputmode="numeric" min="20" max="2000" placeholder="150" /></label>
+          </div>
+          <span id="ab-dim-err" class="ab-err" hidden>가로·깊이·높이를 20~2000 mm로 적어 주세요.</span>
+          <span class="ab-hint">가로는 앞에서 본 폭, 깊이는 앞에서 뒤까지예요. cm이면 10을 곱해요.</span>
+        </div>
+
+        <label class="pp-toggle ab-toggle"><span>위로 쌓을 수 있어요</span><input id="ab-stack" type="checkbox" checked /></label>
+      </div>
+
+      <div class="ab-foot">
+        <button id="btn-add-box-save" class="btn btn-primary ab-save" type="button">목록에 추가</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ==================== 팝업 모달 2: 새 수납함 직접 등록 ==================== -->
   <div id="modal-custom-box" class="modal-backdrop">
     <div class="modal-box">
@@ -616,11 +683,11 @@
   </div>
 
   <!-- 애플리케이션 스크립트 로드 -->
-  <script src="js/presets.js?v=1101b"></script>
-  <script src="js/items.js?v=1101b"></script>
-  <script src="js/packer.js?v=1101b"></script>
-  <script src="js/scene3d.js?v=1101b"></script>
-  <script src="js/app.js?v=1101b"></script>
+  <script src="js/presets.js?v=1101c"></script>
+  <script src="js/items.js?v=1101c"></script>
+  <script src="js/packer.js?v=1101c"></script>
+  <script src="js/scene3d.js?v=1101c"></script>
+  <script src="js/app.js?v=1101c"></script>
 
   <!-- 보관함 자세히 보기: 뒤는 흐리게, 고른 보관함만 크게 + 물건 넣기 -->
   <div id="box-detail" class="box-detail" aria-hidden="true">
@@ -646,6 +713,6 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="js/boxdetail.js?v=1101b"></script>
+  <script src="js/boxdetail.js?v=1101c"></script>
 </body>
 </html>
