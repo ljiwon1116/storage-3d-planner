@@ -4,11 +4,11 @@
   const STORAGE_KEY_CUSTOM_MODELS = 'storagefit_custom_models_v1';
   const STORAGE_KEY_SAVED_COMBOS = 'storagefit_saved_combos_v1';
 
-  // 한국 아파트 ㄱ자 팬트리 기본값 (방 1500x1200, 선반 높이 2300, 깊이 400)
+  // 한국 아파트 ㄱ자 팬트리 기본값 (방 1500x1800, 선반 높이 2300, 깊이 400)
   function defaultPantry() {
     return {
       roomW: 1500,      // 뒤 벽 길이 (방 가로)
-      roomD: 1200,      // 옆 벽 길이 (방 깊이)
+      roomD: 1800,      // 옆 벽 길이 (방 깊이)
       h: 2300,          // 선반 전체 높이
       depthA: 400,      // 뒤 벽 선반 깊이
       depthB: 400,      // 옆 벽 선반 깊이
@@ -463,6 +463,7 @@
           btn.className = 'mobile-shelf-add-btn';
           btn.type = 'button';
           btn.innerHTML = `<span class="msab-num">${anc.label || anc.index + 1}</span><span class="msab-plus">+</span>`;
+          btn.setAttribute('aria-label', `${anc.label || anc.index + 1} 칸에 상자 넣기`);
           btn.dataset.idx = anc.index;
           btn.style.left = `${anc.x.toFixed(1)}px`;
           btn.style.top = `${anc.y.toFixed(1)}px`;
@@ -2008,7 +2009,7 @@
     const activeComp = compartments[compIdx] || compartments[0];
 
     document.getElementById('picker-target-space-badge').textContent =
-      `놓을 곳: ${activeComp.name} (${activeComp.w}×${activeComp.d}×높이 ${activeComp.clearH}mm)`;
+      `놓을 곳: ${activeComp.name} (${Math.round(activeComp.w)}×${Math.round(activeComp.d)}×높이 ${Math.round(activeComp.clearH)}mm)`;
 
     const tabsEl = document.getElementById('picker-brand-tabs');
     tabsEl.innerHTML = '';
@@ -2510,8 +2511,12 @@
       onResize: (h) => {
         const cv = document.getElementById('box-detail-canvas');
         if (cv) cv.style.bottom = h + 'px';
-        clearTimeout(setupResizableSheets.t);
-        setupResizableSheets.t = setTimeout(() => window.dispatchEvent(new Event('resize')), 30);
+        // 끄는 동안 매 화면마다 3D 크기를 바로 맞춤 (뚝뚝 끊기지 않게)
+        if (setupResizableSheets.raf) return;
+        setupResizableSheets.raf = requestAnimationFrame(() => {
+          setupResizableSheets.raf = 0;
+          if (window.BoxDetail && window.BoxDetail.resize) window.BoxDetail.resize();
+        });
       }
     });
     // 화면을 돌리면 끌어서 바꾼 높이는 처음대로

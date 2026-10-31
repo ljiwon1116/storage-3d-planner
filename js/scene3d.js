@@ -479,8 +479,9 @@ window.Scene3DManager = (function () {
     const shelfMat = new THREE.MeshStandardMaterial({ color: 0xf6f1e8, roughness: 0.7 });
     const postMat = new THREE.MeshStandardMaterial({ color: 0xe9e1d3, roughness: 0.6 });
     const edgeMat = new THREE.LineBasicMaterial({ color: 0xb9a78f });
-    const sideWallMat = new THREE.MeshStandardMaterial({
-      color: 0xfdfbf7, roughness: 0.92, transparent: true, opacity: 0.55, depthWrite: false
+    const sideWallMat = new THREE.MeshStandardMaterial({ color: 0xfbf8f2, roughness: 0.92 });
+    const nearWallMat = new THREE.MeshStandardMaterial({
+      color: 0xfdfbf7, roughness: 0.92, transparent: true, opacity: 0.22, depthWrite: false
     });
 
     const addPart = (w, h, d, x, y, z, rotY, mat) => {
@@ -498,12 +499,19 @@ window.Scene3DManager = (function () {
       return m;
     };
 
-    // 옆 벽 (반투명): 입구 반대쪽
-    if (p.wallB !== false) {
-      const sw = new THREE.Mesh(new THREE.BoxGeometry(24, Math.max(2400, H + 300), p.roomD), sideWallMat);
-      const sx = p.doorSide === 'right' ? -p.roomW / 2 - 12 : p.roomW / 2 + 12;
-      sw.position.set(sx, Math.max(2400, H + 300) / 2 - 2, 0);
-      roomEnvGroup.add(sw);
+    // 방 양옆 벽: 선반이 벽에 딱 붙어 보이게
+    // - 옆 선반 쪽 벽은 불투명, 입구 쪽 벽은 보는 쪽이라 거의 투명
+    {
+      const wallHgt = Math.max(2400, H + 300);
+      const rightX = p.roomW / 2 + 12, leftX = -p.roomW / 2 - 12;
+      const bOnLeft = p.doorSide === 'right';
+      const bWall = new THREE.Mesh(new THREE.BoxGeometry(24, wallHgt, p.roomD + 24), p.wallB === false ? nearWallMat : sideWallMat);
+      bWall.position.set(bOnLeft ? leftX : rightX, wallHgt / 2 - 2, -12);
+      bWall.receiveShadow = true;
+      roomEnvGroup.add(bWall);
+      const nWall = new THREE.Mesh(new THREE.BoxGeometry(24, wallHgt, p.roomD + 24), nearWallMat);
+      nWall.position.set(bOnLeft ? rightX : leftX, wallHgt / 2 - 2, -12);
+      roomEnvGroup.add(nWall);
     }
 
     // 선반 판: 칸(열)마다

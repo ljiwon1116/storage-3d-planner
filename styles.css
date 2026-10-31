@@ -3663,8 +3663,17 @@ body.ui-wide .drag-guide-card { max-width: 360px; }
 .pp-field input:disabled { color: var(--text-hint); background: #f3eee6; }
 
 /* 팬트리 칸 ＋ 버튼: '안1-2' 같은 이름이 들어가게 조금 넓게 */
-body.space-pantry #mobile-shelf-buttons .msab-num { font-size: 0.62rem; letter-spacing: -0.02em; white-space: nowrap; }
-body.space-pantry #mobile-shelf-buttons > * { min-width: 44px; width: auto; padding: 0 6px; }
+body.space-pantry #mobile-shelf-buttons .msab-num { display: none !important; }
+body.space-pantry #mobile-shelf-buttons .mobile-shelf-add-btn {
+  /* 팬트리는 칸이 많아서 ＋만, 크기는 60% */
+  min-width: 26px !important;
+  width: 26px !important;
+  height: 26px !important;
+  padding: 0 !important;
+  border-radius: 13px !important;
+  box-shadow: 0 2px 6px rgba(43, 38, 33, 0.16) !important;
+}
+body.space-pantry #mobile-shelf-buttons .msab-plus { font-size: 0.85rem !important; margin-top: 0 !important; line-height: 1; }
 /* 팬트리는 선반이 있어서 '기둥·선반' 버튼을 보여줌 */
 body.ui-mode-mobile.mobile-step-build.space-pantry .mobile-shelfh-btn { display: inline-flex; }
 
@@ -3925,3 +3934,67 @@ body.ui-mode-mobile #modal-box-picker .modal-box.has-grip::before { display: non
 #modal-box-picker .modal-box.has-grip .picker-grid { flex: 1 1 auto; max-height: none; min-height: 80px; }
 .mobile-shelf-sheet.has-grip #mobile-shelf-sheet-body { flex: 1 1 auto; min-height: 0; }
 .box-detail-sheet.has-grip .box-detail-list { flex: 1 1 auto; min-height: 0; }
+
+
+/* =====================================================================
+   상자 고르기 머리: 닫기 버튼 한 줄 · '놓을 곳' 한 줄 · 위 여백 최소
+   ===================================================================== */
+#modal-box-picker .picker-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.picker-head-text { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; }
+.picker-head-title {
+  font-size: clamp(0.95rem, 4.4vw, 1.15rem);
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#modal-box-picker .picker-target-line {
+  display: block;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: none !important;
+  border: none !important;
+  font-size: clamp(0.6rem, 2.9vw, 0.8rem) !important;
+  font-weight: 400;
+  color: var(--text-meta) !important;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.02em;
+}
+#modal-box-picker .picker-close-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  min-height: 32px !important;
+  height: 32px;
+  padding: 0 8px !important;
+  font-size: clamp(0.7rem, 3.2vw, 0.82rem) !important;
+  border-radius: 8px;
+  background: transparent !important;
+  color: var(--text-meta) !important;
+}
+#modal-box-picker .picker-close-btn:hover { background: #f3eee6 !important; color: var(--text-title) !important; }
+body.ui-mode-mobile #modal-box-picker .modal-box { gap: 6px !important; }
+#modal-box-picker .modal-box.has-grip .sheet-grip { height: 18px; }
+
+/* '비우기' 버튼들: 한 줄 고정, 화면 폭에 따라 글자 크기 */
+#box-detail-clear,
+.box-detail-ghost,
+.sheet-action-btn.danger,
+#btn-clear-plan {
+  white-space: nowrap !important;
+  flex-shrink: 0;
+  font-size: clamp(0.66rem, 3.1vw, 0.85rem) !important;
+  word-break: keep-all;
+}
+.box-detail-head { gap: 8px; }
+.box-detail-head > div:first-child { min-width: 0; }

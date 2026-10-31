@@ -522,5 +522,5 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
   else bind();
 
-  window.BoxDetail = { open, close, pack, innerSize };
+  window.BoxDetail = { open, close, pack, innerSize, resize: () => { if (cur) resize(); } };
 })();
