@@ -352,6 +352,91 @@
     ];
   }
 
+  // ---------- 문 열기 / 서랍 열기: 버튼 -> 작은 창 + 슬라이드바 ----------
+  function openCtrlMode() {
+    const sc = state.spaceConfig;
+    if (!sc) return null;
+    if (sc.type === 'drawer') return 'drawer';
+    if (sc.type === 'cabinet' && sc.cabinet && sc.cabinet.doorType && sc.cabinet.doorType !== 'none') return 'door';
+    return null;   // 팬트리 · 문 없는 장은 버튼 없음
+  }
+  function updateOpenCtrlButton() {
+    const btn = document.getElementById('btn-open-ctrl');
+    if (!btn) return;
+    const mode = openCtrlMode();
+    btn.style.display = mode ? '' : 'none';
+    btn.textContent = mode === 'drawer' ? '서랍 열기' : '문 열기';
+    if (!mode) setOpenCtrl(false);
+  }
+  function syncOpenCtrlPop() {
+    const mode = openCtrlMode();
+    const slider = document.getElementById('ocp-slider');
+    const val = document.getElementById('ocp-val');
+    const title = document.getElementById('ocp-title');
+    const maxEl = document.getElementById('ocp-max');
+    if (!slider || !val || !mode) return;
+    if (mode === 'door') {
+      title.textContent = '문 열기';
+      slider.min = 0; slider.max = 110; slider.step = 5;
+      slider.value = state.doorOpenAngle;
+      val.textContent = `${state.doorOpenAngle}°`;
+      maxEl.textContent = '활짝';
+    } else {
+      const pct = Math.round(state.drawerOpenRatio * 100);
+      title.textContent = '서랍 열기';
+      slider.min = 0; slider.max = 100; slider.step = 5;
+      slider.value = pct;
+      val.textContent = `${pct}%`;
+      maxEl.textContent = '다 열림';
+    }
+  }
+  function placeOpenCtrlPop() {
+    const pop = document.getElementById('open-ctrl-pop');
+    const btn = document.getElementById('btn-open-ctrl');
+    if (!pop || !btn) return;
+    const r = btn.getBoundingClientRect();
+    const w = pop.offsetWidth || 260;
+    const left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2));
+    pop.style.left = `${left}px`;
+    pop.style.bottom = `${Math.max(8, window.innerHeight - r.top + 8)}px`;
+  }
+  function setOpenCtrl(open) {
+    const pop = document.getElementById('open-ctrl-pop');
+    const bd = document.getElementById('open-ctrl-backdrop');
+    const btn = document.getElementById('btn-open-ctrl');
+    if (!pop || !bd) return;
+    if (open) syncOpenCtrlPop();
+    pop.hidden = !open;
+    bd.hidden = !open;
+    if (open) placeOpenCtrlPop();
+    if (btn) { btn.classList.toggle('active', open); btn.setAttribute('aria-expanded', open ? 'true' : 'false'); }
+  }
+  let openCtrlRaf = 0;
+  function bindOpenCtrl() {
+    const btn = document.getElementById('btn-open-ctrl');
+    const slider = document.getElementById('ocp-slider');
+    const bd = document.getElementById('open-ctrl-backdrop');
+    const pop = document.getElementById('open-ctrl-pop');
+    if (!btn || !slider || !bd || !pop) return;
+    btn.addEventListener('click', (e) => { e.stopPropagation(); setOpenCtrl(pop.hidden); });
+    bd.addEventListener('pointerdown', (e) => { e.preventDefault(); setOpenCtrl(false); });
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !pop.hidden) setOpenCtrl(false); });
+    window.addEventListener('resize', () => { if (!pop.hidden) placeOpenCtrlPop(); });
+    slider.addEventListener('input', () => {
+      const v = Number(slider.value);
+      if (openCtrlMode() === 'door') {
+        state.doorOpenAngle = v;
+        document.getElementById('ocp-val').textContent = `${v}°`;
+      } else {
+        state.drawerOpenRatio = v / 100;
+        document.getElementById('ocp-val').textContent = `${v}%`;
+      }
+      // 끄는 동안 화면마다 한 번만 다시 그림
+      if (openCtrlRaf) return;
+      openCtrlRaf = requestAnimationFrame(() => { openCtrlRaf = 0; refreshAll(); });
+    });
+  }
+
   function refreshAll() {
     document.body.classList.toggle('space-drawer', state.spaceConfig.type === 'drawer');
     document.body.classList.toggle('space-pantry', state.spaceConfig.type === 'pantry');
@@ -1606,7 +1691,7 @@
 
     document.getElementById('cabinet-config-section').style.display = isCab ? 'block' : 'none';
     document.getElementById('drawer-config-section').style.display = !isCab ? 'block' : 'none';
-    document.getElementById('hud-drawer-controls').style.display = !isCab ? 'flex' : 'none';
+    updateOpenCtrlButton();
 
     if (isCab) {
       const c = state.spaceConfig.cabinet;
@@ -3710,12 +3795,7 @@
       });
     });
 
-    const drawerSlider = document.getElementById('slider-drawer-open');
-    drawerSlider.addEventListener('input', () => {
-      state.drawerOpenRatio = Number(drawerSlider.value) / 100;
-      document.getElementById('drawer-open-pct').textContent = `${drawerSlider.value}%`;
-      refreshAll();
-    });
+    // (예전 서랍 열기 슬라이드바는 '문 열기 / 서랍 열기' 버튼 창으로 옮겼어요: bindOpenCtrl)
 
     document.getElementById('chk-show-deadzones').addEventListener('change', (e) => {
       state.showDeadzones = e.target.checked;
@@ -4014,6 +4094,8 @@
     document.getElementById('box-guide-ok')?.addEventListener('click', closeBoxGuide);
     setupResizableSheets();
     bindAddBoxModal();
+    bindOpenCtrl();
+    updateOpenCtrlButton();
     document.getElementById('box-guide')?.addEventListener('click', (e) => {
       if (e.target.id === 'box-guide') closeBoxGuide();
     });

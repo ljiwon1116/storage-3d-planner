@@ -4509,3 +4509,35 @@ body.ui-mode-mobile .ui-mode-switch .mode-switch-btn {
   padding: 4px 10px !important;
   border-radius: 999px;
 }
+
+
+/* 1101h: 종류 칸 글자 1pt 키움, '직접 추가'도 같은 글자 크기 */
+#modal-box-picker .kind-seg .kind-chip,
+#modal-box-picker .kind-seg .kind-bar,
+#modal-box-picker .kind-chips .kind-add-btn {
+  font-size: clamp(0.62rem, 2.9vw, 0.8rem) !important;
+}
+
+/* 문 열기 / 서랍 열기 작은 창 (버튼 위에 뜸, 위치는 JS가 정함) */
+.open-ctrl-pop {
+  position: fixed;
+  z-index: 61;
+  width: min(260px, calc(100vw - 16px));
+  padding: 10px 14px 8px;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--text-main);
+  box-shadow: 0 4px 16px rgba(28, 25, 22, 0.06), 0 0 0 1px #e7e0d5;
+  transform-origin: bottom center;
+  animation: finePadPop 0.14s ease-out;
+}
+.open-ctrl-pop[hidden] { display: none !important; }
+/* 부모 칸이 터치를 막아 두어서(pointer-events: none) 창과 뒤판은 터치를 다시 켜요 */
+.open-ctrl-pop, #open-ctrl-backdrop { pointer-events: auto; }
+.ocp-slider { touch-action: none; }
+.ocp-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ocp-title { font-size: 0.85rem; font-weight: 600; line-height: 1.4; }
+.ocp-val { font-size: 0.85rem; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.ocp-slider { width: 100%; margin: 8px 0 2px; accent-color: var(--accent); height: 28px; cursor: pointer; }
+.ocp-ends { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-sub); }
+#btn-open-ctrl.active { background: var(--accent-soft) !important; color: var(--accent) !important; }
