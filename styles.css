@@ -31,8 +31,8 @@ body {
   font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
   background-color: var(--bg-stage);
   color: var(--text-main);
-  height: 100vh;
-  width: 100vw;
+  height: calc(var(--vh, 1vh) * 100);
+  width: 100%;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -148,7 +148,7 @@ body {
   position: absolute;
   left: 22px;
   width: 325px;
-  max-width: calc(100vw - 44px);
+  max-width: calc(100% - 44px);
   background: var(--bg-panel);
   border-radius: 12px;
   border: 1px solid var(--border-strong);
@@ -160,14 +160,14 @@ body {
 
 .floating-top-left {
   top: 20px;
-  max-height: calc(100vh - 180px);
+  max-height: calc(calc(var(--vh, 1vh) * 100) - 180px);
   display: flex;
   flex-direction: column;
 }
 
 .floating-bottom-left {
   bottom: 20px;
-  max-height: 42vh;
+  max-height: calc(var(--vh, 1vh) * 42);
   display: flex;
   flex-direction: column;
 }
@@ -273,7 +273,7 @@ body {
 .how-to-use-popover {
   margin-top: 8px;
   width: 390px;
-  max-width: calc(100vw - 32px);
+  max-width: calc(100% - 32px);
   background: rgba(253, 251, 247, 0.97);
   border: 1px solid var(--border-strong);
   border-radius: 14px;
@@ -300,8 +300,8 @@ body {
   flex-direction: column;
   gap: 14px;
   width: 315px;
-  max-width: calc(100vw - 36px);
-  max-height: calc(100vh - 210px);
+  max-width: calc(100% - 36px);
+  max-height: calc(calc(var(--vh, 1vh) * 100) - 210px);
   overflow-y: auto;
   padding: 4px;
 }
@@ -379,7 +379,7 @@ body {
   bottom: 16px;
   right: 36px;
   width: 430px;
-  max-width: calc(100vw - 36px);
+  max-width: calc(100% - 36px);
   z-index: 19;
   display: flex;
   flex-direction: column;
@@ -786,7 +786,7 @@ body {
   border-radius: 14px;
   width: 620px;
   max-width: 95vw;
-  max-height: 90vh;
+  max-height: calc(var(--vh, 1vh) * 90);
   overflow-y: auto;
   padding: 18px;
   display: flex;
@@ -863,7 +863,7 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(235px, 1fr));
   gap: 12px;
-  max-height: 55vh;
+  max-height: calc(var(--vh, 1vh) * 55);
   overflow-y: auto;
   padding: 4px 2px;
 }
@@ -1139,7 +1139,7 @@ body.ui-mode-mobile .btn-how-to-use {
 
 body.ui-mode-mobile .how-to-use-popover {
   left: 0;
-  width: calc(100vw - 20px);
+  width: calc(100% - 20px);
 }
 
 /* 3D 캔버스 하단 미니 HUD */
@@ -1291,7 +1291,7 @@ body.ui-mode-mobile .shelf-callout-card {
 
 /* 선반을 누르면 그 아래로 펴지는 관리 패널 = 작은 팝업 */
 body.ui-mode-mobile .shelf-expanded-panel {
-  max-height: 44vh;
+  max-height: calc(var(--vh, 1vh) * 44);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   box-shadow: var(--shadow-md);
@@ -1870,7 +1870,7 @@ body.ui-mode-mobile #modal-box-picker.modal-backdrop {
 body.ui-mode-mobile #modal-box-picker .modal-box {
   width: 100%;
   max-width: 100%;
-  max-height: 62vh;
+  max-height: calc(var(--vh, 1vh) * 62);
   border-radius: 18px 18px 0 0;
   margin: 0;
 }
@@ -1909,8 +1909,8 @@ body.ui-mode-mobile.mobile-step-build.space-drawer .mobile-shelfh-btn {
   right: 10px;
   left: auto;
   width: 280px;
-  max-width: calc(100vw - 20px);
-  max-height: 40vh;
+  max-width: calc(100% - 20px);
+  max-height: calc(var(--vh, 1vh) * 40);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   background: var(--bg-panel);
@@ -1951,7 +1951,7 @@ body.ui-mode-mobile .mobile-setup-footer { display: none !important; }
 body.ui-mode-mobile.mobile-step-setup #canvas-wrapper {
   top: 56px !important;
   bottom: auto !important;
-  height: 34vh !important;
+  height: calc(var(--vh, 1vh) * 34) !important;
   pointer-events: none;
 }
 
@@ -2005,7 +2005,7 @@ body.ui-mode-mobile.mobile-step-setup .wiz-panel {
   display: flex;
   flex-direction: column;
   position: absolute;
-  top: calc(56px + 34vh);
+  top: calc(56px + calc(var(--vh, 1vh) * 34));
   left: 0; right: 0; bottom: 0;
   background: var(--bg-panel);
   border-top-left-radius: 22px;
@@ -2830,8 +2830,8 @@ body.ui-mode-mobile .wiz-btn { height: 52px; border-radius: 12px; }
   top: 64px;               /* 칩(12 + 44) 아래 8px */
   left: var(--sp-3);
   width: 320px;
-  max-width: calc(100vw - 24px);
-  max-height: 46vh;
+  max-width: calc(100% - 24px);
+  max-height: calc(var(--vh, 1vh) * 46);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   background: var(--bg-panel);
@@ -2980,7 +2980,7 @@ body.box-detail-open .box-detail {
 .box-detail-canvas {
   position: absolute;
   top: 56px; left: 0; right: 0;
-  bottom: 48vh;
+  bottom: calc(var(--vh, 1vh) * 48);
   z-index: 1;
 }
 .box-detail-canvas canvas { display: block; touch-action: none; }
@@ -2988,7 +2988,7 @@ body.box-detail-open .box-detail {
 .box-detail-sheet {
   position: absolute;
   left: 0; right: 0; bottom: 0;
-  height: 48vh;
+  height: calc(var(--vh, 1vh) * 48);
   max-width: 560px;
   margin: 0 auto;
   display: flex;
@@ -3172,10 +3172,10 @@ body.box-detail-open .box-detail {
 .bd-step:disabled { color: var(--text-hint); box-shadow: none; background: var(--surface-2); cursor: not-allowed; }
 
 /* 모든 화면: 위~가운데 보관함 3D, 아래 물건 목록 (폭 꽉 채움) */
-.box-detail-canvas { top: 56px; left: 0; right: 0; bottom: max(36vh, 260px); }
+.box-detail-canvas { top: 56px; left: 0; right: 0; bottom: max(calc(var(--vh, 1vh) * 36), 260px); }
 .box-detail-sheet {
   top: auto; left: 0; right: 0; bottom: 0;
-  width: auto; height: max(36vh, 260px);
+  width: auto; height: max(calc(var(--vh, 1vh) * 36), 260px);
   max-width: none; margin: 0;
   border-radius: 20px 20px 0 0;
 }
@@ -3305,3 +3305,327 @@ body.ui-mode-mobile .mobile-setup-popup { box-shadow: var(--shadow-sm); -webkit-
 .box-detail-list .bd-pick { border-radius: var(--radius-md); background: var(--surface-1); }
 .box-detail-list .bd-pick.on { background: var(--surface-2); box-shadow: inset 0 0 0 1.5px var(--accent); }
 .bd-pick .bd-num { font-size: 13px; font-weight: 600; }
+
+
+/* ---------- 보관함 자세히 보기: 추천 조합 (루틴랩) ---------- */
+.box-detail-recs { padding: 0 16px 8px; }
+.box-detail-recs[hidden] { display: none; }
+.bd-recs-h { font-size: 0.8rem; font-weight: 600; color: var(--text-meta); line-height: 1.5; margin-bottom: 8px; }
+.bd-recs-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.bd-recs-row::-webkit-scrollbar { display: none; }
+.bd-rec {
+  flex: 0 0 auto;
+  width: 168px;
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px 12px;
+  border: 1px solid #e7e0d5;
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--text-title);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, transform 0.1s;
+}
+.bd-rec:hover { background: #faf7f2; }
+.bd-rec:active { transform: scale(0.98); }
+.bd-rec:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bd-rec.on { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 0.5px var(--accent); }
+.bd-rec-top { width: 100%; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.bd-rec-name { font-size: 0.9rem; font-weight: 600; letter-spacing: -0.008em; line-height: 1.4; }
+.bd-rec-pct { font-size: 0.8rem; font-weight: 700; color: var(--accent); line-height: 1.4; }
+.bd-rec-items {
+  width: 100%;
+  font-size: 0.75rem;
+  color: var(--text-meta);
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* =====================================================================
+   반응형: 폰 기종·브라우저마다 위아래가 잘리지 않게
+   - 높이는 --vh(실제로 보이는 화면 높이의 1%)로 계산. js가 화면이 바뀔 때마다 넣어 줌
+   - js가 없을 때도 주소창을 뺀 높이(dvh)를 씀
+   ===================================================================== */
+:root { --vh: 1vh; }
+@supports (height: 1dvh) { :root { --vh: 1dvh; } }
+html { height: 100%; overflow: hidden; }
+body { min-height: 0; }
+
+/* 보관함 자세히 보기: 물건 목록이 화면 절반을 넘지 않게 */
+.box-detail { height: calc(var(--vh, 1vh) * 100); bottom: auto; }
+.box-detail-canvas { bottom: min(max(calc(var(--vh, 1vh) * 36), 260px), calc(var(--vh, 1vh) * 55)); }
+.box-detail-sheet  { height: min(max(calc(var(--vh, 1vh) * 36), 260px), calc(var(--vh, 1vh) * 55)); }
+
+/* 아주 좁은 폰 (예: 갤럭시 폴드 접은 화면, 아이폰 SE) */
+@media (max-width: 360px) {
+  :root { --pad-x: 16px; }
+  .wiz-title { font-size: 1.25rem; }
+  .bd-rec { width: 148px; }
+}
+
+/* 키가 작은 화면 (작은 폰, 키보드가 올라온 때) */
+@media (max-height: 640px) {
+  body.ui-mode-mobile.mobile-step-setup #canvas-wrapper { height: calc(var(--vh, 1vh) * 26) !important; }
+  body.ui-mode-mobile.mobile-step-setup .wiz-panel { top: calc(56px + calc(var(--vh, 1vh) * 26)); }
+  body.ui-mode-mobile .wiz-title { margin-bottom: 4px; }
+  body.ui-mode-mobile .wiz-hint { margin-bottom: 16px; }
+  .wiz-control { margin-top: 16px; }
+}
+
+/* 폰을 눕힌 화면: 위아래로 나누면 둘 다 너무 낮아서 좌우로 나눔 */
+@media (orientation: landscape) and (max-height: 520px) {
+  body.ui-mode-mobile.mobile-step-setup #canvas-wrapper {
+    top: 56px !important;
+    left: 0 !important;
+    right: auto !important;
+    bottom: 0 !important;
+    width: 45% !important;
+    height: auto !important;
+  }
+  body.ui-mode-mobile.mobile-step-setup .wiz-panel {
+    top: 56px;
+    left: 45%;
+    right: 0;
+    bottom: 0;
+    border-top-right-radius: 0;
+    border-bottom-left-radius: 22px;
+  }
+  .box-detail-canvas { top: 56px; left: 0; right: 50%; bottom: 0; }
+  .box-detail-sheet {
+    top: 56px; left: 50%; right: 0; bottom: 0;
+    height: auto;
+    border-radius: 20px 0 0 0;
+  }
+  body.ui-mode-mobile .mobile-shelfh-popup,
+  body.ui-mode-mobile .mobile-setup-popup { max-height: calc(calc(var(--vh, 1vh) * 100) - 120px); }
+}
+
+/* 태블릿처럼 넓은 세로 화면: 글과 버튼이 너무 길게 퍼지지 않게 가운데로 */
+@media (min-width: 600px) and (orientation: portrait) {
+  body.ui-mode-mobile .wiz-inner,
+  body.ui-mode-mobile .wiz-actions {
+    width: 100%;
+    max-width: 560px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* =====================================================================
+   상단 바 가운데: 만든 사람 (@joshleeliving)
+   ===================================================================== */
+.app-header { position: relative; }
+.header-maker {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0 8px;
+  border-radius: 8px;
+  color: var(--text-meta);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  line-height: 1.4;
+  text-decoration: none;
+  white-space: nowrap;
+  z-index: 2;
+  transition: color 0.15s, background-color 0.15s;
+}
+.header-maker:hover { color: var(--accent); background: var(--accent-soft); }
+.header-maker:active { transform: translate(-50%, -50%) scale(0.98); }
+.header-maker:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* 첫 설정 화면에서는 위쪽 바가 없음 */
+body.ui-mode-mobile.mobile-step-setup .header-maker { display: none; }
+@media (max-width: 400px) {
+  .header-maker { font-size: 0.7rem; padding: 0 4px; }
+  .header-maker svg { display: none; }
+  body.ui-mode-mobile .brand-title > span { font-size: 0.92rem; }
+}
+@media (max-width: 340px) {
+  .header-maker { display: none; }
+}
+
+/* =====================================================================
+   3D 화면 처음 들어왔을 때: 끌어서 돌리는 법 안내
+   ===================================================================== */
+.drag-guide {
+  position: absolute;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(43, 38, 33, 0.32);
+}
+.drag-guide[hidden] { display: none; }
+.drag-guide-card {
+  width: 100%;
+  max-width: 320px;
+  padding: 24px;
+  border-radius: 16px;
+  background: var(--bg-panel);
+  color: var(--text-title);
+  box-shadow: 0 4px 16px rgba(28, 25, 22, 0.06);
+  text-align: center;
+}
+.drag-guide-icon {
+  color: var(--accent);
+  animation: dragGuideSwing 1.6s ease-in-out 3;
+}
+@keyframes dragGuideSwing {
+  0%, 100% { transform: translateX(0); }
+  30% { transform: translateX(-10px); }
+  70% { transform: translateX(10px); }
+}
+@media (prefers-reduced-motion: reduce) { .drag-guide-icon { animation: none; } }
+.drag-guide-title { margin: 12px 0 16px; font-size: 1.25rem; font-weight: 600; letter-spacing: -0.01em; line-height: 1.4; }
+.drag-guide-list { list-style: none; margin: 0 0 24px; padding: 0; text-align: left; }
+.drag-guide-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 0;
+  border-top: 1px solid #e7e0d5;
+  font-size: 0.85rem;
+  color: var(--text-meta);
+  line-height: 1.5;
+}
+.drag-guide-list li b { font-size: 0.95rem; font-weight: 600; color: var(--text-title); }
+.drag-guide-ok {
+  width: 100%;
+  height: 52px;
+  border: none;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #fff;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s, transform 0.1s;
+}
+.drag-guide-ok:hover { background: var(--accent-hover); }
+.drag-guide-ok:active { transform: scale(0.98); }
+.drag-guide-ok:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* =====================================================================
+   데스크탑·태블릿 (화면 종류 '데스크탑'): 모바일과 같은 흐름, 넓은 화면 배치
+   - 첫 설정: 왼쪽 큰 3D 미리보기 + 오른쪽 질문 칸
+   - 3D 화면: 아래에서 올라오던 창은 오른쪽 아래 떠 있는 창으로
+   - 보관함 자세히 보기: 왼쪽 3D + 오른쪽 물건 목록
+   ===================================================================== */
+body.ui-wide { --wide-panel: 440px; }
+@media (max-width: 1100px) { body.ui-wide { --wide-panel: 380px; } }
+
+body.ui-wide.mobile-step-build .app-header { height: 56px; padding: 0 24px !important; }
+body.ui-wide .header-maker { font-size: 0.85rem; }
+
+/* 첫 설정 */
+body.ui-wide.mobile-step-setup #canvas-wrapper {
+  top: 56px !important;
+  left: 0 !important;
+  right: var(--wide-panel) !important;
+  bottom: 0 !important;
+  width: auto !important;
+  height: auto !important;
+}
+body.ui-wide.mobile-step-setup .wiz-top { right: var(--wide-panel); }
+body.ui-wide.mobile-step-setup .wiz-panel {
+  top: 0 !important;
+  left: auto !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: var(--wide-panel);
+  border-radius: 0 !important;
+  border-left: 1px solid #e7e0d5;
+  box-shadow: none !important;
+  padding-top: 32px;
+}
+body.ui-wide .wiz-inner,
+body.ui-wide .wiz-actions { max-width: none; margin: 0; }
+body.ui-wide .wiz-inner { padding-left: 32px; padding-right: 32px; }
+body.ui-wide .wiz-actions { padding-left: 32px; padding-right: 32px; }
+
+/* 3D 화면: 떠 있는 창 */
+body.ui-wide .mobile-shelf-sheet {
+  left: auto !important;
+  right: 24px !important;
+  bottom: 24px !important;
+  width: 400px;
+  max-height: min(70%, 640px) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 4px 16px rgba(28, 25, 22, 0.06), 0 0 0 1px #e7e0d5 !important;
+}
+body.ui-wide .mobile-sheet-backdrop { background: transparent !important; }
+body.ui-wide #modal-box-picker.modal-backdrop {
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 24px;
+  background: rgba(43, 38, 33, 0.12);
+}
+body.ui-wide #modal-box-picker .modal-box {
+  width: 480px !important;
+  max-width: calc(100% - 48px) !important;
+  max-height: calc(calc(var(--vh, 1vh) * 100) - 120px) !important;
+  border-radius: 16px !important;
+}
+body.ui-wide #modal-box-picker .modal-box::before { display: none; }
+body.ui-wide .mobile-setup-popup,
+body.ui-wide .mobile-shelfh-popup { width: 360px; max-width: calc(100% - 48px); }
+body.ui-wide.mobile-step-build .mobile-edit-setup-btn { left: 24px; top: 16px; }
+body.ui-wide.mobile-step-build .mobile-shelfh-btn { right: 24px; top: 16px; }
+body.ui-wide .hud-pill-bar { bottom: 24px; }
+
+/* 보관함 자세히 보기 */
+body.ui-wide .box-detail-canvas { top: 56px; left: 0; right: var(--wide-panel); bottom: 0; }
+body.ui-wide .box-detail-sheet {
+  top: 56px; left: auto; right: 0; bottom: 0;
+  width: var(--wide-panel);
+  height: auto;
+  border-radius: 0;
+  border-left: 1px solid #e7e0d5;
+  box-shadow: none;
+}
+body.ui-wide .box-detail-list { display: block; }
+body.ui-wide .box-detail-list .bd-pick { margin-top: 0; }
+body.ui-wide .box-detail-list .bd-pick:first-child { margin-top: 8px; }
+body.ui-wide .drag-guide-card { max-width: 360px; }
+
+/* 데스크탑을 골랐지만 폭이 좁은 창(태블릿 세로 등): 위아래로 나눔 */
+@media (max-width: 760px) {
+  body.ui-wide.mobile-step-setup #canvas-wrapper { right: 0 !important; bottom: auto !important; height: calc(var(--vh, 1vh) * 34) !important; }
+  body.ui-wide.mobile-step-setup .wiz-top { right: 0; }
+  body.ui-wide.mobile-step-setup .wiz-panel {
+    top: calc(56px + calc(var(--vh, 1vh) * 34)) !important;
+    left: 0 !important;
+    width: auto;
+    border-left: none;
+    border-radius: 22px 22px 0 0 !important;
+    padding-top: 0;
+  }
+  body.ui-wide .box-detail-canvas { right: 0; bottom: min(max(calc(var(--vh, 1vh) * 36), 260px), calc(var(--vh, 1vh) * 55)); }
+  body.ui-wide .box-detail-sheet {
+    top: auto; left: 0; width: auto;
+    height: min(max(calc(var(--vh, 1vh) * 36), 260px), calc(var(--vh, 1vh) * 55));
+    border-left: none; border-radius: 20px 20px 0 0;
+  }
+}

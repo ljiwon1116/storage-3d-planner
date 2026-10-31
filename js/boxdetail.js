@@ -338,6 +338,83 @@
     if (tipFor && !ev.target.closest('.bd-tip') && !ev.target.closest('.bd-info')) hideSizeTip();
   });
 
+  // ---------- 추천 조합 (루틴랩 보관함만) ----------
+  // 묶음마다 물건 1~3개 조합을 모두 채워 보고, 고른 물건이 다 들어가면서
+  // 가장 꽉 차는 조합을 골라요. 크기 계산으로 고르니 늘 실제로 들어가요.
+  const REC_THEMES = [
+    { name: '라면', ids: ['shin-ramyun', 'yukgaejang-cup', 'jin-cup-small', 'chamggae-cup-big'] },
+    { name: '통조림', ids: ['tuna-can', 'spam-340', 'gochujang-1kg'] },
+    { name: '간식', ids: ['chocopie-box', 'cereal-box', 'tuna-can', 'spam-340'] },
+    { name: '음료', ids: ['water-2l', 'coke-355', 'guinness-440'] },
+    { name: '생활용품', ids: ['tshirt', 'wet-wipes', 'toilet-roll'] }
+  ];
+  const recCache = {};   // model.id -> 추천 목록
+
+  function subsets(arr, max) {
+    const out = [];
+    const walk = (start, acc) => {
+      if (acc.length) out.push(acc.slice());
+      if (acc.length >= max) return;
+      for (let i = start; i < arr.length; i++) { acc.push(arr[i]); walk(i + 1, acc); acc.pop(); }
+    };
+    walk(0, []);
+    return out;
+  }
+
+  function recommend(model) {
+    if (recCache[model.id]) return recCache[model.id];
+    const inner = innerSize(model);
+    const have = new Set((window.HOUSEHOLD_ITEMS || []).map((m) => m.id));
+    const recs = [];
+    const usedKeys = new Set();
+    REC_THEMES.forEach((th) => {
+      const ids = th.ids.map((s) => 'item-' + s).filter((id) => have.has(id));
+      const cands = [];
+      subsets(ids, 3).forEach((picks) => {
+        const r = pack(inner, picks);
+        if (r.left.length || !r.placed.length || r.fill < 30) return;
+        cands.push({ picks, fill: r.fill, counts: r.counts });
+      });
+      // 더 꽉 차는 순, 같으면 물건 종류가 많은 순
+      cands.sort((a, b) => b.fill - a.fill || b.picks.length - a.picks.length);
+      // 다른 묶음과 똑같은 조합은 건너뛰고 다음 조합을 씀
+      const best = cands.find((c) => !usedKeys.has(c.picks.slice().sort().join('|')));
+      if (!best) return;
+      usedKeys.add(best.picks.slice().sort().join('|'));
+      recs.push({ name: th.name, ...best });
+    });
+    recs.sort((a, b) => b.fill - a.fill);
+    return (recCache[model.id] = recs.slice(0, 4));
+  }
+
+  function renderRecs() {
+    const el = document.getElementById('box-detail-recs');
+    if (!el) return;
+    const recs = cur.model.brand === '루틴랩' ? recommend(cur.model) : [];
+    el.hidden = !recs.length;
+    if (!recs.length) { el.innerHTML = ''; return; }
+    const items = window.HOUSEHOLD_ITEMS || [];
+    const nameOf = (id) => (items.find((m) => m.id === id) || {}).name || '';
+    const same = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
+    el.innerHTML = '<div class="bd-recs-h">추천 조합</div><div class="bd-recs-row"></div>';
+    const row = el.querySelector('.bd-recs-row');
+    recs.forEach((rc) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'bd-rec' + (same(rc.picks, cur.box.picks || []) ? ' on' : '');
+      const detail = rc.picks.map((id) => `${nameOf(id)} ${rc.counts[id]}개`).join(' · ');
+      b.innerHTML = `<span class="bd-rec-top"><span class="bd-rec-name">${rc.name}</span><span class="bd-rec-pct">${rc.fill}%</span></span>` +
+        `<span class="bd-rec-items">${detail}</span>`;
+      b.addEventListener('click', () => {
+        cur.box.picks = rc.picks.slice();
+        renderList();
+        drawItems();
+        if (cur.onChange) cur.onChange();
+      });
+      row.appendChild(b);
+    });
+  }
+
   // ---------- 화면 글자·목록 ----------
   function renderSummary(inner, res) {
     const total = res.placed.length;
@@ -355,6 +432,7 @@
   }
 
   function renderList(res) {
+    renderRecs();
     const list = document.getElementById('box-detail-list');
     const items = window.HOUSEHOLD_ITEMS || [];
     const inner = innerSize(cur.model);

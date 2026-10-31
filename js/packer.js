@@ -259,10 +259,10 @@ window.PackerEngine = (function () {
           const hiddenDepth = Math.min(dims.d, drwConst.unexposedD - zMin);
           if (model.accessType === 'top_open' || model.accessType === 'top_lid') {
             setSeverity('warn');
-            issues.push(`[안 보이는 곳 주의] '${model.name}'의 안쪽 ${Math.round(hiddenDepth)}mm가 서랍을 다 열어도 가려져서 위로 꺼내기 불편해요.`);
+            issues.push(`[꺼내기 힘든 곳 주의] '${model.name}'의 안쪽 ${Math.round(hiddenDepth)}mm가 서랍을 다 열어도 가려져서 위로 꺼내기 불편해요.`);
           } else {
             setSeverity('warn');
-            issues.push(`[안 보이는 곳] '${model.name}'의 일부(${Math.round(hiddenDepth)}mm)가 서랍 안쪽 안 보이는 곳에 있어요.`);
+            issues.push(`[꺼내기 힘든 곳] '${model.name}'의 일부(${Math.round(hiddenDepth)}mm)가 서랍 안쪽 꺼내기 힘든 곳에 있어요.`);
           }
         }
       }

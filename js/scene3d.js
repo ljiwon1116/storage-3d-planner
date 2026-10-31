@@ -387,13 +387,19 @@ window.Scene3DManager = (function () {
   }
 
   // 첨부 샘플 이미지와 같은 깔끔한 웜톤 가정집 실내 배경 (벽면 + 따뜻한 마루 바닥)
+  // 2단 서랍장: 아래 단(닫힌 빈 서랍) + 받침 높이. 위 단과 같은 높이로 맞춰요
+  function drawerLowerBodyH(spaceConfig) {
+    const clearH = window.PackerEngine.getDrawerConstraints(spaceConfig).clearanceH;
+    return Math.max(120, clearH + 64);
+  }
+
   function buildWarmHomeRoomEnvironment(spaceConfig) {
     const isCab = spaceConfig.type === 'cabinet';
     const W = isCab ? spaceConfig.cabinet.w : spaceConfig.drawer.w;
     const D = isCab ? spaceConfig.cabinet.d : spaceConfig.drawer.d;
     const H = isCab ? spaceConfig.cabinet.h : spaceConfig.drawer.h;
 
-    const floorY = isCab ? -46 : -360;
+    const floorY = isCab ? -46 : -14 - drawerLowerBodyH(spaceConfig);
     const backWallZ = -D / 2 - 24;
 
     const roomW = 2400;
@@ -695,11 +701,13 @@ window.Scene3DManager = (function () {
 
   function buildDrawerScene(spaceConfig) {
     const d = spaceConfig.drawer;
-    const W = d.w, D = d.d, wallH = d.h;
+    const W = d.w, D = d.d;
     const drwConst = window.PackerEngine.getDrawerConstraints(spaceConfig);
     const clearH = drwConst.clearanceH;
     const exposedD = drwConst.exposedD;
     const unexposedD = drwConst.unexposedD;
+    // 서랍 벽 높이는 '넣을 수 있는 높이'를 따라가요 (높이를 올리면 벽·앞판도 같이 올라감)
+    const wallH = Math.max(40, clearH - 8);
 
     const chestWoodMat = new THREE.MeshStandardMaterial({
       color: 0xc8a47e,
@@ -713,7 +721,7 @@ window.Scene3DManager = (function () {
     });
     const chestEdgeMat = new THREE.LineBasicMaterial({ color: 0x8c6d4e });
 
-    const lowerBodyH = 346;
+    const lowerBodyH = drawerLowerBodyH(spaceConfig);
     const lowerGeom = new THREE.BoxGeometry(W + 52, lowerBodyH, D + 30);
     const lowerMesh = new THREE.Mesh(lowerGeom, chestWoodMat);
     lowerMesh.position.set(0, -14 - lowerBodyH / 2, -8);
@@ -723,6 +731,27 @@ window.Scene3DManager = (function () {
     const lowerLine = new THREE.LineSegments(new THREE.EdgesGeometry(lowerGeom), chestEdgeMat);
     lowerLine.position.copy(lowerMesh.position);
     drawerStaticGroup.add(lowerLine);
+
+    // 아래 단: 닫혀 있는 빈 서랍 (앞판 + 손잡이). 위 단만 채워요
+    {
+      const lowFrontH = clearH - 2;
+      const lowFrontY = -14 - 8 - lowFrontH / 2;
+      const lowFrontZ = -8 + (D + 30) / 2 + 9;
+      const lowFrontGeom = new THREE.BoxGeometry(W + 44, lowFrontH, 18);
+      const lowFrontMat = new THREE.MeshStandardMaterial({ color: 0xd2b08c, roughness: 0.5 });
+      const lowFront = new THREE.Mesh(lowFrontGeom, lowFrontMat);
+      lowFront.position.set(0, lowFrontY, lowFrontZ);
+      lowFront.castShadow = true;
+      drawerStaticGroup.add(lowFront);
+      const lowFrontLine = new THREE.LineSegments(new THREE.EdgesGeometry(lowFrontGeom), chestEdgeMat);
+      lowFrontLine.position.copy(lowFront.position);
+      drawerStaticGroup.add(lowFrontLine);
+
+      const lowHandleGeom = new THREE.BoxGeometry(Math.min(140, W * 0.32), 14, 22);
+      const lowHandle = new THREE.Mesh(lowHandleGeom, new THREE.MeshStandardMaterial({ color: 0x6e5034, metalness: 0.2, roughness: 0.4 }));
+      lowHandle.position.set(0, lowFrontY + lowFrontH * 0.08, lowFrontZ + 17);
+      drawerStaticGroup.add(lowHandle);
+    }
 
     const topCoverGeom = new THREE.BoxGeometry(W + 56, 20, D + 34);
     const topCoverMesh = new THREE.Mesh(topCoverGeom, chestTopMat);
@@ -737,6 +766,31 @@ window.Scene3DManager = (function () {
     const lintelMesh = new THREE.Mesh(lintelGeom, lintelMat);
     lintelMesh.position.set(0, clearH, D / 2);
     drawerStaticGroup.add(lintelMesh);
+
+    // 서랍장 몸통의 옆판·뒤판 (반투명): 서랍 칸이 옆으로 뚫려 보이지 않게
+    const chestSideMat = new THREE.MeshStandardMaterial({
+      color: 0xd2b08c,
+      roughness: 0.6,
+      transparent: true,
+      opacity: xrayMode ? 0.12 : 0.3,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const sideT = 12;
+    const chestInnerHalf = (W + 52) / 2;
+    const addChestPart = (pw, ph, pd, px, py, pz) => {
+      const g = new THREE.BoxGeometry(pw, ph, pd);
+      const m = new THREE.Mesh(g, chestSideMat);
+      m.position.set(px, py, pz);
+      m.renderOrder = 1;
+      drawerStaticGroup.add(m);
+      const el = new THREE.LineSegments(new THREE.EdgesGeometry(g), chestEdgeMat);
+      el.position.copy(m.position);
+      drawerStaticGroup.add(el);
+    };
+    addChestPart(sideT, clearH + 14, D + 30, -chestInnerHalf + sideT / 2, (clearH - 14) / 2, -8);
+    addChestPart(sideT, clearH + 14, D + 30, chestInnerHalf - sideT / 2, (clearH - 14) / 2, -8);
+    addChestPart(W + 52, clearH + 14, sideT, 0, (clearH - 14) / 2, -8 - (D + 30) / 2 + sideT / 2);
 
     const slideOffsetZ = drawerOpenRatio * exposedD;
     drawerSlidingGroup.position.set(0, 0, slideOffsetZ);
@@ -767,7 +821,8 @@ window.Scene3DManager = (function () {
     addDrawerPart(wallT, wallH, D, W / 2 + wallT / 2, wallH / 2, 0);
     addDrawerPart(W + wallT * 2, wallH, wallT, 0, wallH / 2, -D / 2 - wallT / 2);
 
-    const frontPanelH = Math.max(wallH, Math.min(clearH - 4, wallH + 28));
+    // 앞판(손잡이 쪽 벽)도 높이를 따라 올라가요
+    const frontPanelH = Math.max(wallH, clearH - 2);
     const frontPanelMat = new THREE.MeshStandardMaterial({
       color: 0xd2b08c,
       roughness: 0.5,
@@ -1252,6 +1307,12 @@ window.Scene3DManager = (function () {
     createFrustumGeometry,
     resize: () => {
       if (containerEl) onWindowResize(containerEl);
+    },
+    // 지금 3D 화면을 그림(dataURL)으로 (바로 다시 그린 뒤 읽어서 빈 그림이 안 나와요)
+    snapshot: () => {
+      if (!renderer || !scene || !camera) return null;
+      renderer.render(scene, camera);
+      return renderer.domElement.toDataURL('image/png');
     }
   };
 })();

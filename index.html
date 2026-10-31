@@ -6,7 +6,29 @@
   <title>수납 공간 꾸미기 - 옷장·서랍 3D로 짜보기</title>
   <meta name="theme-color" content="#f7f3ec" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <link rel="stylesheet" href="styles.css?v=1031d" />
+  <link rel="stylesheet" href="styles.css?v=1031h" />
+  <script>
+    // 실제로 보이는 화면 높이를 --vh 로 넣어요 (주소창·툴바가 생기고 없어질 때마다).
+    // 브라우저마다 100vh 가 툴바를 포함해서 위아래가 잘리는 문제를 막아요.
+    (function () {
+      var last = 0, timer = null;
+      function setVh() {
+        var vv = window.visualViewport;
+        var h = Math.round((vv && vv.height) || window.innerHeight || document.documentElement.clientHeight);
+        if (!h || h === last) return;
+        last = h;
+        document.documentElement.style.setProperty('--vh', (h / 100) + 'px');
+        // 3D 화면 크기도 다시 맞추게 알려 줌 (값이 바뀔 때만)
+        clearTimeout(timer);
+        timer = setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 60);
+      }
+      setVh();
+      window.addEventListener('resize', setVh);
+      window.addEventListener('orientationchange', function () { setTimeout(setVh, 250); });
+      if (window.visualViewport) window.visualViewport.addEventListener('resize', setVh);
+      document.addEventListener('DOMContentLoaded', setVh);
+    })();
+  </script>
   <!-- Three.js & OrbitControls CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -17,10 +39,16 @@
     <div class="brand-title">
       <span>수납 공간 꾸미기</span>
       <div class="ui-mode-switch" role="group" aria-label="화면 종류 고르기">
-        <button id="btn-mode-mobile" type="button" class="mode-switch-btn active" title="폰 화면에 맞춘 화면">폰</button>
-        <button id="btn-mode-pc" type="button" class="mode-switch-btn" title="큰 화면에 맞춘 화면">큰 화면</button>
+        <button id="btn-mode-mobile" type="button" class="mode-switch-btn active" title="폰에 맞춘 화면">모바일</button>
+        <button id="btn-mode-pc" type="button" class="mode-switch-btn" title="컴퓨터·태블릿에 맞춘 화면">데스크탑</button>
       </div>
     </div>
+
+    <!-- 상단 바 가운데: 만든 사람 -->
+    <a class="header-maker" href="https://www.instagram.com/joshleeliving/" target="_blank" rel="noopener noreferrer" aria-label="만든 사람 인스타그램 @joshleeliving">
+      <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="17.3" cy="6.7" r="1.1" fill="currentColor"/></svg>
+      <span>joshleeliving</span>
+    </a>
 
     <!-- 중앙 시안 탭 바 -->
     <div class="header-plan-tabs">
@@ -41,6 +69,24 @@
   <main class="stage-container">
     <!-- 3D 캔버스 -->
     <div id="canvas-wrapper"></div>
+
+    <!-- 3D 화면 처음 들어왔을 때 한 번만: 돌려 보는 법 안내 -->
+    <div id="drag-guide" class="drag-guide" hidden>
+      <div class="drag-guide-card" role="dialog" aria-modal="true" aria-labelledby="drag-guide-title">
+        <svg class="drag-guide-icon" viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+          <path d="M14 22c6-6 30-6 36 0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M14 22l1-6M14 22l6 1M50 22l-1-6M50 22l-6 1" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M28 52V33a3 3 0 0 1 6 0v9l9 2a4 4 0 0 1 3 4.6L45 56H31z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/>
+        </svg>
+        <h3 id="drag-guide-title" class="drag-guide-title">끌어서 돌려 보세요</h3>
+        <ul class="drag-guide-list">
+          <li><b>한 손가락으로 끌기</b> 장을 이리저리 돌려요</li>
+          <li><b>두 손가락 벌리기·모으기</b> 크게·작게 봐요</li>
+          <li><b>칸 옆 ＋ 누르기</b> 상자를 넣어요</li>
+        </ul>
+        <button id="drag-guide-ok" class="drag-guide-ok" type="button">알겠어요</button>
+      </div>
+    </div>
 
     <!-- [모바일 전용] 3D 화면 위 '장 설정' 돌아가기 버튼 -->
     <button id="btn-mobile-edit-setup" class="mobile-edit-setup-btn" type="button">장 설정</button>
@@ -88,13 +134,13 @@
         </div>
         <div class="hint-text" style="color:var(--text-main);font-size:0.76rem;line-height:1.5;">
           • <strong>위에 쌓기:</strong> 상자를 다른 상자 위로 끌면 <strong>차곡차곡 쌓여요.</strong><br>
-          • <strong>여러 개 고르기 (큰 화면은 Shift+클릭, 폰은 '여러 개'):</strong> 상자 여러 개를 한 번에 골라요.<br>
+          • <strong>여러 개 고르기 (데스크탑은 Shift+클릭, 모바일은 '여러 개'):</strong> 상자 여러 개를 한 번에 골라요.<br>
           • <strong>함께 옮기기:</strong> 여러 개 고른 채 끌면 같이 움직여요.<br>
           • <strong>하나만 고르기:</strong> 고른 상태에서 상자를 다시 누르면 그것만 골라져요.
         </div>
         <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:0.73rem;padding-top:4px;border-top:1px solid var(--border);">
           <span><i class="legend-dot" style="background:#dc2626;"></i>문에 걸림 / 문제</span>
-          <span><i class="legend-dot" style="background:#f59e0b;"></i>여러 개 고름 / 안 보이는 곳</span>
+          <span><i class="legend-dot" style="background:#f59e0b;"></i>여러 개 고름 / 꺼내기 힘든 곳</span>
           <span><i class="legend-dot" style="background:#3b8a64;"></i>서랍 다 보이는 곳</span>
         </div>
       </div>
@@ -305,10 +351,7 @@
 
       <!-- 시점 전환 & 모바일 묶음선택 토글 캡슐 바 -->
       <div class="hud-pill-bar">
-        <button class="btn btn-sm" data-cam="iso">입체로</button>
-        <button class="btn btn-sm" data-cam="front">앞에서</button>
-        <button class="btn btn-sm" data-cam="top">위에서</button>
-        <button class="btn btn-sm" data-cam="side">옆에서</button>
+        <button id="btn-save-photo" class="btn btn-sm" type="button" title="지금 3D 화면을 사진으로 저장">사진 저장</button>
         <button id="btn-touch-multiselect" class="btn btn-sm" title="폰·태블릿에서 상자 여러 개를 손가락으로 한 번에 고르기">
           여러 개 고르기: 꺼짐
         </button>
@@ -319,7 +362,7 @@
         </div>
         <label class="checkbox-row" style="margin:0;">
           <input id="chk-show-deadzones" type="checkbox" checked />
-          <span style="font-size:0.72rem;">안 보이는 곳</span>
+          <span style="font-size:0.72rem;">꺼내기 힘든 곳</span>
         </label>
         <button id="btn-clear-plan" class="btn btn-danger btn-sm">다 비우기</button>
       </div>
@@ -544,11 +587,11 @@
   </div>
 
   <!-- 애플리케이션 스크립트 로드 -->
-  <script src="js/presets.js?v=1031d"></script>
-  <script src="js/items.js?v=1031d"></script>
-  <script src="js/packer.js?v=1031d"></script>
-  <script src="js/scene3d.js?v=1031d"></script>
-  <script src="js/app.js?v=1031d"></script>
+  <script src="js/presets.js?v=1031h"></script>
+  <script src="js/items.js?v=1031h"></script>
+  <script src="js/packer.js?v=1031h"></script>
+  <script src="js/scene3d.js?v=1031h"></script>
+  <script src="js/app.js?v=1031h"></script>
 
   <!-- 보관함 자세히 보기: 뒤는 흐리게, 고른 보관함만 크게 + 물건 넣기 -->
   <div id="box-detail" class="box-detail" aria-hidden="true">
@@ -566,6 +609,7 @@
         </div>
         <button id="box-detail-clear" class="box-detail-ghost" type="button">비우기</button>
       </div>
+      <div id="box-detail-recs" class="box-detail-recs" hidden></div>
       <div id="box-detail-list" class="box-detail-list"></div>
       <div class="box-detail-foot">
         <button id="box-detail-done" class="box-detail-done" type="button">다 됐어요</button>
@@ -573,6 +617,6 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="js/boxdetail.js?v=1031d"></script>
+  <script src="js/boxdetail.js?v=1031h"></script>
 </body>
 </html>

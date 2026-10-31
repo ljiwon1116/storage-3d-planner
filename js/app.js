@@ -350,6 +350,7 @@
     });
 
     renderWarningsBanner();
+    saveLocalSoon();
   }
 
   // 3D 화면에서 수납함 클릭 / Shift+클릭 / 모바일 터치 묶음 / 묶음 내 재클릭 처리
@@ -510,7 +511,7 @@
     return m.accessType === 'front_drawer' || m.accessType === 'front_open';
   }
 
-  // 한 칸을 고른 상자들로 무작위로 채움 (문틀·안 보이는 곳은 피함)
+  // 한 칸을 고른 상자들로 무작위로 채움 (문틀·꺼내기 힘든 곳은 피함)
   // opts.levelRows: 줄마다 높이가 비슷한 것끼리, 앞줄은 낮게 · 뒷줄일수록 높게
   function randomFillCompartment(compIdx, pool, rng, opts) {
     const compartments = window.PackerEngine.getCompartments(state.spaceConfig);
@@ -1392,7 +1393,7 @@
       const ratioPct = Math.round((drwConst.exposedD / drwConst.totalD) * 100);
       document.getElementById('drw-exposure-summary').innerHTML =
         `보이는 곳: <strong style="color:#3b8a64">${drwConst.exposedD}mm (${ratioPct}%)</strong> / ` +
-        `안 보이는 곳: <strong style="color:#d97706">${drwConst.unexposedD}mm (${100 - ratioPct}%)</strong>`;
+        `꺼내기 힘든 곳: <strong style="color:#d97706">${drwConst.unexposedD}mm (${100 - ratioPct}%)</strong>`;
     }
   }
 
@@ -1542,7 +1543,7 @@
 
               <label class="checkbox-row">
                 <input type="checkbox" class="exp-chk-deadzone" ${state.autofillAvoidDeadzone ? 'checked' : ''} />
-                <span>${state.spaceConfig.type === 'cabinet' ? '문에 걸리는 곳 빼기' : '안 보이는 곳 빼기'}</span>
+                <span>${state.spaceConfig.type === 'cabinet' ? '문에 걸리는 곳 빼기' : '꺼내기 힘든 곳 빼기'}</span>
               </label>
               <label class="checkbox-row">
                 <input type="checkbox" class="exp-chk-rotate" ${state.autofillRotate ? 'checked' : ''} />
@@ -2093,27 +2094,132 @@
     });
   }
 
+  // 화면 종류: 'mobile' | 'pc'(데스크탑·태블릿)
+  // 둘 다 같은 흐름(첫 설정 질문 -> 3D 화면)을 쓰고, 데스크탑은 넓은 화면에 맞게 배치만 바꿔요.
   function setUIMode(mode) {
-    state.uiMode = mode;
-    document.body.classList.toggle('ui-mode-mobile', mode === 'mobile');
-    document.body.classList.toggle('ui-mode-pc', mode === 'pc');
-    document.getElementById('btn-mode-mobile')?.classList.toggle('active', mode === 'mobile');
-    document.getElementById('btn-mode-pc')?.classList.toggle('active', mode === 'pc');
+    state.layout = mode === 'pc' ? 'pc' : 'mobile';
+    state.uiMode = 'mobile';
+    document.body.classList.add('ui-mode-mobile');
+    document.body.classList.remove('ui-mode-pc');
+    document.body.classList.toggle('ui-wide', state.layout === 'pc');
+    document.getElementById('btn-mode-mobile')?.classList.toggle('active', state.layout === 'mobile');
+    document.getElementById('btn-mode-pc')?.classList.toggle('active', state.layout === 'pc');
+    updateDragGuideText();
 
-    if (mode === 'mobile') {
-      // 3D 단계의 기본은 순수 3D 화면(오버레이 없음), 단계는 저장된 상태(처음엔 설정)
-      document.body.setAttribute('data-active-mtab', state.activeMobileTab || 'none');
-      setMobileStep(state.mobileStep || 'setup');
-    } else {
-      state.wizPreview = false;
-      document.body.removeAttribute('data-active-mtab');
-      document.body.classList.remove('mobile-step-setup', 'mobile-step-build');
-    }
+    // 3D 단계의 기본은 순수 3D 화면(오버레이 없음), 단계는 저장된 상태(처음엔 설정)
+    document.body.setAttribute('data-active-mtab', state.activeMobileTab || 'none');
+    setMobileStep(state.mobileStep || 'setup');
 
     renderShelfCalloutCards();
+    saveLocalSoon();
     setTimeout(() => {
       window.Scene3DManager.resize();
     }, 60);
+  }
+
+  // ---------- 3D 화면 사진 저장 (오른쪽 아래에 만든 사람 표시) ----------
+  function savePhoto() {
+    const url = window.Scene3DManager.snapshot && window.Scene3DManager.snapshot();
+    if (!url) return;
+    const img = new Image();
+    img.onload = () => {
+      const cv = document.createElement('canvas');
+      cv.width = img.width;
+      cv.height = img.height;
+      const g = cv.getContext('2d');
+      g.drawImage(img, 0, 0);
+
+      // 표시 크기는 사진 크기에 맞춰요 (짧은 변의 3.2%)
+      const fs = Math.max(14, Math.round(Math.min(cv.width, cv.height) * 0.032));
+      const pad = Math.round(fs * 0.9);
+      const text = 'made by joshleeliving';
+      g.font = `600 ${fs}px Pretendard, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif`;
+      const tw = g.measureText(text).width;
+      const bw = tw + pad * 1.4, bh = fs * 1.9;
+      const bx = cv.width - bw - pad, by = cv.height - bh - pad;
+      const r = Math.round(bh * 0.3);
+      g.fillStyle = 'rgba(255, 255, 255, 0.78)';
+      g.beginPath();
+      g.moveTo(bx + r, by);
+      g.arcTo(bx + bw, by, bx + bw, by + bh, r);
+      g.arcTo(bx + bw, by + bh, bx, by + bh, r);
+      g.arcTo(bx, by + bh, bx, by, r);
+      g.arcTo(bx, by, bx + bw, by, r);
+      g.closePath();
+      g.fill();
+      g.fillStyle = '#5c4630';
+      g.textBaseline = 'middle';
+      g.fillText(text, bx + pad * 0.7, by + bh / 2);
+
+      const d = new Date();
+      const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`;
+      const a = document.createElement('a');
+      a.href = cv.toDataURL('image/png');
+      a.download = `수납공간-${stamp}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    };
+    img.src = url;
+  }
+
+  // ---------- 3D 돌려 보는 법 안내 (처음 3D 화면에 들어왔을 때 한 번) ----------
+  const STORAGE_KEY_GUIDE_SEEN = 'storagefit_drag_guide_seen_v1';
+  function updateDragGuideText() {
+    const wide = state.layout === 'pc';
+    const items = document.querySelectorAll('#drag-guide .drag-guide-list li');
+    if (items.length < 3) return;
+    items[0].innerHTML = wide ? '<b>마우스로 끌기</b> 장을 이리저리 돌려요' : '<b>한 손가락으로 끌기</b> 장을 이리저리 돌려요';
+    items[1].innerHTML = wide ? '<b>마우스 휠 굴리기</b> 크게·작게 봐요' : '<b>두 손가락 벌리기·모으기</b> 크게·작게 봐요';
+  }
+  function maybeShowDragGuide() {
+    let seen = false;
+    try { seen = localStorage.getItem(STORAGE_KEY_GUIDE_SEEN) === '1'; } catch (e) {}
+    const el = document.getElementById('drag-guide');
+    if (!el || seen) return;
+    updateDragGuideText();
+    el.hidden = false;
+    document.getElementById('drag-guide-ok')?.focus();
+  }
+  function closeDragGuide() {
+    const el = document.getElementById('drag-guide');
+    if (el) el.hidden = true;
+    try { localStorage.setItem(STORAGE_KEY_GUIDE_SEEN, '1'); } catch (e) {}
+  }
+
+  // ---------- 내 설정 저장 (다음에 링크를 다시 열어도 그대로) ----------
+  const STORAGE_KEY_STATE = 'storagefit_state_v1';
+  let saveTimer = null;
+  function saveLocalNow() {
+    try {
+      const payload = {
+        v: 1,
+        spaceConfig: state.spaceConfig,
+        plans: state.plans,
+        activePlanId: state.activePlanId,
+        setupDone: state.mobileStep === 'build' || !!state.setupDone,
+        layout: state.layout,
+        savedAt: Date.now()
+      };
+      localStorage.setItem(STORAGE_KEY_STATE, JSON.stringify(payload));
+    } catch (e) {
+      // 저장 공간이 꽉 찼거나 막힌 브라우저(사생활 보호 모드 등)는 그냥 넘어가요
+    }
+  }
+  function saveLocalSoon() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveLocalNow, 400);
+  }
+  function loadLocal() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_STATE);
+      if (!raw) return null;
+      const d = JSON.parse(raw);
+      if (!d || d.v !== 1 || !d.spaceConfig || !Array.isArray(d.plans) || !d.plans.length) return null;
+      return d;
+    } catch (e) {
+      return null;
+    }
   }
 
   // 모바일 단계 전환: 'setup'(장 설정만) <-> 'build'(3D 상자 배치)
@@ -2148,6 +2254,11 @@
     }
 
     renderLeftAccordionCards();
+    if (step === 'build') {
+      state.setupDone = true;
+      saveLocalSoon();
+      setTimeout(maybeShowDragGuide, 350);
+    }
     setTimeout(() => {
       window.Scene3DManager.resize();
       window.Scene3DManager.setCameraView('iso');
@@ -2583,16 +2694,28 @@
       refreshAll();
     });
 
-    // 1. 공간 유형 선택
+    // 1. 공간 유형 선택 — 문 달린 장과 서랍장은 따로 정리해요 (각자 상자 배치를 따로 기억)
+    const switchSpaceType = (next) => {
+      const prev = state.spaceConfig.type;
+      if (prev === next) return false;
+      state.plans.forEach((p) => {
+        p.boxesByType = p.boxesByType || {};
+        p.boxesByType[prev] = p.boxes;
+        p.boxes = Array.isArray(p.boxesByType[next]) ? p.boxesByType[next] : [];
+      });
+      state.spaceConfig.type = next;
+      return true;
+    };
+
     document.getElementById('card-type-cabinet').addEventListener('click', () => {
-      state.spaceConfig.type = 'cabinet';
+      switchSpaceType('cabinet');
       state.selectedBoxIds = [];
       refreshAll();
       window.Scene3DManager.setCameraView('iso');
     });
 
     document.getElementById('card-type-drawer').addEventListener('click', () => {
-      state.spaceConfig.type = 'drawer';
+      switchSpaceType('drawer');
       state.activeCompartmentIdx = 0;
       state.expandedCompartmentIdx = 0;
       state.selectedBoxIds = [];
@@ -2956,9 +3079,31 @@
     loadCatalogAndCombos();
     seedInitialDemoPlans();
 
+    // 지난번에 쓰던 설정이 있으면 그대로 불러와요 (공유 링크로 열었을 때는 링크 내용이 먼저)
+    const urlParams = new URLSearchParams(window.location.search);
+    const restored = (urlParams.get('state') || urlParams.get('plan')) ? null : loadLocal();
+    if (restored) {
+      state.spaceConfig = restored.spaceConfig;
+      state.plans = restored.plans;
+      if (restored.plans.some((p) => p.id === restored.activePlanId)) state.activePlanId = restored.activePlanId;
+      if (restored.setupDone) {
+        state.setupDone = true;
+        state.mobileStep = 'build';
+        state.wizPreview = false;
+      }
+    }
+    window.addEventListener('pagehide', saveLocalNow);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) saveLocalNow(); });
+    document.getElementById('drag-guide-ok')?.addEventListener('click', closeDragGuide);
+    document.getElementById('btn-save-photo')?.addEventListener('click', savePhoto);
+    document.getElementById('drag-guide')?.addEventListener('click', (e) => {
+      if (e.target.id === 'drag-guide') closeDragGuide();
+    });
+
     window.Scene3DManager.init('canvas-wrapper', {
       onBoxInteraction: handleBoxInteraction,
       onBoxesMoved: () => {
+        saveLocalSoon();
         renderShelfCalloutCards();
         renderSelectedBoxInspector();
         renderWarningsBanner();
@@ -2976,8 +3121,9 @@
     refreshAll();
     window.Scene3DManager.setCameraView('iso');
 
-    // 디폴트 인터페이스: 모바일 모드로 초기화 (PC 모드로 즉시 전환 가능!)
-    setUIMode('mobile');
+    // 처음 화면 종류: 지난번에 고른 것 -> 없으면 화면 너비로 (900px 이상은 데스크탑)
+    const startLayout = (restored && restored.layout) || (window.innerWidth >= 900 ? 'pc' : 'mobile');
+    setUIMode(startLayout);
 
     // Vercel + Neon DB 및 공유 URL 동기화
     syncWithCloudDatabase();
