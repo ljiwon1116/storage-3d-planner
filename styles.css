@@ -4433,6 +4433,3 @@ body.ui-wide .add-box-modal { border-radius: 16px !important; }
   box-shadow: 0 -1px 0 #e7e0d5;
 }
 .ab-save { width: 100%; height: 48px !important; border-radius: 12px !important; font-size: 0.95rem !important; }
-
-/* 상자 목록의 '들어가요 / 너무 높아요' 표시는 숨김 (화면 오른쪽 위로 튀어나와 겹쳐 보였음) */
-.picker-fit-badge { display: none !important; }
