@@ -4433,3 +4433,28 @@ body.ui-wide .add-box-modal { border-radius: 16px !important; }
   box-shadow: 0 -1px 0 #e7e0d5;
 }
 .ab-save { width: 100%; height: 48px !important; border-radius: 12px !important; font-size: 0.95rem !important; }
+
+
+/* 문 열기 / 서랍 열기 작은 창 */
+.open-ctrl-pop {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  z-index: 61;
+  width: min(280px, calc(100vw - 32px));
+  padding: 10px 14px 8px;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--text-title);
+  box-shadow: 0 4px 16px rgba(28, 25, 22, 0.06), 0 0 0 1px #e7e0d5;
+  transform-origin: bottom center;
+  animation: finePadPop 0.14s ease-out;
+}
+.open-ctrl-pop[hidden] { display: none !important; }
+.ocp-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ocp-title { font-size: 0.85rem; font-weight: 600; line-height: 1.4; }
+.ocp-val { font-size: 0.85rem; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.ocp-slider { width: 100%; margin: 8px 0 2px; accent-color: var(--accent); height: 28px; cursor: pointer; }
+.ocp-ends { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-meta); }
+#btn-open-ctrl.active { background: var(--accent-soft) !important; color: var(--accent) !important; }
