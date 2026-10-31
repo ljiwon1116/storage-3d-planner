@@ -3629,3 +3629,41 @@ body.ui-wide .drag-guide-card { max-width: 360px; }
     border-left: none; border-radius: 20px 20px 0 0;
   }
 }
+
+
+/* =====================================================================
+   팬트리: '기둥·선반' 창
+   ===================================================================== */
+.pp-sec { padding: 16px 0; border-top: 1px solid #e7e0d5; }
+.pp-sec:first-child { padding-top: 4px; border-top: none; }
+.pp-h { font-size: 0.95rem; font-weight: 600; color: var(--text-title); line-height: 1.4; margin-bottom: 8px; display: block; }
+.pp-h-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.pp-h-row .pp-h { margin-bottom: 0; }
+.pp-cap { font-size: 0.75rem; font-weight: 400; color: var(--text-meta); line-height: 1.5; }
+.pp-sub { font-size: 0.8rem; font-weight: 600; color: var(--text-sub, var(--text-meta)); margin: 8px 0 4px; }
+.pp-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.pp-chips .sp-chip { min-height: 44px; display: inline-flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; padding: 4px 12px; }
+.pp-chip-sub { font-size: 0.7rem; font-weight: 400; color: var(--text-meta); }
+.pp-text-btn {
+  min-height: 44px; padding: 0 8px; border: none; border-radius: 8px;
+  background: transparent; color: var(--accent); font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+}
+.pp-text-btn:hover { background: var(--accent-soft); }
+.pp-text-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pp-outline-btn {
+  width: 100%; min-height: 44px; margin-top: 8px; border: 1px solid #e7e0d5; border-radius: 10px;
+  background: #fff; color: var(--text-title); font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+}
+.pp-outline-btn:hover { background: #faf7f2; }
+.pp-outline-btn:active { transform: scale(0.98); }
+.pp-outline-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pp-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pp-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.75rem; color: var(--text-meta); }
+.pp-field input { min-height: 44px; }
+.pp-field input:disabled { color: var(--text-hint); background: #f3eee6; }
+
+/* 팬트리 칸 ＋ 버튼: '안1-2' 같은 이름이 들어가게 조금 넓게 */
+body.space-pantry #mobile-shelf-buttons .msab-num { font-size: 0.62rem; letter-spacing: -0.02em; white-space: nowrap; }
+body.space-pantry #mobile-shelf-buttons > * { min-width: 44px; width: auto; padding: 0 6px; }
+/* 팬트리는 선반이 있어서 '기둥·선반' 버튼을 보여줌 */
+body.ui-mode-mobile.mobile-step-build.space-pantry .mobile-shelfh-btn { display: inline-flex; }

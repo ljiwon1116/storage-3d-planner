@@ -303,21 +303,22 @@ window.Scene3DManager = (function () {
   function updateShelfCalloutAnchors() {
     if (!onShelfAnchorsCallback || !currentSpaceConfig || !containerEl || !camera) return;
     const compartments = window.PackerEngine.getCompartments(currentSpaceConfig);
-    const isCab = currentSpaceConfig.type === 'cabinet';
-    const W = isCab ? currentSpaceConfig.cabinet.w : currentSpaceConfig.drawer.w;
-    const D = isCab ? currentSpaceConfig.cabinet.d : currentSpaceConfig.drawer.d;
+    const isPantry = currentSpaceConfig.type === 'pantry';
 
     const cw = containerEl.clientWidth;
     const ch = containerEl.clientHeight;
 
     const anchors = compartments.map((comp) => {
-      const worldX = W / 2 + 18;
+      // 장·서랍: 오른쪽 바깥 / 팬트리: 각 칸 앞쪽 오른편 안
+      const p = window.PackerEngine.localToWorld(comp, isPantry ? comp.w - 36 : comp.w + 18, comp.d);
+      const worldX = p.x;
       const worldY = comp.yStart + Math.min(45, comp.clearH * 0.25);
-      const worldZ = D / 2;
+      const worldZ = p.z;
       const v = new THREE.Vector3(worldX, worldY, worldZ);
       v.project(camera);
       return {
         index: comp.index,
+        label: comp.short || String(comp.index + 1),
         x: (v.x * 0.5 + 0.5) * cw,
         y: (-(v.y * 0.5) + 0.5) * ch
       };
@@ -341,8 +342,6 @@ window.Scene3DManager = (function () {
 
     const compartments = window.PackerEngine.getCompartments(currentSpaceConfig);
     const comp = compartments[selBoxes[0].compartmentIndex] || compartments[0];
-    const W = currentSpaceConfig.type === 'cabinet' ? currentSpaceConfig.cabinet.w : currentSpaceConfig.drawer.w;
-    const D = currentSpaceConfig.type === 'cabinet' ? currentSpaceConfig.cabinet.d : currentSpaceConfig.drawer.d;
     const slideZ = currentSpaceConfig.type === 'drawer'
       ? drawerOpenRatio * window.PackerEngine.getDrawerConstraints(currentSpaceConfig).exposedD
       : 0;
@@ -359,9 +358,10 @@ window.Scene3DManager = (function () {
       if ((b.y || 0) + dims.h > maxTopY) maxTopY = (b.y || 0) + dims.h;
     });
 
-    const worldX = -W / 2 + (minX + maxX) / 2;
+    const bpos = window.PackerEngine.localToWorld(comp, (minX + maxX) / 2, (minZ + maxZ) / 2);
+    const worldX = bpos.x;
     const worldY = comp.yStart + maxTopY + 30;
-    const worldZ = -D / 2 + (minZ + maxZ) / 2 + slideZ;
+    const worldZ = bpos.z + slideZ;
 
     const pos3D = new THREE.Vector3(worldX, worldY, worldZ);
     pos3D.project(camera);
@@ -395,12 +395,11 @@ window.Scene3DManager = (function () {
 
   function buildWarmHomeRoomEnvironment(spaceConfig) {
     const isCab = spaceConfig.type === 'cabinet';
-    const W = isCab ? spaceConfig.cabinet.w : spaceConfig.drawer.w;
-    const D = isCab ? spaceConfig.cabinet.d : spaceConfig.drawer.d;
-    const H = isCab ? spaceConfig.cabinet.h : spaceConfig.drawer.h;
+    const isPantry = spaceConfig.type === 'pantry';
+    const { W, D, H } = window.PackerEngine.getSpaceDims(spaceConfig);
 
-    const floorY = isCab ? -46 : -14 - drawerLowerBodyH(spaceConfig);
-    const backWallZ = -D / 2 - 24;
+    const floorY = isPantry ? -2 : isCab ? -46 : -14 - drawerLowerBodyH(spaceConfig);
+    const backWallZ = isPantry ? -D / 2 - 2 : -D / 2 - 24;
 
     const roomW = 2400;
     const roomD = 2200;
@@ -470,6 +469,76 @@ window.Scene3DManager = (function () {
     }
   }
 
+  // ㄱ자 팬트리 방: 뒤 벽 선반 + 오른쪽 옆 벽 선반, 기둥(세로 기둥)으로 열을 나눔
+  function buildPantryScene(spaceConfig) {
+    const p = spaceConfig.pantry;
+    const { bays, postsA, postsB, startB } = window.PackerEngine.getPantryBays(spaceConfig);
+    const H = p.h;
+    const postW = Math.max(6, Number(p.postW) || 25);
+
+    const shelfMat = new THREE.MeshStandardMaterial({ color: 0xf6f1e8, roughness: 0.7 });
+    const postMat = new THREE.MeshStandardMaterial({ color: 0xe9e1d3, roughness: 0.6 });
+    const edgeMat = new THREE.LineBasicMaterial({ color: 0xb9a78f });
+    const sideWallMat = new THREE.MeshStandardMaterial({
+      color: 0xfdfbf7, roughness: 0.92, transparent: true, opacity: 0.55, depthWrite: false
+    });
+
+    const addPart = (w, h, d, x, y, z, rotY, mat) => {
+      const g = new THREE.BoxGeometry(w, h, d);
+      const m = new THREE.Mesh(g, mat);
+      m.position.set(x, y, z);
+      m.rotation.y = rotY || 0;
+      m.castShadow = true;
+      m.receiveShadow = true;
+      cabinetGroup.add(m);
+      const e = new THREE.LineSegments(new THREE.EdgesGeometry(g), edgeMat);
+      e.position.copy(m.position);
+      e.rotation.y = m.rotation.y;
+      cabinetGroup.add(e);
+      return m;
+    };
+
+    // 오른쪽 옆 벽 (반투명)
+    if (p.wallB !== false) {
+      const sw = new THREE.Mesh(new THREE.BoxGeometry(24, Math.max(2400, H + 300), p.roomD), sideWallMat);
+      sw.position.set(p.roomW / 2 + 12, Math.max(2400, H + 300) / 2 - 2, 0);
+      roomEnvGroup.add(sw);
+    }
+
+    // 선반 판: 칸(열)마다
+    bays.forEach((b) => {
+      const comp0 = { ox: b.ox, oz: b.oz, rotY: b.rotY };
+      b.shelves.forEach((sh) => {
+        const t = sh.thickness || 18;
+        const c = window.PackerEngine.localToWorld(comp0, b.w / 2, b.d / 2);
+        addPart(b.w, t, b.d, c.x, sh.bottomY + t / 2, c.z, b.rotY, shelfMat);
+      });
+    });
+
+    // 세로 기둥: 벽마다 시작·끝·중간 기둥 위치
+    const postAt = (wall, s) => {
+      const d = wall === 'A' ? p.depthA : p.depthB;
+      const comp0 = wall === 'A'
+        ? { ox: -p.roomW / 2, oz: -p.roomD / 2, rotY: 0 }
+        : { ox: p.roomW / 2, oz: -p.roomD / 2, rotY: -Math.PI / 2 };
+      const front = window.PackerEngine.localToWorld(comp0, s, d - postW / 2);
+      addPart(postW, H, postW, front.x, H / 2, front.z, comp0.rotY, postMat);
+      const back = window.PackerEngine.localToWorld(comp0, s, postW / 2);
+      addPart(postW, H, postW, back.x, H / 2, back.z, comp0.rotY, postMat);
+    };
+    [postW / 2, ...postsA, p.roomW - postW / 2].forEach((s) => postAt('A', s));
+    if (p.wallB !== false) [startB + postW / 2, ...postsB, p.roomD - postW / 2].forEach((s) => postAt('B', s));
+
+    // 바닥에 입구 표시 (왼쪽 앞)
+    const doorW = Math.max(300, Math.min(p.doorW || 800, p.roomW - p.depthB - 50));
+    const doorLine = new THREE.Mesh(
+      new THREE.BoxGeometry(doorW, 2, 30),
+      new THREE.MeshBasicMaterial({ color: 0xb08d63, transparent: true, opacity: 0.5 })
+    );
+    doorLine.position.set(-p.roomW / 2 + doorW / 2 + 40, 1, p.roomD / 2 - 15);
+    cabinetGroup.add(doorLine);
+  }
+
   function renderScene(spaceConfig, placedBoxes, modelsMap, stateOpts) {
     currentSpaceConfig = spaceConfig;
     currentBoxes = placedBoxes;
@@ -497,6 +566,10 @@ window.Scene3DManager = (function () {
 
     if (spaceConfig.type === 'cabinet') {
       buildCabinetScene(spaceConfig);
+      cabinetGroup.add(boxesGroup);
+      boxesGroup.position.set(0, 0, 0);
+    } else if (spaceConfig.type === 'pantry') {
+      buildPantryScene(spaceConfig);
       cabinetGroup.add(boxesGroup);
       boxesGroup.position.set(0, 0, 0);
     } else {
@@ -890,8 +963,6 @@ window.Scene3DManager = (function () {
   // 배치된 수납함 렌더링 (자동 적층 높이 box.y 반영!)
   function buildPlacedBoxes(spaceConfig, placedBoxes, modelsMap) {
     const compartments = window.PackerEngine.getCompartments(spaceConfig);
-    const W = spaceConfig.type === 'cabinet' ? spaceConfig.cabinet.w : spaceConfig.drawer.w;
-    const D = spaceConfig.type === 'cabinet' ? spaceConfig.cabinet.d : spaceConfig.drawer.d;
     const isMultiBundle = selectedBoxIds.length >= 2;
 
     placedBoxes.forEach((box) => {
@@ -912,11 +983,11 @@ window.Scene3DManager = (function () {
         xrayMode
       );
 
-      const centerX = -W / 2 + box.x + dims.w / 2;
-      const centerZ = -D / 2 + box.z + dims.d / 2;
+      const wp = window.PackerEngine.localToWorld(comp, box.x + dims.w / 2, box.z + dims.d / 2);
       const bottomY = comp.yStart + (box.y || 0); // 자동 적층된 Y 높이 반영
 
-      meshGroup.position.set(centerX, bottomY, centerZ);
+      meshGroup.position.set(wp.x, bottomY, wp.z);
+      meshGroup.rotation.y += comp.rotY || 0;   // 팬트리 옆 벽은 90도 돌아가 있음
       meshGroup.userData = { boxId: box.id };
 
       meshGroup.traverse((child) => {
@@ -955,11 +1026,9 @@ window.Scene3DManager = (function () {
           bundleEdges,
           new THREE.LineBasicMaterial({ color: 0xd97706 })
         );
-        bundleLine.position.set(
-          -W / 2 + (minX + maxX) / 2,
-          comp.yStart + minY + bh / 2,
-          -D / 2 + (minZ + maxZ) / 2
-        );
+        const bp = window.PackerEngine.localToWorld(comp, (minX + maxX) / 2, (minZ + maxZ) / 2);
+        bundleLine.position.set(bp.x, comp.yStart + minY + bh / 2, bp.z);
+        bundleLine.rotation.y = comp.rotY || 0;
         boxesGroup.add(bundleLine);
       }
     }
@@ -1093,11 +1162,20 @@ window.Scene3DManager = (function () {
 
     const intersectPoint = new THREE.Vector3();
     if (raycaster.ray.intersectPlane(dragPlane, intersectPoint)) {
-      const W = currentSpaceConfig.type === 'cabinet' ? currentSpaceConfig.cabinet.w : currentSpaceConfig.drawer.w;
-      const D = currentSpaceConfig.type === 'cabinet' ? currentSpaceConfig.cabinet.d : currentSpaceConfig.drawer.d;
+      const anchorBox = currentBoxes.find((item) => item.id === dragAnchorBoxId);
+      const dragComps = window.PackerEngine.getCompartments(currentSpaceConfig);
+      const dragComp = (anchorBox && dragComps[anchorBox.compartmentIndex]) || dragComps[0];
+      const W = dragComp.w;
+      const D = dragComp.d;
 
-      let deltaX = intersectPoint.x - dragStartWorldPoint.x;
-      let deltaZ = intersectPoint.z - dragStartWorldPoint.z;
+      // 화면에서 끈 만큼을 칸 안의 방향으로 바꿈 (팬트리 옆 벽은 돌아가 있음)
+      const loc = window.PackerEngine.worldDeltaToLocal(
+        dragComp,
+        intersectPoint.x - dragStartWorldPoint.x,
+        intersectPoint.z - dragStartWorldPoint.z
+      );
+      let deltaX = loc.x;
+      let deltaZ = loc.z;
 
       const step = snapStep || 5;
       deltaX = Math.round(deltaX / step) * step;
@@ -1183,10 +1261,16 @@ window.Scene3DManager = (function () {
 
   function setCameraView(viewType) {
     if (!currentSpaceConfig || !camera || !controls) return;
-    const W = currentSpaceConfig.type === 'cabinet' ? currentSpaceConfig.cabinet.w : currentSpaceConfig.drawer.w;
-    const D = currentSpaceConfig.type === 'cabinet' ? currentSpaceConfig.cabinet.d : currentSpaceConfig.drawer.d;
-    const H = currentSpaceConfig.type === 'cabinet' ? currentSpaceConfig.cabinet.h : currentSpaceConfig.drawer.h;
+    const { W, D, H } = window.PackerEngine.getSpaceDims(currentSpaceConfig);
     const maxDim = Math.max(W, D, H, 600);
+
+    if (currentSpaceConfig.type === 'pantry') {
+      // 팬트리: 입구(왼쪽 앞)에서 안쪽 구석을 비스듬히 내려다봄
+      controls.target.set(W * 0.12, H * 0.45, -D * 0.1);
+      camera.position.set(-W * 0.55, H * 0.85, D * 1.55 + 900);
+      controls.update();
+      return;
+    }
 
     controls.target.set(80, H * 0.46, 0);
 

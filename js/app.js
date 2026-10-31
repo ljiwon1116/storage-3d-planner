@@ -4,6 +4,24 @@
   const STORAGE_KEY_CUSTOM_MODELS = 'storagefit_custom_models_v1';
   const STORAGE_KEY_SAVED_COMBOS = 'storagefit_saved_combos_v1';
 
+  // 한국 아파트 ㄱ자 팬트리 기본값 (방 1500x1200, 선반 높이 2300, 깊이 400)
+  function defaultPantry() {
+    return {
+      roomW: 1500,      // 뒤 벽 길이 (방 가로)
+      roomD: 1200,      // 옆 벽 길이 (방 깊이)
+      h: 2300,          // 선반 전체 높이
+      depthA: 400,      // 뒤 벽 선반 깊이
+      depthB: 400,      // 옆 벽 선반 깊이
+      wallB: true,      // 옆 벽 선반 있음
+      postW: 25,        // 세로 기둥 굵기
+      postsA: [750],    // 뒤 벽 기둥 위치 (왼쪽 끝에서)
+      postsB: [],       // 옆 벽 기둥 위치 (안쪽 구석에서)
+      doorW: 800,       // 입구 폭 (그림 표시용)
+      defaultShelves: [400, 800, 1200, 1600, 2000].map((y, i) => ({ id: `ps-${i}`, bottomY: y, thickness: 18 })),
+      bayShelves: {}    // 열마다 따로 바꾼 선반 { A0: [...], B0: [...] }
+    };
+  }
+
   const state = {
     spaceConfig: {
       type: 'cabinet', // 'cabinet' | 'drawer'
@@ -28,7 +46,9 @@
         exposedD: 350,
         h: 140,
         clearanceH: 175
-      }
+      },
+      // ㄱ자 팬트리 방 (mm). 뒤 벽(A) = 방 가로, 옆 벽(B) = 방 깊이
+      pantry: defaultPantry()
     },
 
     plans: [
@@ -331,6 +351,11 @@
 
   function refreshAll() {
     document.body.classList.toggle('space-drawer', state.spaceConfig.type === 'drawer');
+    document.body.classList.toggle('space-pantry', state.spaceConfig.type === 'pantry');
+    const shBtn = document.getElementById('btn-mobile-shelf-height');
+    if (shBtn) shBtn.textContent = state.spaceConfig.type === 'pantry' ? '기둥·선반' : '선반 높이';
+    const shHead = document.querySelector('#mobile-shelfh-popup .mobile-shelfh-head > span');
+    if (shHead) shHead.textContent = state.spaceConfig.type === 'pantry' ? '기둥·선반' : '선반 높이';
     renderLeftAccordionCards();
     renderPlanTabs();
     renderShelfCalloutCards();
@@ -376,7 +401,7 @@
       return;
     }
 
-    if (state.spaceConfig.type === 'cabinet') {
+    if (state.spaceConfig.type !== 'drawer') {
       state.activeCompartmentIdx = clickedBox.compartmentIndex;
     }
 
@@ -434,7 +459,7 @@
           const btn = document.createElement('button');
           btn.className = 'mobile-shelf-add-btn';
           btn.type = 'button';
-          btn.innerHTML = `<span class="msab-num">${anc.index + 1}</span><span class="msab-plus">+</span>`;
+          btn.innerHTML = `<span class="msab-num">${anc.label || anc.index + 1}</span><span class="msab-plus">+</span>`;
           btn.dataset.idx = anc.index;
           btn.style.left = `${anc.x.toFixed(1)}px`;
           btn.style.top = `${anc.y.toFixed(1)}px`;
@@ -450,7 +475,7 @@
           const btn = existing[i];
           btn.dataset.idx = anc.index;
           const numEl = btn.querySelector('.msab-num');
-          if (numEl) numEl.textContent = anc.index + 1;
+          if (numEl) numEl.textContent = anc.label || anc.index + 1;
           btn.style.left = `${anc.x.toFixed(1)}px`;
           btn.style.top = `${anc.y.toFixed(1)}px`;
         });
@@ -522,7 +547,7 @@
       const k = window.PackerEngine.getCabinetConstraints(state.spaceConfig);
       xStart = k.leftDeadW;
       xEnd = comp.w - k.rightDeadW;
-    } else {
+    } else if (state.spaceConfig.type === 'drawer') {
       zStart = window.PackerEngine.getDrawerConstraints(state.spaceConfig).unexposedD;
     }
 
@@ -604,7 +629,13 @@
     const plan = getActivePlan();
     const rng = seededRng(state.previewSeed);
     const isCab = state.spaceConfig.type === 'cabinet';
-    if (isCab) {
+    if (state.spaceConfig.type === 'pantry') {
+      const comps = window.PackerEngine.getCompartments(state.spaceConfig);
+      plan.boxes = [];
+      comps.filter((c) => c.level === 1).forEach((c) => {
+        plan.boxes = plan.boxes.concat(randomFillCompartment(c.index, typeFillPool(), rng, { stack: false, multiRow: true, levelRows: true }));
+      });
+    } else if (isCab) {
       const count = window.PackerEngine.getCompartments(state.spaceConfig).length;
       plan.boxes = randomFillCompartment(Math.floor(count / 2), typeFillPool(), rng, { stack: true, multiRow: false });
     } else {
@@ -625,7 +656,8 @@
     let boxes = [];
     for (let attempt = 0; attempt < 4; attempt++) {
       const rng = seededRng(Math.floor(Math.random() * 1e9));
-      boxes = randomFillCompartment(compIdx, pool, rng, { stack: isCab, multiRow: !isCab, levelRows: !isCab });
+      const isPan = state.spaceConfig.type === 'pantry';
+      boxes = randomFillCompartment(compIdx, pool, rng, { stack: isCab || isPan, multiRow: !isCab, levelRows: !isCab });
       if (sig(boxes) !== prevSig) break;
     }
     if (boxes.length > 0) {
@@ -779,6 +811,10 @@
   function renderShelfHeightPopup() {
     const body = document.getElementById('mobile-shelfh-body');
     if (!body) return;
+    if (state.spaceConfig.type === 'pantry') {
+      renderPantryPopup(body);
+      return;
+    }
     if (state.spaceConfig.type !== 'cabinet') {
       body.innerHTML = `<div class="hint-text">서랍은 선반이 없어요.</div>`;
       return;
@@ -837,6 +873,176 @@
     });
   }
 
+  // ===== 팬트리: 기둥 위치 · 열마다 선반 높이 · 선반 깊이 (3D 화면의 '기둥·선반' 창) =====
+  function renderPantryPopup(body) {
+    const p = state.spaceConfig.pantry;
+    const { bays, startB } = window.PackerEngine.getPantryBays(state.spaceConfig);
+    if (!bays.some((b) => b.key === state.pantryBay)) state.pantryBay = bays[0] ? bays[0].key : 'A0';
+    const bay = bays.find((b) => b.key === state.pantryBay);
+    const bayLabel = (b) => `${b.wall === 'A' ? '안쪽' : '옆'} ${b.col + 1}열`;
+    const clampNum = (v, lo, hi, dflt) => Math.max(lo, Math.min(hi, Number.isFinite(Number(v)) ? Number(v) : dflt));
+    const after = (redraw) => { refreshAll(); if (redraw !== false) renderShelfHeightPopup(); };
+
+    body.innerHTML = `
+      <div class="pp-sec">
+        <div class="pp-h">열 고르기</div>
+        <div class="pp-chips" id="pp-bays"></div>
+      </div>
+      <div class="pp-sec">
+        <div class="pp-h-row">
+          <span class="pp-h">${bay ? bayLabel(bay) : ''} 선반 높이 <span class="pp-cap">바닥에서 mm</span></span>
+          <button id="pp-add-shelf" class="pp-text-btn" type="button">+ 선반 넣기</button>
+        </div>
+        <div id="pp-shelves" class="shelf-list"></div>
+        <button id="pp-apply-all" class="pp-outline-btn" type="button">모든 열을 이 열처럼</button>
+      </div>
+      <div class="pp-sec">
+        <div class="pp-h">세로 기둥 위치 <span class="pp-cap">벽 끝에서 mm</span></div>
+        <div id="pp-posts"></div>
+      </div>
+      <div class="pp-sec">
+        <div class="pp-h">선반 깊이 · 기둥 굵기</div>
+        <div class="pp-grid2">
+          <label class="pp-field"><span>안쪽 벽 깊이</span><input id="pp-depth-a" type="number" class="input-box" step="10" value="${p.depthA}"></label>
+          <label class="pp-field"><span>옆 벽 깊이</span><input id="pp-depth-b" type="number" class="input-box" step="10" value="${p.depthB}" ${p.wallB === false ? 'disabled' : ''}></label>
+          <label class="pp-field"><span>기둥 굵기</span><input id="pp-post-w" type="number" class="input-box" step="5" value="${p.postW}"></label>
+        </div>
+      </div>`;
+
+    // 열 칩
+    const chipsEl = body.querySelector('#pp-bays');
+    bays.forEach((b) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'sp-chip' + (b.key === state.pantryBay ? ' selected' : '');
+      chip.innerHTML = `${bayLabel(b)}<span class="pp-chip-sub">${Math.round(b.w)}mm</span>`;
+      chip.addEventListener('click', () => { state.pantryBay = b.key; renderShelfHeightPopup(); });
+      chipsEl.appendChild(chip);
+    });
+
+    // 고른 열의 선반
+    const shelvesEl = body.querySelector('#pp-shelves');
+    const list = bay ? pantryBayShelves(bay.key, false) : [];
+    list.forEach((sh, idx) => {
+      const row = document.createElement('div');
+      row.className = 'shelf-item';
+      row.innerHTML = `
+        <span>${idx + 1}단 위</span>
+        <input type="number" class="input-box pp-y" value="${sh.bottomY}" step="10" aria-label="${idx + 1}번째 선반 높이" />
+        <span style="display:flex;align-items:center;gap:4px;">두께 <input type="number" class="input-box pp-t" value="${sh.thickness || 18}" step="2" style="width:48px;" aria-label="두께" /></span>
+        <button class="btn btn-danger btn-sm pp-del" type="button" aria-label="이 선반 빼기">✕</button>`;
+      row.querySelector('.pp-y').addEventListener('change', (e) => {
+        const own = pantryBayShelves(bay.key, true);
+        own[idx].bottomY = clampNum(e.target.value, 30, p.h - 30, own[idx].bottomY);
+        after();
+      });
+      row.querySelector('.pp-t').addEventListener('change', (e) => {
+        const own = pantryBayShelves(bay.key, true);
+        own[idx].thickness = clampNum(e.target.value, 5, 60, 18);
+        after();
+      });
+      row.querySelector('.pp-del').addEventListener('click', () => {
+        snapPantryComps();
+        const own = pantryBayShelves(bay.key, true);
+        own.splice(idx, 1);
+        // 빠진 선반 위의 단은 한 칸씩 내려옴: 같은 열의 상자는 단 번호 기준으로 다시 맞춤
+        clampPantryBoxes();
+        after();
+      });
+      shelvesEl.appendChild(row);
+    });
+    if (!list.length) shelvesEl.innerHTML = '<div class="pp-cap">선반이 없어요. 바닥부터 천장까지 한 칸이에요.</div>';
+
+    body.querySelector('#pp-add-shelf').addEventListener('click', () => {
+      if (!bay) return;
+      snapPantryComps();
+      const own = pantryBayShelves(bay.key, true);
+      const sorted = [...own].sort((a, b) => a.bottomY - b.bottomY);
+      // 가장 넓은 칸 가운데에 넣음
+      let bestGap = -1, bestY = 400;
+      let prev = 0;
+      [...sorted, { bottomY: p.h }].forEach((s) => {
+        if (s.bottomY - prev > bestGap) { bestGap = s.bottomY - prev; bestY = Math.round((prev + s.bottomY) / 2 / 10) * 10; }
+        prev = s.bottomY + (s.thickness || 18);
+      });
+      own.push({ id: `${bay.key}-${Date.now()}`, bottomY: bestY, thickness: 18 });
+      own.sort((a, b) => a.bottomY - b.bottomY);
+      clampPantryBoxes();
+      after();
+    });
+    body.querySelector('#pp-apply-all').addEventListener('click', () => {
+      if (!bay) return;
+      snapPantryComps();
+      const src = pantryBayShelves(bay.key, false).map((s) => ({ bottomY: s.bottomY, thickness: s.thickness || 18 }));
+      p.defaultShelves = src.map((s, i) => ({ id: `ps-${i}-${Date.now()}`, ...s }));
+      p.bayShelves = {};
+      clampPantryBoxes();
+      after();
+    });
+
+    // 기둥 위치
+    const postsEl = body.querySelector('#pp-posts');
+    const wallRow = (wall) => {
+      if (wall === 'B' && p.wallB === false) return;
+      const key = wall === 'A' ? 'postsA' : 'postsB';
+      const lo = wall === 'A' ? 0 : startB;
+      const hi = wall === 'A' ? p.roomW : p.roomD;
+      const wrap = document.createElement('div');
+      wrap.className = 'pp-post-wall';
+      wrap.innerHTML = `<div class="pp-sub">${wall === 'A' ? '안쪽 벽 (왼쪽 끝부터)' : '옆 벽 (안쪽 구석부터)'}</div>`;
+      const posts = [...(p[key] || [])].sort((a, b) => a - b);
+      posts.forEach((pos, i) => {
+        const row = document.createElement('div');
+        row.className = 'shelf-item';
+        row.innerHTML = `
+          <span>기둥 ${i + 1}</span>
+          <input type="number" class="input-box" value="${pos}" step="10" aria-label="기둥 ${i + 1} 위치" />
+          <span class="pp-cap">mm</span>
+          <button class="btn btn-danger btn-sm" type="button" aria-label="기둥 ${i + 1} 빼기">✕</button>`;
+        row.querySelector('input').addEventListener('change', (e) => {
+          snapPantryComps();
+          posts[i] = clampNum(e.target.value, lo + 60, hi - 60, pos);
+          p[key] = posts.sort((a, b) => a - b);
+          clampPantryBoxes();
+          after();
+        });
+        row.querySelector('button').addEventListener('click', () => {
+          snapPantryComps();
+          posts.splice(i, 1);
+          p[key] = posts;
+          delete p.bayShelves[`${wall}${posts.length}`];
+          clampPantryBoxes();
+          after();
+        });
+        wrap.appendChild(row);
+      });
+      const add = document.createElement('button');
+      add.type = 'button';
+      add.className = 'pp-text-btn';
+      add.textContent = '+ 기둥 넣기';
+      add.addEventListener('click', () => {
+        snapPantryComps();
+        // 가장 넓은 열 가운데에 기둥
+        const edges = [lo, ...posts, hi];
+        let bi = 0;
+        for (let i = 0; i < edges.length - 1; i++) if (edges[i + 1] - edges[i] > edges[bi + 1] - edges[bi]) bi = i;
+        posts.push(Math.round((edges[bi] + edges[bi + 1]) / 2 / 10) * 10);
+        p[key] = posts.sort((a, b) => a - b);
+        clampPantryBoxes();
+        after();
+      });
+      wrap.appendChild(add);
+      postsEl.appendChild(wrap);
+    };
+    wallRow('A');
+    wallRow('B');
+
+    const bindNum = (id, set) => body.querySelector(id).addEventListener('change', (e) => { set(Number(e.target.value)); after(); });
+    bindNum('#pp-depth-a', (v) => { snapPantryComps(); p.depthA = clampNum(v, 150, Math.min(900, p.roomD - 200), 400); clampPantryBoxes(); });
+    bindNum('#pp-depth-b', (v) => { p.depthB = clampNum(v, 150, Math.min(900, p.roomW - 200), 400); });
+    bindNum('#pp-post-w', (v) => { p.postW = clampNum(v, 0, 80, 25); });
+  }
+
   function handleBundleScreenPos(posInfo) {
     const popupEl = document.getElementById('bundle-floating-popup');
     if (!popupEl) return;
@@ -850,7 +1056,7 @@
     popupEl.style.left = `${posInfo.x}px`;
     popupEl.style.top = `${posInfo.y - 12}px`;
     document.getElementById('bundle-popup-label').textContent =
-      `📦 상자 ${posInfo.count}개 골랐어요`;
+      `상자 ${posInfo.count}개 골랐어요`;
 
     const isCab = state.spaceConfig.type === 'cabinet';
     document.getElementById('btn-bundle-up').style.display = isCab ? 'inline-flex' : 'none';
@@ -913,7 +1119,7 @@
 
     const activePlan = getActivePlan();
     const compartments = window.PackerEngine.getCompartments(state.spaceConfig);
-    const compIdx = state.spaceConfig.type === 'cabinet' ? state.activeCompartmentIdx : 0;
+    const compIdx = state.spaceConfig.type !== 'drawer' ? state.activeCompartmentIdx : 0;
     const comp = compartments[compIdx] || compartments[0];
 
     let xMinBound = 0;
@@ -996,7 +1202,7 @@
 
     const activePlan = getActivePlan();
     const compartments = window.PackerEngine.getCompartments(state.spaceConfig);
-    const compIdx = state.spaceConfig.type === 'cabinet' ? state.activeCompartmentIdx : 0;
+    const compIdx = state.spaceConfig.type !== 'drawer' ? state.activeCompartmentIdx : 0;
     const comp = compartments[compIdx] || compartments[0];
     const dims = window.PackerEngine.getOrientedDims(model, initialRot);
 
@@ -1723,7 +1929,7 @@
   // 팝업 모달 내부 렌더링
   function renderPickerModalContent() {
     const compartments = window.PackerEngine.getCompartments(state.spaceConfig);
-    const compIdx = state.spaceConfig.type === 'cabinet' ? state.activeCompartmentIdx : 0;
+    const compIdx = state.spaceConfig.type !== 'drawer' ? state.activeCompartmentIdx : 0;
     const activeComp = compartments[compIdx] || compartments[0];
 
     document.getElementById('picker-target-space-badge').textContent =
@@ -2265,6 +2471,71 @@
     }, 60);
   }
 
+  // ===== 팬트리: 열(기둥)과 단(선반) =====
+  function pantryShelfCount() {
+    return (state.spaceConfig.pantry.defaultShelves || []).length;
+  }
+  // 벽을 n열로 고르게 나눔 (기둥 n-1개)
+  function setPantryCols(wall, n) {
+    snapPantryComps();
+    const p = state.spaceConfig.pantry;
+    const start = wall === 'A' ? 0 : Math.min(p.roomD - 100, p.depthA);
+    const end = wall === 'A' ? p.roomW : p.roomD;
+    const cols = Math.max(1, Math.round(n));
+    const posts = [];
+    for (let i = 1; i < cols; i++) posts.push(Math.round((start + ((end - start) * i) / cols) / 5) * 5);
+    if (wall === 'A') p.postsA = posts; else p.postsB = posts;
+    p.bayShelves = {};   // 열이 바뀌면 열마다 높이는 처음 값으로
+    clampPantryBoxes();
+  }
+  // 모든 열을 같은 간격 선반 n개로
+  function setPantryLevels(n) {
+    snapPantryComps();
+    const p = state.spaceConfig.pantry;
+    const k = Math.max(0, Math.round(n));
+    const shelves = [];
+    for (let i = 1; i <= k; i++) {
+      shelves.push({ id: `ps-${i}-${Date.now()}`, bottomY: Math.round((p.h * i) / (k + 1) / 10) * 10, thickness: 18 });
+    }
+    p.defaultShelves = shelves;
+    p.bayShelves = {};
+    clampPantryBoxes();
+  }
+  // 칸 구성이 바뀌어도 상자는 같은 열·같은 단에 그대로 (없어진 칸의 상자만 지움)
+  let pantryCompSnapshot = null;
+  function snapPantryComps() {
+    if (state.spaceConfig.type === 'pantry') pantryCompSnapshot = window.PackerEngine.getCompartments(state.spaceConfig);
+  }
+  function clampPantryBoxes() {
+    const now = window.PackerEngine.getCompartments(state.spaceConfig);
+    const before = pantryCompSnapshot;
+    pantryCompSnapshot = null;
+    const findNew = (old) => now.find((c) => c.bayKey === old.bayKey && c.level === old.level);
+    state.plans.forEach((plan) => {
+      if (!before) {
+        plan.boxes = plan.boxes.filter((b) => b.compartmentIndex < now.length);
+        return;
+      }
+      plan.boxes = plan.boxes.filter((b) => {
+        const old = before[b.compartmentIndex];
+        const nc = old && findNew(old);
+        if (!nc) return false;
+        b.compartmentIndex = nc.index;
+        return true;
+      });
+    });
+    if (state.activeCompartmentIdx >= now.length) state.activeCompartmentIdx = 0;
+  }
+  // 한 열의 선반 목록 (따로 바꾼 적 없으면 기본값을 복사해서 그 열 것으로)
+  function pantryBayShelves(key, forEdit) {
+    const p = state.spaceConfig.pantry;
+    p.bayShelves = p.bayShelves || {};
+    if (!p.bayShelves[key] && forEdit) {
+      p.bayShelves[key] = (p.defaultShelves || []).map((s, i) => ({ id: `${key}-${i}-${Date.now()}`, bottomY: s.bottomY, thickness: s.thickness || 18 }));
+    }
+    return p.bayShelves[key] || p.defaultShelves || [];
+  }
+
   // ===== 모바일 첫 설정: 한 화면에 질문 하나 =====
   function setShelfCount(n) {
     const c = state.spaceConfig.cabinet;
@@ -2295,15 +2566,77 @@
       hint: () => '나중에 언제든 바꿀 수 있어요.',
       options: [
         { value: 'cabinet', label: '문 달린 장', sub: '옷장 · 벽장 · 주방장' },
-        { value: 'drawer', label: '빼는 서랍', sub: '앞으로 당겨 여는 서랍장' }
+        { value: 'drawer', label: '빼는 서랍', sub: '앞으로 당겨 여는 서랍장' },
+        { value: 'pantry', label: '팬트리 방', sub: 'ㄱ자로 걸어 들어가는 방' }
       ],
       get: () => state.spaceConfig.type,
       set: (v) => {
         if (v === state.spaceConfig.type) return;
         state.previewSeed = Math.floor(Math.random() * 1e9);
-        document.getElementById(v === 'cabinet' ? 'card-type-cabinet' : 'card-type-drawer').click();
+        const cardId = { cabinet: 'card-type-cabinet', drawer: 'card-type-drawer', pantry: 'card-type-pantry' }[v];
+        document.getElementById(cardId).click();
       }
     };
+
+    if (state.spaceConfig.type === 'pantry') {
+      const p = state.spaceConfig.pantry;
+      const bayCount = (wall) => window.PackerEngine.getPantryBays(state.spaceConfig).bays.filter((b) => b.wall === wall).length;
+      return [
+        typeStep,
+        num({
+          title: '안쪽 벽은<br>몇 mm인가요?',
+          caption: '방 가로 (뒤 벽 길이)',
+          hint: () => '입구에서 보이는 맞은편 벽 끝에서 끝까지 재요.',
+          min: 600, max: 4000,
+          get: () => p.roomW,
+          set: (v) => { p.roomW = v; setPantryCols('A', bayCount('A')); }
+        }),
+        num({
+          title: '옆 벽은<br>몇 mm인가요?',
+          caption: '방 깊이 (오른쪽 벽 길이)',
+          hint: () => '안쪽 벽에서 입구까지 재요.',
+          min: 600, max: 4000,
+          get: () => p.roomD,
+          set: (v) => { p.roomD = v; setPantryCols('B', bayCount('B')); }
+        }),
+        num({
+          title: '선반 전체 높이는<br>얼마인가요?',
+          hint: () => '바닥에서 맨 위 선반 위까지 재요.',
+          min: 600, max: 2800,
+          get: () => p.h,
+          set: (v) => { p.h = v; setPantryLevels(pantryShelfCount()); }
+        }),
+        num({
+          title: '선반 깊이는<br>얼마인가요?',
+          caption: '안쪽 벽 · 옆 벽 똑같이',
+          hint: () => '벽에서 선반 앞 끝까지 재요. 벽마다 다르면 3D 화면에서 바꿔요.',
+          min: 150, max: 800, step: 10,
+          get: () => p.depthA,
+          set: (v) => { p.depthA = v; p.depthB = v; }
+        }),
+        num({
+          title: '안쪽 벽은<br>몇 열로 나뉘나요?',
+          unit: '열', step: 1, min: 1, max: 6,
+          hint: () => `세로 기둥이 ${Math.max(0, bayCount('A') - 1)}개예요. 기둥 위치는 3D 화면에서 바꿀 수 있어요.`,
+          get: () => bayCount('A'),
+          set: (v) => setPantryCols('A', v)
+        }),
+        num({
+          title: '옆 벽은<br>몇 열로 나뉘나요?',
+          unit: '열', step: 1, min: 0, max: 6,
+          hint: () => (p.wallB === false ? '옆 벽에는 선반이 없어요.' : `세로 기둥이 ${Math.max(0, bayCount('B') - 1)}개예요.`),
+          get: () => (p.wallB === false ? 0 : bayCount('B')),
+          set: (v) => { if (v <= 0) { p.wallB = false; } else { p.wallB = true; setPantryCols('B', v); } }
+        }),
+        num({
+          title: '선반은 몇 단인가요?',
+          unit: '단', step: 1, min: 1, max: 9,
+          hint: () => '모든 열이 같은 높이로 나뉘어요. 열마다 높이는 3D 화면에서 바꿔요.',
+          get: () => pantryShelfCount() + 1,
+          set: (v) => setPantryLevels(v - 1)
+        })
+      ];
+    }
 
     if (state.spaceConfig.type === 'cabinet') {
       return [
@@ -2405,7 +2738,9 @@
     const body = document.getElementById('mobile-setup-body');
     if (!body) return;
     const steps = getWizardSteps();
-    const names = state.spaceConfig.type === 'cabinet'
+    const names = state.spaceConfig.type === 'pantry'
+      ? ['가구 종류', '안쪽 벽', '옆 벽', '전체 높이', '선반 깊이', '안쪽 벽 열', '옆 벽 열', '단 수']
+      : state.spaceConfig.type === 'cabinet'
       ? ['가구 종류', '가로', '깊이', '높이', '문 여는 쪽', '문틀 폭', '선반 개수']
       : ['가구 종류', '가로', '깊이', '보이는 깊이', '넣을 수 있는 높이'];
 
@@ -2710,6 +3045,20 @@
     document.getElementById('card-type-cabinet').addEventListener('click', () => {
       switchSpaceType('cabinet');
       state.selectedBoxIds = [];
+      refreshAll();
+      window.Scene3DManager.setCameraView('iso');
+    });
+
+    document.getElementById('card-type-pantry')?.addEventListener('click', () => {
+      if (!state.spaceConfig.pantry) state.spaceConfig.pantry = defaultPantry();
+      switchSpaceType('pantry');
+      state.activeCompartmentIdx = 0;
+      state.expandedCompartmentIdx = null;
+      state.selectedBoxIds = [];
+      const count = window.PackerEngine.getCompartments(state.spaceConfig).length;
+      state.plans.forEach((p) => {
+        p.boxes = p.boxes.filter((b) => b.compartmentIndex < count);
+      });
       refreshAll();
       window.Scene3DManager.setCameraView('iso');
     });
@@ -3084,6 +3433,7 @@
     const restored = (urlParams.get('state') || urlParams.get('plan')) ? null : loadLocal();
     if (restored) {
       state.spaceConfig = restored.spaceConfig;
+      if (!state.spaceConfig.pantry) state.spaceConfig.pantry = defaultPantry();
       state.plans = restored.plans;
       if (restored.plans.some((p) => p.id === restored.activePlanId)) state.activePlanId = restored.activePlanId;
       if (restored.setupDone) {

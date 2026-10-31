@@ -1,8 +1,110 @@
 // 3D 공간 구획 계산, 자동 적층(Auto-Stacking), 충돌/간섭 검증(문설주·경첩·서랍 미노출 구간), 자동 채우기 엔진
 
 window.PackerEngine = (function () {
+  // 0. 가구 전체 크기 (가로 W, 깊이 D, 높이 H)
+  function getSpaceDims(spaceConfig) {
+    if (spaceConfig.type === 'pantry') {
+      const p = spaceConfig.pantry;
+      return { W: p.roomW, D: p.roomD, H: p.h };
+    }
+    if (spaceConfig.type === 'drawer') {
+      const d = spaceConfig.drawer;
+      return { W: d.w, D: d.d, H: d.h };
+    }
+    const c = spaceConfig.cabinet;
+    return { W: c.w, D: c.d, H: c.h };
+  }
+
+  // 0-1. ㄱ자 팬트리: 기둥으로 나뉜 열(bay) 목록
+  // - 'A' = 안쪽(뒤) 벽: 방 왼쪽 끝부터 오른쪽으로
+  // - 'B' = 오른쪽 옆 벽: 안쪽 구석(뒤 선반 끝)부터 입구 쪽으로
+  // 좌표: 방 가운데가 (0,0). 뒤 벽 면은 z = -roomD/2, 오른쪽 벽 면은 x = +roomW/2
+  function getPantryBays(spaceConfig) {
+    const p = spaceConfig.pantry;
+    const postW = Math.max(0, Number(p.postW) || 0);
+    const bays = [];
+    const makeWall = (wall, length, posts, startAt) => {
+      const pts = [...(posts || [])].map(Number).filter((v) => v > startAt && v < length).sort((a, b) => a - b);
+      const edges = [startAt, ...pts, length];
+      for (let i = 0; i < edges.length - 1; i++) {
+        const s0 = edges[i] + (i === 0 ? 0 : postW / 2);
+        const s1 = edges[i + 1] - (i === edges.length - 2 ? 0 : postW / 2);
+        if (s1 - s0 < 40) continue;
+        bays.push({ wall, col: i, key: `${wall}${i}`, s0, s1, w: s1 - s0 });
+      }
+      return pts;
+    };
+    const postsA = makeWall('A', p.roomW, p.postsA, 0);
+    const startB = Math.min(p.roomD - 100, p.depthA);
+    const postsB = p.wallB === false ? [] : makeWall('B', p.roomD, p.postsB, startB);
+    if (p.wallB === false) {
+      for (let i = bays.length - 1; i >= 0; i--) if (bays[i].wall === 'B') bays.splice(i, 1);
+    }
+    bays.forEach((b) => {
+      if (b.wall === 'A') {
+        b.d = p.depthA;
+        b.ox = -p.roomW / 2 + b.s0;
+        b.oz = -p.roomD / 2;
+        b.rotY = 0;
+      } else {
+        b.d = p.depthB;
+        b.ox = p.roomW / 2;
+        b.oz = -p.roomD / 2 + b.s0;
+        b.rotY = -Math.PI / 2;
+      }
+      const sh = (p.bayShelves && p.bayShelves[b.key]) || p.defaultShelves || [];
+      b.shelves = [...sh].sort((x, y) => x.bottomY - y.bottomY);
+    });
+    return { bays, postsA, postsB, startB };
+  }
+
+  // 칸 안의 위치(x: 벽을 따라, z: 벽에서 앞으로)를 방 좌표로
+  function localToWorld(comp, lx, lz) {
+    const c = Math.cos(comp.rotY || 0), s = Math.sin(comp.rotY || 0);
+    return { x: comp.ox + lx * c + lz * s, z: comp.oz - lx * s + lz * c };
+  }
+  function worldDeltaToLocal(comp, dx, dz) {
+    const c = Math.cos(comp.rotY || 0), s = Math.sin(comp.rotY || 0);
+    return { x: dx * c - dz * s, z: dx * s + dz * c };
+  }
+
   // 1. 장 형식의 선반 구획(칸) 또는 슬라이딩 서랍의 유효 공간 목록 반환
   function getCompartments(spaceConfig) {
+    const list = getCompartmentsRaw(spaceConfig);
+    if (spaceConfig.type !== 'pantry') {
+      const { W, D } = getSpaceDims(spaceConfig);
+      list.forEach((c) => { c.ox = -W / 2; c.oz = -D / 2; c.rotY = 0; });
+    }
+    return list;
+  }
+
+  function getCompartmentsRaw(spaceConfig) {
+    if (spaceConfig.type === 'pantry') {
+      const p = spaceConfig.pantry;
+      const { bays } = getPantryBays(spaceConfig);
+      const out = [];
+      bays.forEach((b) => {
+        let curY = 0;
+        const wallName = b.wall === 'A' ? '안쪽 벽' : '옆 벽';
+        const pushComp = (yEnd, lvl) => {
+          out.push({
+            index: out.length,
+            name: `${wallName} ${b.col + 1}열 ${lvl + 1}단`,
+            short: `${b.wall === 'A' ? '안' : '옆'}${b.col + 1}-${lvl + 1}`,
+            bayKey: b.key, wall: b.wall, col: b.col, level: lvl,
+            yStart: curY, yEnd, clearH: Math.max(0, yEnd - curY),
+            w: b.w, d: b.d, ox: b.ox, oz: b.oz, rotY: b.rotY
+          });
+        };
+        b.shelves.forEach((sh, i) => {
+          const topY = Math.min(p.h, Math.max(curY + 20, sh.bottomY));
+          pushComp(topY, i);
+          curY = Math.min(p.h, topY + (sh.thickness || 18));
+        });
+        pushComp(p.h, b.shelves.length);
+      });
+      return out;
+    }
     if (spaceConfig.type === 'drawer') {
       const d = spaceConfig.drawer;
       const clearH = d.clearanceH && d.clearanceH > 0 ? d.clearanceH : d.h;
@@ -571,6 +673,10 @@ window.PackerEngine = (function () {
   }
 
   return {
+    getSpaceDims,
+    getPantryBays,
+    localToWorld,
+    worldDeltaToLocal,
     getCompartments,
     getOrientedDims,
     getCabinetConstraints,
