@@ -17,6 +17,8 @@
       postsA: [750],    // 뒤 벽 기둥 위치 (왼쪽 끝에서)
       postsB: [],       // 옆 벽 기둥 위치 (안쪽 구석에서)
       doorW: 800,       // 입구 폭 (그림 표시용)
+      doorSide: 'left', // 입구 쪽: 'left'(옆 선반은 오른쪽 벽) | 'right'(옆 선반은 왼쪽 벽)
+      keepFloor: false, // 맨 아래 칸 비워두기 (쌀통·생수·청소기 자리)
       defaultShelves: [400, 800, 1200, 1600, 2000].map((y, i) => ({ id: `ps-${i}`, bottomY: y, thickness: 18 })),
       bayShelves: {}    // 열마다 따로 바꾼 선반 { A0: [...], B0: [...] }
     };
@@ -647,6 +649,8 @@
   // 3D 화면의 '한 번에 채우기': 가구 종류에 맞는 상자로 한 칸 채우기
   function runTypeFill(compIdx, brand) {
     const plan = getActivePlan();
+    const fillComp = window.PackerEngine.getCompartments(state.spaceConfig)[compIdx];
+    if (fillComp && fillComp.reserved) return 0;   // 팬트리 '맨 아래 비워두기' 칸은 채우지 않음
     let pool = typeFillPool();
     if (brand) pool = pool.filter((m) => m.brand === brand);
     const isCab = state.spaceConfig.type === 'cabinet';
@@ -883,7 +887,14 @@
     const clampNum = (v, lo, hi, dflt) => Math.max(lo, Math.min(hi, Number.isFinite(Number(v)) ? Number(v) : dflt));
     const after = (redraw) => { refreshAll(); if (redraw !== false) renderShelfHeightPopup(); };
 
+    const walk = window.PackerEngine.getPantryWalkway(state.spaceConfig);
     body.innerHTML = `
+      ${walk.ok ? '' : `<div class="pp-warn">걷는 길이 ${walk.min} mm로 좁아요. 600 mm 이상이 좋아요. 선반 깊이를 줄여 보세요.</div>`}
+      <div class="pp-sec">
+        <label class="pp-toggle"><span>맨 아래 칸 비워두기 <span class="pp-cap">쌀통·생수·청소기 자리</span></span><input id="pp-keep-floor" type="checkbox" ${p.keepFloor ? 'checked' : ''}></label>
+        <div class="pp-h" style="margin-top:8px;">입구 쪽</div>
+        <div class="pp-chips" id="pp-door"></div>
+      </div>
       <div class="pp-sec">
         <div class="pp-h">열 고르기</div>
         <div class="pp-chips" id="pp-bays"></div>
@@ -908,6 +919,30 @@
           <label class="pp-field"><span>기둥 굵기</span><input id="pp-post-w" type="number" class="input-box" step="5" value="${p.postW}"></label>
         </div>
       </div>`;
+
+    // 맨 아래 비워두기 · 입구 쪽
+    body.querySelector('#pp-keep-floor').addEventListener('change', (e) => {
+      p.keepFloor = e.target.checked;
+      if (p.keepFloor) {
+        // 이미 넣은 바닥 칸 상자는 지움
+        const comps = window.PackerEngine.getCompartments(state.spaceConfig);
+        state.plans.forEach((pl) => { pl.boxes = pl.boxes.filter((b) => !(comps[b.compartmentIndex] && comps[b.compartmentIndex].reserved)); });
+      }
+      after();
+    });
+    const doorEl = body.querySelector('#pp-door');
+    [['left', '왼쪽 입구'], ['right', '오른쪽 입구']].forEach(([v, label]) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'sp-chip' + ((p.doorSide || 'left') === v ? ' selected' : '');
+      chip.textContent = label;
+      chip.addEventListener('click', () => {
+        p.doorSide = v;
+        after();
+        window.Scene3DManager.setCameraView('iso');
+      });
+      doorEl.appendChild(chip);
+    });
 
     // 열 칩
     const chipsEl = body.querySelector('#pp-bays');
@@ -1964,7 +1999,8 @@
       state.pickerBrandListOpen = !state.pickerBrandListOpen;
       renderPickerModalContent();
     });
-    tabsEl.appendChild(nav);
+    const navSlot = document.getElementById('picker-brand-nav-slot');
+    if (navSlot) { navSlot.innerHTML = ''; navSlot.appendChild(nav); } else tabsEl.appendChild(nav);
 
     // 상자 종류 필터: 전체 · 서랍형 · 바구니형 · 뚜껑형
     if (state.pickerBrand !== 'COMBOS') {
@@ -2200,13 +2236,18 @@
 
     if (selBoxes.length === 0) {
       hud.style.display = 'none';
+      document.body.classList.remove('has-box-selected');
+      if (window.closeBoxFinePad) window.closeBoxFinePad();
       return;
     }
 
     hud.style.display = 'flex';
+    document.body.classList.add('has-box-selected');
     const isCab = state.spaceConfig.type === 'cabinet';
     document.getElementById('btn-box-shelf-up').style.display = isCab ? 'inline-flex' : 'none';
     document.getElementById('btn-box-shelf-down').style.display = isCab ? 'inline-flex' : 'none';
+    const fineShelf = document.querySelector('#box-fine-pad .fine-shelf');
+    if (fineShelf) fineShelf.style.display = isCab ? 'flex' : 'none';
 
     const saveComboBtn = document.getElementById('btn-box-save-combo');
 
@@ -2219,11 +2260,11 @@
       const yInfo = (box.y || 0) > 0 ? ` · 바닥에서 +${box.y}mm 위` : '';
       document.getElementById('sel-box-title').innerHTML =
         `<strong>[${model.brand}] ${model.name}</strong> ` +
-        `<span style="color:var(--text-sub);font-size:0.74rem;">(${dims.w}×${dims.d}×H${dims.h}mm, ${box.rot || 0}°${yInfo})</span>`;
+        `<span class="sel-box-meta">${dims.w}×${dims.d}×${dims.h}mm · ${box.rot || 0}°${yInfo}</span>`;
     } else {
       saveComboBtn.style.display = 'inline-flex';
       document.getElementById('sel-box-title').innerHTML =
-        `<strong style="color:#b45309;">📦 상자 ${selBoxes.length}개 골랐어요</strong>`;
+        `<strong>상자 ${selBoxes.length}개 골랐어요</strong>`;
     }
   }
 
@@ -2583,6 +2624,17 @@
       const bayCount = (wall) => window.PackerEngine.getPantryBays(state.spaceConfig).bays.filter((b) => b.wall === wall).length;
       return [
         typeStep,
+        {
+          kind: 'choice',
+          title: '입구는<br>어느 쪽인가요?',
+          hint: () => '방에 들어가서 정면을 볼 때 입구가 있는 쪽이에요.',
+          options: [
+            { value: 'left', label: '왼쪽 입구', sub: '선반은 안쪽 벽과 오른쪽 벽' },
+            { value: 'right', label: '오른쪽 입구', sub: '선반은 안쪽 벽과 왼쪽 벽' }
+          ],
+          get: () => p.doorSide || 'left',
+          set: (v) => { p.doorSide = v; }
+        },
         num({
           title: '안쪽 벽은<br>몇 mm인가요?',
           caption: '방 가로 (뒤 벽 길이)',
@@ -2609,7 +2661,12 @@
         num({
           title: '선반 깊이는<br>얼마인가요?',
           caption: '안쪽 벽 · 옆 벽 똑같이',
-          hint: () => '벽에서 선반 앞 끝까지 재요. 벽마다 다르면 3D 화면에서 바꿔요.',
+          hint: () => {
+            const w = window.PackerEngine.getPantryWalkway(state.spaceConfig);
+            return w.ok
+              ? `걷는 길은 ${w.min} mm 남아요.`
+              : `걷는 길이 ${w.min} mm로 좁아요. 600 mm는 남겨 두는 게 좋아요.`;
+          },
           min: 150, max: 800, step: 10,
           get: () => p.depthA,
           set: (v) => { p.depthA = v; p.depthB = v; }
@@ -2739,7 +2796,7 @@
     if (!body) return;
     const steps = getWizardSteps();
     const names = state.spaceConfig.type === 'pantry'
-      ? ['가구 종류', '안쪽 벽', '옆 벽', '전체 높이', '선반 깊이', '안쪽 벽 열', '옆 벽 열', '단 수']
+      ? ['가구 종류', '입구 쪽', '안쪽 벽', '옆 벽', '전체 높이', '선반 깊이', '안쪽 벽 열', '옆 벽 열', '단 수']
       : state.spaceConfig.type === 'cabinet'
       ? ['가구 종류', '가로', '깊이', '높이', '문 여는 쪽', '문틀 폭', '선반 개수']
       : ['가구 종류', '가로', '깊이', '보이는 깊이', '넣을 수 있는 높이'];
@@ -3277,7 +3334,22 @@
     };
 
     document.getElementById('btn-box-save-combo').addEventListener('click', saveCurrentSelectionAsCombo);
-    document.getElementById('btn-box-stack-more').addEventListener('click', stackOneMoreOnSelected);
+    document.getElementById('btn-box-stack-more')?.addEventListener('click', stackOneMoreOnSelected);
+
+    // 상세 조정: 방향키 창 열고 닫기 (창 밖을 누르면 닫힘)
+    const finePad = document.getElementById('box-fine-pad');
+    const fineBackdrop = document.getElementById('box-fine-backdrop');
+    const fineBtn = document.getElementById('btn-box-fine');
+    const setFine = (open) => {
+      finePad.hidden = !open;
+      fineBackdrop.hidden = !open;
+      fineBtn.classList.toggle('active', open);
+      fineBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+    window.closeBoxFinePad = () => setFine(false);
+    fineBtn.addEventListener('click', (e) => { e.stopPropagation(); setFine(finePad.hidden); });
+    fineBackdrop.addEventListener('pointerdown', (e) => { e.preventDefault(); setFine(false); });
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !finePad.hidden) setFine(false); });
     document.getElementById('btn-box-shelf-up').addEventListener('click', () => moveSelectedBoxesToShelf(1));
     document.getElementById('btn-box-shelf-down').addEventListener('click', () => moveSelectedBoxesToShelf(-1));
     document.getElementById('btn-box-rot').addEventListener('click', () => rotateSelectedBoxes(90));

@@ -498,10 +498,11 @@ window.Scene3DManager = (function () {
       return m;
     };
 
-    // 오른쪽 옆 벽 (반투명)
+    // 옆 벽 (반투명): 입구 반대쪽
     if (p.wallB !== false) {
       const sw = new THREE.Mesh(new THREE.BoxGeometry(24, Math.max(2400, H + 300), p.roomD), sideWallMat);
-      sw.position.set(p.roomW / 2 + 12, Math.max(2400, H + 300) / 2 - 2, 0);
+      const sx = p.doorSide === 'right' ? -p.roomW / 2 - 12 : p.roomW / 2 + 12;
+      sw.position.set(sx, Math.max(2400, H + 300) / 2 - 2, 0);
       roomEnvGroup.add(sw);
     }
 
@@ -516,26 +517,104 @@ window.Scene3DManager = (function () {
     });
 
     // 세로 기둥: 벽마다 시작·끝·중간 기둥 위치
+    const leftSide = p.doorSide === 'right';
+    const wallPoint = (wall, s, dd) => {
+      if (wall === 'A') return { x: -p.roomW / 2 + s, z: -p.roomD / 2 + dd };
+      return leftSide ? { x: -p.roomW / 2 + dd, z: -p.roomD / 2 + s } : { x: p.roomW / 2 - dd, z: -p.roomD / 2 + s };
+    };
     const postAt = (wall, s) => {
       const d = wall === 'A' ? p.depthA : p.depthB;
-      const comp0 = wall === 'A'
-        ? { ox: -p.roomW / 2, oz: -p.roomD / 2, rotY: 0 }
-        : { ox: p.roomW / 2, oz: -p.roomD / 2, rotY: -Math.PI / 2 };
-      const front = window.PackerEngine.localToWorld(comp0, s, d - postW / 2);
-      addPart(postW, H, postW, front.x, H / 2, front.z, comp0.rotY, postMat);
-      const back = window.PackerEngine.localToWorld(comp0, s, postW / 2);
-      addPart(postW, H, postW, back.x, H / 2, back.z, comp0.rotY, postMat);
+      const front = wallPoint(wall, s, d - postW / 2);
+      addPart(postW, H, postW, front.x, H / 2, front.z, 0, postMat);
+      const back = wallPoint(wall, s, postW / 2);
+      addPart(postW, H, postW, back.x, H / 2, back.z, 0, postMat);
     };
     [postW / 2, ...postsA, p.roomW - postW / 2].forEach((s) => postAt('A', s));
     if (p.wallB !== false) [startB + postW / 2, ...postsB, p.roomD - postW / 2].forEach((s) => postAt('B', s));
 
-    // 바닥에 입구 표시 (왼쪽 앞)
+    // 구석 (옆 선반에 막혀 꺼내기 힘든 곳): 주황색으로 옅게
+    const corner = window.PackerEngine.getPantryCorner(spaceConfig);
+    if (corner && showDeadzones) {
+      const cw = corner.s1 - corner.s0;
+      const cornerVol = new THREE.Mesh(
+        new THREE.BoxGeometry(cw, H, p.depthA),
+        new THREE.MeshBasicMaterial({ color: 0xd97706, transparent: true, opacity: 0.1, depthWrite: false })
+      );
+      cornerVol.position.set(-p.roomW / 2 + corner.s0 + cw / 2, H / 2, -p.roomD / 2 + p.depthA / 2);
+      cabinetGroup.add(cornerVol);
+    }
+
+    // 맨 아래 빈칸 (쌀통·생수·청소기 자리): 바닥에 옅은 표시
+    if (p.keepFloor) {
+      bays.forEach((b) => {
+        const topY = b.shelves.length ? b.shelves[0].bottomY : H;
+        const c = window.PackerEngine.localToWorld({ ox: b.ox, oz: b.oz, rotY: b.rotY }, b.w / 2, b.d / 2);
+        const m = new THREE.Mesh(
+          new THREE.BoxGeometry(b.w - 4, topY, b.d - 4),
+          new THREE.MeshBasicMaterial({ color: 0x8a9a7b, transparent: true, opacity: 0.08, depthWrite: false })
+        );
+        m.position.set(c.x, topY / 2, c.z);
+        m.rotation.y = b.rotY;
+        cabinetGroup.add(m);
+      });
+    }
+
+    // 손 닿는 높이 선 (1800mm): 이보다 위는 의자가 필요해요
+    const reachY = 1800;
+    if (H > reachY + 50) {
+      const pts = [];
+      const fA0 = wallPoint('A', 0, p.depthA + 2), fA1 = wallPoint('A', p.roomW, p.depthA + 2);
+      pts.push(new THREE.Vector3(fA0.x, reachY, fA0.z), new THREE.Vector3(fA1.x, reachY, fA1.z));
+      if (p.wallB !== false) {
+        const fB0 = wallPoint('B', startB, p.depthB + 2), fB1 = wallPoint('B', p.roomD, p.depthB + 2);
+        pts.push(new THREE.Vector3(fB0.x, reachY, fB0.z), new THREE.Vector3(fB1.x, reachY, fB1.z));
+      }
+      const reachLine = new THREE.LineSegments(
+        new THREE.BufferGeometry().setFromPoints(pts),
+        new THREE.LineDashedMaterial({ color: 0x5c7fa3, dashSize: 40, gapSize: 25 })
+      );
+      reachLine.computeLineDistances();
+      cabinetGroup.add(reachLine);
+      // 글자 표시
+      const cv = document.createElement('canvas');
+      cv.width = 512; cv.height = 96;
+      const g = cv.getContext('2d');
+      g.fillStyle = 'rgba(255,255,255,0.85)';
+      g.fillRect(0, 0, 512, 96);
+      g.fillStyle = '#3f5f80';
+      g.font = '600 40px Pretendard, sans-serif';
+      g.textBaseline = 'middle';
+      g.fillText('손 닿는 높이 1800', 20, 48);
+      const tex = new THREE.CanvasTexture(cv);
+      const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
+      label.scale.set(360, 68, 1);
+      const lp = wallPoint('A', leftSide ? p.roomW - 220 : 220, p.depthA + 10);
+      label.position.set(lp.x, reachY + 50, lp.z);
+      cabinetGroup.add(label);
+    }
+
+    // 걷는 길이 좁으면 바닥에 붉게 표시 (600mm 미만)
+    const walk = window.PackerEngine.getPantryWalkway(spaceConfig);
+    if (!walk.ok) {
+      const wz0 = -p.roomD / 2 + p.depthA;
+      const wx0 = leftSide ? -p.roomW / 2 + (p.wallB === false ? 0 : p.depthB) : -p.roomW / 2;
+      const wx1 = leftSide ? p.roomW / 2 : p.roomW / 2 - (p.wallB === false ? 0 : p.depthB);
+      const floorWarn = new THREE.Mesh(
+        new THREE.BoxGeometry(Math.max(10, wx1 - wx0), 2, Math.max(10, p.roomD / 2 - wz0)),
+        new THREE.MeshBasicMaterial({ color: 0xc2410c, transparent: true, opacity: 0.16, depthWrite: false })
+      );
+      floorWarn.position.set((wx0 + wx1) / 2, 2, (wz0 + p.roomD / 2) / 2);
+      cabinetGroup.add(floorWarn);
+    }
+
+    // 바닥에 입구 표시 (입구 쪽 앞)
     const doorW = Math.max(300, Math.min(p.doorW || 800, p.roomW - p.depthB - 50));
     const doorLine = new THREE.Mesh(
       new THREE.BoxGeometry(doorW, 2, 30),
       new THREE.MeshBasicMaterial({ color: 0xb08d63, transparent: true, opacity: 0.5 })
     );
-    doorLine.position.set(-p.roomW / 2 + doorW / 2 + 40, 1, p.roomD / 2 - 15);
+    const doorX = leftSide ? p.roomW / 2 - doorW / 2 - 40 : -p.roomW / 2 + doorW / 2 + 40;
+    doorLine.position.set(doorX, 1, p.roomD / 2 - 15);
     cabinetGroup.add(doorLine);
   }
 
@@ -1266,8 +1345,9 @@ window.Scene3DManager = (function () {
 
     if (currentSpaceConfig.type === 'pantry') {
       // 팬트리: 입구(왼쪽 앞)에서 안쪽 구석을 비스듬히 내려다봄
-      controls.target.set(W * 0.12, H * 0.45, -D * 0.1);
-      camera.position.set(-W * 0.55, H * 0.85, D * 1.55 + 900);
+      const mir = currentSpaceConfig.pantry && currentSpaceConfig.pantry.doorSide === 'right' ? -1 : 1;
+      controls.target.set(mir * W * 0.12, H * 0.45, -D * 0.1);
+      camera.position.set(-mir * W * 0.55, H * 0.85, D * 1.55 + 900);
       controls.update();
       return;
     }

@@ -3667,3 +3667,224 @@ body.space-pantry #mobile-shelf-buttons .msab-num { font-size: 0.62rem; letter-s
 body.space-pantry #mobile-shelf-buttons > * { min-width: 44px; width: auto; padding: 0 6px; }
 /* 팬트리는 선반이 있어서 '기둥·선반' 버튼을 보여줌 */
 body.ui-mode-mobile.mobile-step-build.space-pantry .mobile-shelfh-btn { display: inline-flex; }
+
+
+/* =====================================================================
+   3D 화면 아래 바 · 상자 팝업 · 상자 고르기: 여백 줄이기 (2026-10-31 요청)
+   ===================================================================== */
+/* 기본 옵션 바 (사진 저장 · 여러 개 고르기 ...): 위아래 여백 약 70% 줄임 */
+body.ui-mode-mobile .hud-pill-bar {
+  padding: 2px 4px !important;
+  gap: 2px !important;
+  row-gap: 0 !important;
+  align-items: center;
+}
+body.ui-mode-mobile .hud-pill-bar .btn-sm,
+body.ui-mode-mobile .hud-pill-bar .checkbox-row {
+  min-height: 34px !important;
+  height: 34px;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+}
+body.ui-mode-mobile .hud-pill-bar #hud-drawer-controls { min-height: 34px; }
+
+/* 상자를 고르면: 기본 옵션 바는 숨기고 그 자리에 상자 팝업 */
+body.ui-mode-mobile.has-box-selected .hud-pill-bar { display: none !important; }
+body.ui-mode-mobile .selected-box-pill {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 4px !important;
+  padding: 6px 8px !important;
+  position: relative;
+}
+.sel-box-title {
+  font-size: clamp(0.68rem, 3.2vw, 0.82rem);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-title);
+}
+.sel-box-meta { margin-left: 4px; font-weight: 400; color: var(--text-meta); font-size: 0.92em; }
+
+/* 버튼은 무조건 한 줄: 화면 폭에 따라 글자 크기를 줄여서 맞춤 */
+.sel-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: clamp(3px, 1.2vw, 6px);
+  width: 100%;
+}
+body.ui-mode-mobile .sel-actions .btn,
+body.ui-mode-mobile .sel-actions .btn-sm {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 34px !important;
+  height: 34px;
+  padding: 0 clamp(2px, 1vw, 8px) !important;
+  font-size: clamp(0.62rem, 3.1vw, 0.8rem) !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+  letter-spacing: -0.02em;
+  border-radius: 8px;
+  justify-content: center;
+}
+body.ui-mode-mobile .sel-actions .sel-fine-btn { background: var(--bg-card, #f3eee6); color: var(--text-title); }
+body.ui-mode-mobile .sel-actions .sel-fine-btn.active { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent); }
+
+/* 상세 조정: 버튼에서 커지듯 나오는 작은 방향키 (ㅗ 모양) */
+.box-fine-backdrop { position: fixed; inset: 0; z-index: 60; background: transparent; }
+.box-fine-backdrop[hidden], .box-fine-pad[hidden] { display: none !important; }
+.box-fine-pad {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 8px;
+  z-index: 61;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(28, 25, 22, 0.06), 0 0 0 1px #e7e0d5;
+  transform-origin: bottom center;
+  animation: finePadPop 0.14s ease-out;
+}
+@keyframes finePadPop { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .box-fine-pad { animation: none; } }
+.fine-keys {
+  display: grid;
+  grid-template-columns: repeat(3, 40px);
+  grid-template-rows: repeat(2, 40px);
+  gap: 3px;
+  grid-template-areas: ". up ." "left down right";
+}
+.fine-key {
+  border: none;
+  border-radius: 8px;
+  background: #f3eee6;
+  color: var(--text-title);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background-color 0.12s, transform 0.08s;
+}
+.fine-key:hover { background: #e9e1d4; }
+.fine-key:active { transform: scale(0.94); background: var(--accent-soft); color: var(--accent); }
+.fine-key:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.fk-up { grid-area: up; } .fk-left { grid-area: left; } .fk-down { grid-area: down; } .fk-right { grid-area: right; }
+.fine-shelf { display: flex; gap: 4px; }
+.fine-text-btn {
+  min-height: 32px; padding: 0 8px; border: none; border-radius: 8px;
+  background: transparent; color: var(--accent); font-family: inherit; font-size: 0.75rem; font-weight: 600; cursor: pointer;
+}
+.fine-text-btn:hover { background: var(--accent-soft); }
+
+/* ---------- 상자 고르기 ---------- */
+.picker-top-row { display: flex; align-items: center; gap: 8px; width: 100%; }
+.picker-brand-nav-slot { flex: 0 0 auto; }
+body.ui-mode-mobile .picker-top-row .brand-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  width: auto;
+  justify-content: flex-start;
+}
+body.ui-mode-mobile .picker-top-row .brand-nav-arrow {
+  min-width: 28px !important;
+  width: 28px;
+  min-height: 36px !important;
+  height: 36px;
+  padding: 0 !important;
+  font-size: 0.62rem !important;
+  background: transparent !important;
+  border-radius: 8px;
+}
+body.ui-mode-mobile .picker-top-row .brand-nav-label {
+  min-height: 36px !important;
+  height: 36px;
+  padding: 0 2px !important;
+  font-size: 0.88rem !important;
+  font-weight: 600;
+  max-width: 34vw;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: transparent !important;
+}
+.picker-search {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  height: 36px;
+  margin: 0;
+  border-radius: 10px;
+  background: #f3eee6;
+}
+.picker-search:focus-within { box-shadow: 0 0 0 2px var(--accent-soft); }
+.picker-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  background: transparent;
+  padding: 0 4px 0 12px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: var(--text-title);
+}
+.picker-search-input:focus { outline: none; }
+.picker-search-input::placeholder { color: var(--text-hint, #a89f92); }
+.picker-search-btn {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 36px;
+  border: none;
+  border-radius: 0 10px 10px 0;
+  background: transparent;
+  color: var(--text-meta);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.picker-search-btn:hover { color: var(--accent); }
+.picker-search-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+body.ui-mode-mobile .brand-tabs-row { gap: 6px !important; }
+body.ui-mode-mobile .kind-chips { margin-top: 0 !important; }
+
+/* 아래 '담은 상자 / 담기' 바: 여백 최소, 글자 90%, 버튼 70% */
+body.ui-mode-mobile .picker-cart-bar {
+  padding: 4px 4px calc(4px + env(safe-area-inset-bottom)) !important;
+  margin-top: 4px !important;
+  gap: 8px !important;
+  min-height: 0;
+}
+body.ui-mode-mobile #picker-cart-count { font-size: 0.9em; }
+body.ui-mode-mobile .picker-cart-bar .btn {
+  height: 34px !important;
+  min-height: 34px !important;
+  padding: 0 16px !important;
+  font-size: 0.9em !important;
+  border-radius: 9px !important;
+}
+
+/* ---------- 팬트리 표시: 구석 · 걷는 길 경고 ---------- */
+.pp-warn {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(217, 119, 6, 0.10);
+  color: #9a5b0f;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.pp-toggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; font-size: 0.85rem; color: var(--text-title); }
+.pp-toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
+
+body.ui-mode-mobile .selected-box-pill,
+body.ui-mode-mobile .bottom-center-hud { overflow: visible !important; }

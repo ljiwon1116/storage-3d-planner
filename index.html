@@ -6,7 +6,7 @@
   <title>수납 공간 꾸미기 - 옷장·서랍 3D로 짜보기</title>
   <meta name="theme-color" content="#f7f3ec" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <link rel="stylesheet" href="styles.css?v=1031i" />
+  <link rel="stylesheet" href="styles.css?v=1031j" />
   <script>
     // 실제로 보이는 화면 높이를 --vh 로 넣어요 (주소창·툴바가 생기고 없어질 때마다).
     // 브라우저마다 100vh 가 툴바를 포함해서 위아래가 잘리는 문제를 막아요.
@@ -335,23 +335,29 @@
     <div class="bottom-center-hud">
       <!-- 수납함 선택 시 나타나는 회전·이동·적층 컨트롤 -->
       <div id="selected-box-hud" class="selected-box-pill">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-          <div id="sel-box-title" style="font-size:0.79rem;"></div>
-          <div style="display:flex;gap:5px;flex-wrap:wrap;">
-            <button id="btn-box-save-combo" class="btn btn-warning btn-sm" style="display:none;">이 묶음 저장</button>
-            <button id="btn-box-rot-ccw" class="btn btn-primary btn-sm">↺ 왼쪽 돌리기</button>
-            <button id="btn-box-rot" class="btn btn-primary btn-sm" title="단축키: R">↻ 오른쪽 돌리기</button>
-            <button id="btn-box-stack-more" class="btn btn-sm" title="이 상자 위에 같은 상자 하나 더">위에 하나 더</button>
-            <button id="btn-box-shelf-up" class="btn btn-sm">↑ 위 선반</button>
-            <button id="btn-box-shelf-down" class="btn btn-sm">↓ 아래 선반</button>
-            <button id="btn-box-left" class="btn btn-sm">◀</button>
-            <button id="btn-box-right" class="btn btn-sm">▶</button>
-            <button id="btn-box-back" class="btn btn-sm">▲</button>
-            <button id="btn-box-front" class="btn btn-sm">▼</button>
-            <button id="btn-box-del" class="btn btn-danger btn-sm">빼기</button>
+        <div id="sel-box-title" class="sel-box-title"></div>
+        <div class="sel-actions">
+          <button id="btn-box-save-combo" class="btn btn-warning btn-sm" style="display:none;">묶음 저장</button>
+          <button id="btn-box-rot-ccw" class="btn btn-primary btn-sm" aria-label="왼쪽으로 돌리기">↺ 왼쪽</button>
+          <button id="btn-box-rot" class="btn btn-primary btn-sm" title="단축키: R" aria-label="오른쪽으로 돌리기">↻ 오른쪽</button>
+          <button id="btn-box-fine" class="btn btn-sm sel-fine-btn" type="button" aria-expanded="false" aria-controls="box-fine-pad">상세 조정</button>
+          <button id="btn-box-del" class="btn btn-danger btn-sm">빼기</button>
+        </div>
+        <!-- 상세 조정: ㅗ 모양 방향키 (밖을 누르면 닫힘) -->
+        <div id="box-fine-pad" class="box-fine-pad" hidden>
+          <div class="fine-keys" role="group" aria-label="조금씩 옮기기">
+            <button id="btn-box-back" class="fine-key fk-up" type="button" aria-label="안쪽으로">▲</button>
+            <button id="btn-box-left" class="fine-key fk-left" type="button" aria-label="왼쪽으로">◀</button>
+            <button id="btn-box-front" class="fine-key fk-down" type="button" aria-label="앞쪽으로">▼</button>
+            <button id="btn-box-right" class="fine-key fk-right" type="button" aria-label="오른쪽으로">▶</button>
+          </div>
+          <div class="fine-shelf">
+            <button id="btn-box-shelf-up" class="fine-text-btn" type="button">↑ 위 칸</button>
+            <button id="btn-box-shelf-down" class="fine-text-btn" type="button">↓ 아래 칸</button>
           </div>
         </div>
       </div>
+      <div id="box-fine-backdrop" class="box-fine-backdrop" hidden></div>
 
       <!-- 시점 전환 & 모바일 묶음선택 토글 캡슐 바 -->
       <div class="hud-pill-bar">
@@ -435,10 +441,16 @@
       </div>
 
       <div class="brand-tabs-row">
-        <div id="picker-brand-tabs" class="brand-tab-group"></div>
-        <div style="display:flex;gap:6px;align-items:center;">
-          <input id="picker-search-input" type="text" class="input-box" placeholder="상자나 묶음 이름 찾기..." style="width:200px;" />
+        <div class="picker-top-row">
+          <div id="picker-brand-nav-slot" class="picker-brand-nav-slot"></div>
+          <form id="picker-search-form" class="picker-search" role="search" onsubmit="return false;">
+            <input id="picker-search-input" type="search" class="picker-search-input" placeholder="상자·묶음 이름 찾기" aria-label="상자나 묶음 이름 찾기" />
+            <button id="btn-picker-search" class="picker-search-btn" type="submit" aria-label="찾기">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+          </form>
         </div>
+        <div id="picker-brand-tabs" class="brand-tab-group"></div>
       </div>
 
       <div id="picker-cards-grid" class="picker-grid"></div>
@@ -591,11 +603,11 @@
   </div>
 
   <!-- 애플리케이션 스크립트 로드 -->
-  <script src="js/presets.js?v=1031i"></script>
-  <script src="js/items.js?v=1031i"></script>
-  <script src="js/packer.js?v=1031i"></script>
-  <script src="js/scene3d.js?v=1031i"></script>
-  <script src="js/app.js?v=1031i"></script>
+  <script src="js/presets.js?v=1031j"></script>
+  <script src="js/items.js?v=1031j"></script>
+  <script src="js/packer.js?v=1031j"></script>
+  <script src="js/scene3d.js?v=1031j"></script>
+  <script src="js/app.js?v=1031j"></script>
 
   <!-- 보관함 자세히 보기: 뒤는 흐리게, 고른 보관함만 크게 + 물건 넣기 -->
   <div id="box-detail" class="box-detail" aria-hidden="true">
@@ -621,6 +633,6 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="js/boxdetail.js?v=1031i"></script>
+  <script src="js/boxdetail.js?v=1031j"></script>
 </body>
 </html>

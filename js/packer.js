@@ -41,11 +41,18 @@ window.PackerEngine = (function () {
       for (let i = bays.length - 1; i >= 0; i--) if (bays[i].wall === 'B') bays.splice(i, 1);
     }
     bays.forEach((b) => {
+      const leftSide = p.doorSide === 'right';   // 입구가 오른쪽이면 옆 선반은 왼쪽 벽
       if (b.wall === 'A') {
         b.d = p.depthA;
         b.ox = -p.roomW / 2 + b.s0;
         b.oz = -p.roomD / 2;
         b.rotY = 0;
+      } else if (leftSide) {
+        // 왼쪽 벽: 칸 안 x는 입구 쪽 끝에서 안쪽 구석으로
+        b.d = p.depthB;
+        b.ox = -p.roomW / 2;
+        b.oz = -p.roomD / 2 + b.s1;
+        b.rotY = Math.PI / 2;
       } else {
         b.d = p.depthB;
         b.ox = p.roomW / 2;
@@ -56,6 +63,21 @@ window.PackerEngine = (function () {
       b.shelves = [...sh].sort((x, y) => x.bottomY - y.bottomY);
     });
     return { bays, postsA, postsB, startB };
+  }
+
+  // 0-2. 팬트리 구석: 안쪽 벽 선반 중 옆 선반에 막혀 손이 잘 안 닿는 구간 (안쪽 벽 왼쪽 끝 기준 mm)
+  function getPantryCorner(spaceConfig) {
+    const p = spaceConfig.pantry;
+    if (!p || p.wallB === false) return null;
+    return p.doorSide === 'right' ? { s0: 0, s1: p.depthB } : { s0: p.roomW - p.depthB, s1: p.roomW };
+  }
+
+  // 0-3. 팬트리 걷는 길 폭: 안쪽 선반 앞 · 옆 선반 앞
+  function getPantryWalkway(spaceConfig) {
+    const p = spaceConfig.pantry;
+    const front = p.roomD - p.depthA;                          // 안쪽 선반 앞에서 입구까지
+    const side = p.wallB === false ? p.roomW : p.roomW - p.depthB; // 옆 선반 앞에서 맞은편 벽까지
+    return { front, side, min: Math.min(front, side), ok: Math.min(front, side) >= 600 };
   }
 
   // 칸 안의 위치(x: 벽을 따라, z: 벽에서 앞으로)를 방 좌표로
@@ -91,7 +113,8 @@ window.PackerEngine = (function () {
             index: out.length,
             name: `${wallName} ${b.col + 1}열 ${lvl + 1}단`,
             short: `${b.wall === 'A' ? '안' : '옆'}${b.col + 1}-${lvl + 1}`,
-            bayKey: b.key, wall: b.wall, col: b.col, level: lvl,
+            bayKey: b.key, wall: b.wall, col: b.col, level: lvl, s0: b.s0,
+            reserved: !!p.keepFloor && lvl === 0,
             yStart: curY, yEnd, clearH: Math.max(0, yEnd - curY),
             w: b.w, d: b.d, ox: b.ox, oz: b.oz, rotY: b.rotY
           });
@@ -365,6 +388,18 @@ window.PackerEngine = (function () {
           } else {
             setSeverity('warn');
             issues.push(`[꺼내기 힘든 곳] '${model.name}'의 일부(${Math.round(hiddenDepth)}mm)가 서랍 안쪽 꺼내기 힘든 곳에 있어요.`);
+          }
+        }
+      }
+
+      // (D-2) 팬트리 구석: 옆 선반에 막혀 손이 잘 안 닿는 곳
+      if (spaceConfig.type === 'pantry' && comp.wall === 'A') {
+        const corner = getPantryCorner(spaceConfig);
+        if (corner) {
+          const a0 = (comp.s0 || 0) + xMin, a1 = (comp.s0 || 0) + xMax;
+          if (a1 > corner.s0 + 0.5 && a0 < corner.s1 - 0.5) {
+            setSeverity('warn');
+            issues.push(`[구석] '${model.name}'이 구석에 있어요. 옆 선반에 막혀 꺼내기 힘들어요.`);
           }
         }
       }
@@ -675,6 +710,8 @@ window.PackerEngine = (function () {
   return {
     getSpaceDims,
     getPantryBays,
+    getPantryCorner,
+    getPantryWalkway,
     localToWorld,
     worldDeltaToLocal,
     getCompartments,
