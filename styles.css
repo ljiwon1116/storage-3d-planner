@@ -4325,3 +4325,111 @@ body.ui-wide .wiz-measure-list { font-size: 0.85rem; }
   .header-maker { height: 28px; min-height: 28px !important; padding: 0 8px !important; gap: 4px !important; font-size: 0.68rem; }
   .header-maker svg { width: 12px; height: 12px; }
 }
+
+
+/* =====================================================================
+   상자 고르기: 종류 칩 + '직접 추가' 버튼을 한 줄에
+   ===================================================================== */
+#modal-box-picker .kind-chips {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center;
+  gap: clamp(3px, 1.2vw, 8px) !important;
+  overflow: hidden;
+  width: 100%;
+}
+#modal-box-picker .kind-chip {
+  flex: 0 1 auto;
+  min-width: 0;
+  height: clamp(28px, 8vw, 34px);
+  min-height: 0 !important;
+  padding: 0 clamp(6px, 2.2vw, 14px) !important;
+  font-size: clamp(0.62rem, 3vw, 0.85rem) !important;
+  white-space: nowrap;
+  letter-spacing: -0.02em;
+}
+/* 직접 추가: 종류 칩과 같은 높이·둥글기, 점선 테두리 + 갈색 글자로 구별 */
+.kind-add-btn {
+  flex: 0 0 auto;
+  margin-left: auto;                         /* 종류 칩과 여백 */
+  padding-left: clamp(6px, 2.2vw, 14px);
+  padding-right: clamp(6px, 2.2vw, 14px);
+  height: clamp(28px, 8vw, 34px);
+  border: 1.5px dashed rgba(125, 98, 68, 0.55);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent);
+  font-family: inherit;
+  font-size: clamp(0.62rem, 3vw, 0.85rem);
+  font-weight: 600;
+  white-space: nowrap;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.kind-add-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
+.kind-add-btn:active { transform: scale(0.97); }
+.kind-add-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#modal-box-picker .kind-chips .kind-sep { flex: 1 1 clamp(8px, 4vw, 24px); min-width: clamp(8px, 3vw, 16px); }
+#modal-box-picker .kind-chips .kind-add-btn { margin-left: 0; }
+
+/* =====================================================================
+   상자 직접 추가 창
+   ===================================================================== */
+#modal-add-box { z-index: 260; }
+body.ui-mode-mobile #modal-add-box.modal-backdrop { align-items: flex-end; background: rgba(43, 38, 33, 0.3); }
+.add-box-modal { width: 440px; max-width: 100%; padding: 12px 16px 0 !important; gap: 0 !important; }
+body.ui-mode-mobile .add-box-modal { width: 100%; max-height: calc(var(--vh, 1vh) * 88) !important; border-radius: 18px 18px 0 0 !important; margin: 0; }
+body.ui-wide #modal-add-box.modal-backdrop { align-items: center; justify-content: center; }
+body.ui-wide .add-box-modal { border-radius: 16px !important; }
+.ab-body { display: flex; flex-direction: column; gap: 16px; padding: 12px 0 16px; }
+.ab-photo-row { display: flex; gap: 12px; align-items: center; }
+.ab-photo {
+  flex: 0 0 auto;
+  width: 72px; height: 72px;
+  border-radius: 12px;
+  background: #f3eee6;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+  color: var(--text-meta);
+  box-shadow: inset 0 0 0 1.5px #e7e0d5;
+}
+.ab-photo:hover { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.ab-photo img { width: 100%; height: 100%; object-fit: cover; }
+.ab-photo-empty { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.72rem; }
+.ab-photo-help { min-width: 0; }
+.ab-field { display: flex; flex-direction: column; gap: 6px; }
+.ab-label { font-size: 0.85rem; font-weight: 600; color: var(--text-title); line-height: 1.4; }
+.ab-opt { font-size: 0.72rem; font-weight: 400; color: var(--text-meta); }
+.ab-hint { font-size: 0.75rem; color: var(--text-meta); line-height: 1.5; }
+.ab-err { font-size: 0.75rem; color: var(--danger, #c0392b); line-height: 1.4; }
+.ab-input {
+  width: 100%;
+  height: 44px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 10px;
+  background: #f3eee6;
+  color: var(--text-title);
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+.ab-input:focus { outline: none; box-shadow: 0 0 0 2px var(--accent-soft), inset 0 0 0 1.5px var(--accent); }
+.ab-input::placeholder { color: var(--text-hint, #a89f92); }
+.ab-chips { display: flex; gap: 8px; }
+.ab-chips .sp-chip { flex: 1 1 0; min-height: 40px; justify-content: center; }
+.ab-dims { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ab-dim { display: flex; flex-direction: column; gap: 4px; font-size: 0.75rem; color: var(--text-meta); }
+.ab-dim .ab-input { text-align: center; padding: 0 4px; }
+.ab-toggle { padding: 0; }
+.ab-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin: 0 -16px;
+  padding: 8px 16px calc(10px + env(safe-area-inset-bottom));
+  background: var(--bg-panel);
+  box-shadow: 0 -1px 0 #e7e0d5;
+}
+.ab-save { width: 100%; height: 48px !important; border-radius: 12px !important; font-size: 0.95rem !important; }
