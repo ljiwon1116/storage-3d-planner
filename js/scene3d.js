@@ -479,10 +479,11 @@ window.Scene3DManager = (function () {
     const shelfMat = new THREE.MeshStandardMaterial({ color: 0xf6f1e8, roughness: 0.7 });
     const postMat = new THREE.MeshStandardMaterial({ color: 0xe9e1d3, roughness: 0.6 });
     const edgeMat = new THREE.LineBasicMaterial({ color: 0xb9a78f });
-    const sideWallMat = new THREE.MeshStandardMaterial({ color: 0xfbf8f2, roughness: 0.92 });
+    const sideWallMat = new THREE.MeshStandardMaterial({ color: 0xeee6d8, roughness: 0.92 });
     const nearWallMat = new THREE.MeshStandardMaterial({
-      color: 0xfdfbf7, roughness: 0.92, transparent: true, opacity: 0.22, depthWrite: false
+      color: 0xeee6d8, roughness: 0.92, transparent: true, opacity: 0.4, depthWrite: false
     });
+    const wallEdgeMat = new THREE.LineBasicMaterial({ color: 0xb9a78f });
 
     const addPart = (w, h, d, x, y, z, rotY, mat) => {
       const g = new THREE.BoxGeometry(w, h, d);
@@ -512,6 +513,17 @@ window.Scene3DManager = (function () {
       const nWall = new THREE.Mesh(new THREE.BoxGeometry(24, wallHgt, p.roomD + 24), nearWallMat);
       nWall.position.set(bOnLeft ? rightX : leftX, wallHgt / 2 - 2, -12);
       roomEnvGroup.add(nWall);
+      // 벽과 바닥·뒷벽이 만나는 선: 선반이 벽에 붙은 게 잘 보이게
+      [bOnLeft ? -p.roomW / 2 : p.roomW / 2, bOnLeft ? p.roomW / 2 : -p.roomW / 2].forEach((wx) => {
+        const seam = new THREE.LineSegments(
+          new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(wx, 0.5, -p.roomD / 2), new THREE.Vector3(wx, 0.5, p.roomD / 2),
+            new THREE.Vector3(wx, 0, -p.roomD / 2), new THREE.Vector3(wx, wallHgt, -p.roomD / 2)
+          ]),
+          wallEdgeMat
+        );
+        roomEnvGroup.add(seam);
+      });
     }
 
     // 선반 판: 칸(열)마다
@@ -624,6 +636,49 @@ window.Scene3DManager = (function () {
     const doorX = leftSide ? p.roomW / 2 - doorW / 2 - 40 : -p.roomW / 2 + doorW / 2 + 40;
     doorLine.position.set(doorX, 1, p.roomD / 2 - 15);
     cabinetGroup.add(doorLine);
+
+    // 출입문 틀 (나무색): 문이 어디 있는지 잘 보이게
+    {
+      const frameMat = new THREE.MeshStandardMaterial({ color: 0x9c7a55, roughness: 0.6 });
+      const doorH = Math.min(2100, Math.max(1800, H - 100));
+      const fw = 40, fz = p.roomD / 2 + 10;
+      [doorX - doorW / 2 - fw / 2, doorX + doorW / 2 + fw / 2].forEach((x) => {
+        const post = new THREE.Mesh(new THREE.BoxGeometry(fw, doorH, 40), frameMat);
+        post.position.set(x, doorH / 2, fz);
+        post.castShadow = true;
+        cabinetGroup.add(post);
+      });
+      const header = new THREE.Mesh(new THREE.BoxGeometry(doorW + fw * 2, fw, 40), frameMat);
+      header.position.set(doorX, doorH + fw / 2, fz);
+      cabinetGroup.add(header);
+    }
+
+    // 바닥 글자: 문 표시선 바로 안쪽에 '팬트리 출입문'
+    {
+      const cv = document.createElement('canvas');
+      cv.width = 512; cv.height = 128;
+      const g = cv.getContext('2d');
+      g.clearRect(0, 0, 512, 128);
+      g.fillStyle = 'rgba(255, 252, 246, 0.92)';
+      const r = 28;
+      g.beginPath();
+      g.moveTo(r, 8); g.arcTo(504, 8, 504, 120, r); g.arcTo(504, 120, 8, 120, r); g.arcTo(8, 120, 8, 8, r); g.arcTo(8, 8, 504, 8, r);
+      g.closePath(); g.fill();
+      g.fillStyle = '#7d6244';
+      g.font = '700 54px Pretendard, -apple-system, sans-serif';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText('팬트리 출입문', 256, 66);
+      const tex = new THREE.CanvasTexture(cv);
+      const labelW = Math.min(doorW * 0.9, 520);
+      const label = new THREE.Mesh(
+        new THREE.PlaneGeometry(labelW, labelW / 4),
+        new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false })
+      );
+      label.rotation.x = -Math.PI / 2;              // 바닥에 눕힘, 입구에서 읽히는 방향
+      label.position.set(doorX, 3, p.roomD / 2 - 40 - labelW / 8);
+      cabinetGroup.add(label);
+    }
   }
 
   function renderScene(spaceConfig, placedBoxes, modelsMap, stateOpts) {
