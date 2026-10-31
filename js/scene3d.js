@@ -579,7 +579,7 @@ window.Scene3DManager = (function () {
       const cw = corner.s1 - corner.s0;
       const cornerVol = new THREE.Mesh(
         new THREE.BoxGeometry(cw, H, p.depthA),
-        new THREE.MeshBasicMaterial({ color: 0xd97706, transparent: true, opacity: 0.1, depthWrite: false })
+        new THREE.MeshBasicMaterial({ color: 0xdc2626, transparent: true, opacity: 0.2, depthWrite: false })
       );
       cornerVol.position.set(-p.roomW / 2 + corner.s0 + cw / 2, H / 2, -p.roomD / 2 + p.depthA / 2);
       cabinetGroup.add(cornerVol);
@@ -895,10 +895,10 @@ window.Scene3DManager = (function () {
       const deadMat = new THREE.MeshBasicMaterial({
         color: 0xdc2626,
         transparent: true,
-        opacity: 0.13,
+        opacity: 0.22,
         depthWrite: false
       });
-      const deadEdgeMat = new THREE.LineBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.45 });
+      const deadEdgeMat = new THREE.LineBasicMaterial({ color: 0xdc2626, transparent: true, opacity: 0.8 });
 
       if (cabConst.leftDeadW > 0) {
         const dg = new THREE.BoxGeometry(cabConst.leftDeadW, H, D);
@@ -1072,12 +1072,12 @@ window.Scene3DManager = (function () {
       drawerSlidingGroup.add(expMesh);
     }
 
-    if (unexposedD > 0) {
+    if (unexposedD > 0 && showDeadzones) {
       const unexpGeom = new THREE.PlaneGeometry(W - 2, unexposedD - 2);
       const unexpMat = new THREE.MeshBasicMaterial({
-        color: 0xd97706,
+        color: 0xdc2626,
         transparent: true,
-        opacity: 0.28,
+        opacity: 0.32,
         side: THREE.DoubleSide
       });
       const unexpMesh = new THREE.Mesh(unexpGeom, unexpMat);
@@ -1091,16 +1091,16 @@ window.Scene3DManager = (function () {
       ]);
       const boundaryLine = new THREE.Line(
         lineGeom,
-        new THREE.LineBasicMaterial({ color: 0xd97706, linewidth: 2 })
+        new THREE.LineBasicMaterial({ color: 0xdc2626, linewidth: 2 })
       );
       drawerSlidingGroup.add(boundaryLine);
 
       if (showDeadzones) {
         const unexpVolGeom = new THREE.BoxGeometry(W, clearH, unexposedD);
         const unexpVolMat = new THREE.MeshBasicMaterial({
-          color: 0xd97706,
+          color: 0xdc2626,
           transparent: true,
-          opacity: 0.12,
+          opacity: 0.2,
           depthWrite: false
         });
         const unexpVol = new THREE.Mesh(unexpVolGeom, unexpVolMat);
@@ -1515,7 +1515,7 @@ window.Scene3DManager = (function () {
       // 팬트리: 입구(왼쪽 앞)에서 안쪽 구석을 비스듬히 내려다봄
       const mir = currentSpaceConfig.pantry && currentSpaceConfig.pantry.doorSide === 'right' ? -1 : 1;
       controls.target.set(mir * W * 0.12, H * 0.45, -D * 0.1);
-      camera.position.set(-mir * W * 0.55, H * 0.85, D * 1.55 + 900);
+      camera.position.set(-mir * W * 0.9, H * 1.1, D * 1.4 + 2400);
       controls.update();
       return;
     }

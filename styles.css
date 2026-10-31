@@ -4168,3 +4168,65 @@ body.ui-mode-mobile .sheet-action-btn { margin: 0 !important; }
 .gl-lost-btn { width: 100%; height: 48px; border: none; border-radius: 12px; background: var(--accent); color: #fff; font-family: inherit; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
 .gl-lost-btn:hover { background: var(--accent-hover); }
 .gl-lost-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+
+/* 짧은 알림 */
+.app-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(120px + env(safe-area-inset-bottom));
+  transform: translate(-50%, 8px);
+  z-index: 300;
+  max-width: calc(100% - 40px);
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: rgba(43, 38, 33, 0.9);
+  color: #fff;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.app-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* 확인 창 (다 비우기 등) */
+.app-confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 310;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(43, 38, 33, 0.36);
+}
+.app-confirm-card {
+  width: 100%;
+  max-width: 320px;
+  padding: 20px;
+  border-radius: 16px;
+  background: #fff;
+  color: var(--text-title);
+  box-shadow: 0 4px 16px rgba(28, 25, 22, 0.06);
+}
+.app-confirm-t { font-size: 1.05rem; font-weight: 600; line-height: 1.4; }
+.app-confirm-m { margin-top: 4px; font-size: 0.85rem; color: var(--text-meta); line-height: 1.5; }
+.app-confirm-btns { display: flex; gap: 8px; margin-top: 20px; }
+.app-confirm-btns button {
+  flex: 1 1 0;
+  height: 48px;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.app-confirm-no { border: 1px solid #e7e0d5; background: #fff; color: var(--text-title); }
+.app-confirm-no:hover { background: #faf7f2; }
+.app-confirm-yes { border: none; background: var(--danger, #c0392b); color: #fff; }
+.app-confirm-yes:hover { filter: brightness(0.95); }
+.app-confirm-btns button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

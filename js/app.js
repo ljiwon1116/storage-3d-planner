@@ -663,12 +663,37 @@
     const sig = (list) => list.map((b) => `${b.modelId}@${b.x},${b.z},${b.y}`).join('|');
     const prevSig = sig(plan.boxes.filter((b) => b.compartmentIndex === compIdx));
     let boxes = [];
-    for (let attempt = 0; attempt < 4; attempt++) {
+    const isPan = state.spaceConfig.type === 'pantry';
+    const opts = { stack: isCab || isPan, multiRow: !isCab, levelRows: !isCab };
+    // 채운 정도: 바닥을 덮은 비율 (쌓는 가구는 높이까지 본 부피 비율)
+    const comp = window.PackerEngine.getCompartments(state.spaceConfig)[compIdx];
+    const fillRate = (list) => {
+      if (!comp || !list.length) return 0;
+      let floor = 0, vol = 0;
+      list.forEach((b) => {
+        const m = state.modelsMap[b.modelId];
+        if (!m) return;
+        const dm = window.PackerEngine.getOrientedDims(m, b.rot || 0);
+        if ((b.y || 0) < 5) floor += dm.w * dm.d;
+        vol += dm.w * dm.d * dm.h;
+      });
+      const fr = floor / (comp.w * comp.d);
+      const vr = vol / (comp.w * comp.d * Math.max(1, comp.clearH));
+      return opts.stack ? Math.min(fr, 1) * 0.5 + Math.min(vr, 1) * 0.5 : Math.min(fr, 1);
+    };
+    // 일정 수준(목표 70%) 이상 채운 조합이 나올 때까지 여러 번 뽑고, 안 되면 가장 많이 채운 조합
+    const TARGET = 0.7;
+    let best = null, bestRate = -1;
+    for (let attempt = 0; attempt < 18; attempt++) {
       const rng = seededRng(Math.floor(Math.random() * 1e9));
-      const isPan = state.spaceConfig.type === 'pantry';
-      boxes = randomFillCompartment(compIdx, pool, rng, { stack: isCab || isPan, multiRow: !isCab, levelRows: !isCab });
-      if (sig(boxes) !== prevSig) break;
+      const cand = randomFillCompartment(compIdx, pool, rng, opts);
+      if (!cand.length) continue;
+      const rate = fillRate(cand);
+      const same = sig(cand) === prevSig;
+      if (!same && rate >= TARGET) { best = cand; bestRate = rate; break; }
+      if (rate > bestRate && (!same || !best)) { best = cand; bestRate = rate; }
     }
+    boxes = best || [];
     if (boxes.length > 0) {
       plan.boxes = plan.boxes.filter((b) => b.compartmentIndex !== compIdx).concat(boxes);
       state.selectedBoxIds = [];
@@ -836,7 +861,13 @@
 
     // 5. 이 칸 비우기
     if (compBoxes.length > 0) {
-      body.appendChild(makeBtn('🗑️', '이 칸 비우기', 'danger', () => {
+      body.appendChild(makeBtn('', '이 칸 비우기', 'danger', async () => {
+        const ok = await confirmDialog({
+          title: '이 칸을 비울까요?',
+          message: `이 칸의 상자 ${compBoxes.length}개가 빠져요.`,
+          ok: '비우기'
+        });
+        if (!ok) return;
         activePlan.boxes = activePlan.boxes.filter((b) => b.compartmentIndex !== compIdx);
         state.selectedBoxIds = [];
         closeShelfSheet();
@@ -2405,6 +2436,48 @@
     }, 60);
   }
 
+  // ---------- 짧은 알림 · 확인 창 ----------
+  let toastTimer = null;
+  function showToast(msg) {
+    let el = document.getElementById('app-toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'app-toast';
+      el.className = 'app-toast';
+      el.setAttribute('role', 'status');
+      el.setAttribute('aria-live', 'polite');
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+  }
+  // 되돌리기 힘든 동작 전에 한 번 묻기. 결과: true(진행) / false(취소)
+  function confirmDialog({ title, message, ok }) {
+    return new Promise((resolve) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'app-confirm';
+      wrap.innerHTML = `
+        <div class="app-confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="app-confirm-t">
+          <div id="app-confirm-t" class="app-confirm-t">${title}</div>
+          ${message ? `<div class="app-confirm-m">${message}</div>` : ''}
+          <div class="app-confirm-btns">
+            <button type="button" class="app-confirm-no">취소</button>
+            <button type="button" class="app-confirm-yes">${ok || '확인'}</button>
+          </div>
+        </div>`;
+      const done = (v) => { wrap.remove(); document.removeEventListener('keydown', onKey); resolve(v); };
+      const onKey = (e) => { if (e.key === 'Escape') done(false); };
+      wrap.addEventListener('click', (e) => { if (e.target === wrap) done(false); });
+      wrap.querySelector('.app-confirm-no').addEventListener('click', () => done(false));
+      wrap.querySelector('.app-confirm-yes').addEventListener('click', () => done(true));
+      document.addEventListener('keydown', onKey);
+      document.body.appendChild(wrap);
+      wrap.querySelector('.app-confirm-no').focus();
+    });
+  }
+
   // ---------- 3D 화면 사진 저장 (오른쪽 아래에 만든 사람 표시) ----------
   function savePhoto() {
     const url = window.Scene3DManager.snapshot && window.Scene3DManager.snapshot();
@@ -3497,6 +3570,19 @@
     document.getElementById('chk-show-deadzones').addEventListener('change', (e) => {
       state.showDeadzones = e.target.checked;
       refreshAll();
+      // 눌렀을 때 무엇이 바뀌었는지 바로 알려줌
+      const sc = state.spaceConfig;
+      let has = false;
+      if (sc.type === 'cabinet') {
+        const k = window.PackerEngine.getCabinetConstraints(sc);
+        has = k.leftDeadW > 0 || k.rightDeadW > 0;
+      } else if (sc.type === 'drawer') {
+        has = window.PackerEngine.getDrawerConstraints(sc).unexposedD > 0;
+      } else {
+        has = !!window.PackerEngine.getPantryCorner(sc);
+      }
+      if (!state.showDeadzones) showToast('빨간 표시를 숨겼어요');
+      else showToast(has ? '꺼내기 힘든 곳을 빨간색으로 보여줘요' : '이 가구에는 꺼내기 힘든 곳이 없어요');
     });
 
     // 5. 시안(Plan) 추가 / 비우기 / 비교표 모달
@@ -3514,8 +3600,15 @@
       refreshAll();
     });
 
-    document.getElementById('btn-clear-plan').addEventListener('click', () => {
+    document.getElementById('btn-clear-plan').addEventListener('click', async () => {
       const activePlan = getActivePlan();
+      if (!activePlan.boxes.length) { showToast('비울 상자가 없어요'); return; }
+      const ok = await confirmDialog({
+        title: '상자를 다 비울까요?',
+        message: `지금 계획의 상자 ${activePlan.boxes.length}개가 모두 빠져요.`,
+        ok: '다 비우기'
+      });
+      if (!ok) return;
       activePlan.boxes = [];
       state.selectedBoxIds = [];
       refreshAll();
