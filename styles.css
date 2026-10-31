@@ -3998,3 +3998,128 @@ body.ui-mode-mobile #modal-box-picker .modal-box { gap: 6px !important; }
 }
 .box-detail-head { gap: 8px; }
 .box-detail-head > div:first-child { min-width: 0; }
+
+/* =====================================================================
+   고르는 창: 손잡이는 위에, 주요 버튼은 아래에 고정 (스크롤해도 안 가려짐)
+   ===================================================================== */
+#modal-box-picker .modal-box.has-grip > .sheet-grip {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg-panel);
+  margin: 0 -16px;           /* 창 좌우 여백까지 덮기 */
+  width: calc(100% + 32px);
+}
+body.ui-mode-mobile .picker-cart-bar {
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 5;
+  background: var(--bg-panel) !important;
+  padding: 8px 4px calc(8px + env(safe-area-inset-bottom)) !important;
+  margin: 0 -16px !important;
+  padding-left: 20px !important;
+  padding-right: 20px !important;
+  box-shadow: 0 -1px 0 #e7e0d5;
+}
+body.ui-mode-mobile #modal-box-picker .modal-box { padding-bottom: 0 !important; }
+
+/* 칸 메뉴 (＋ 눌렀을 때): 버튼 사이 · 아래 여백 최소 */
+body.ui-mode-mobile #mobile-shelf-sheet-body {
+  gap: 6px !important;
+  padding: 4px 16px calc(12px + env(safe-area-inset-bottom)) !important;
+}
+body.ui-mode-mobile .mobile-shelf-sheet-head { padding-bottom: 4px !important; }
+.sheet-menu-btn {
+  display: flex !important;
+  flex-direction: column;
+  align-items: flex-start !important;
+  justify-content: center;
+  gap: 2px;
+  min-height: 52px !important;
+  padding: 8px 14px !important;
+  text-align: left;
+}
+.sheet-menu-btn .smb-label { font-size: 0.92rem; font-weight: 600; line-height: 1.3; }
+.sheet-menu-btn .smb-sub {
+  font-size: clamp(0.66rem, 3vw, 0.76rem);
+  font-weight: 400;
+  line-height: 1.35;
+  opacity: 0.78;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+body.ui-mode-mobile .sheet-action-btn { margin: 0 !important; }
+
+/* =====================================================================
+   첫 설정: 재는 법 안내
+   ===================================================================== */
+.wiz-measure {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #faf7f2;
+  color: var(--text-title);
+  text-align: left;
+}
+.wiz-measure-fig { flex: 0 0 auto; color: var(--text-title); }
+.wiz-measure-text { min-width: 0; }
+.wiz-measure-h { font-size: 0.8rem; font-weight: 600; color: var(--accent); line-height: 1.4; margin-bottom: 4px; }
+.wiz-measure-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text-meta);
+}
+.wiz-measure-list li + li { margin-top: 2px; }
+@media (max-width: 360px) { .wiz-measure-fig { width: 72px; height: 51px; } }
+
+/* =====================================================================
+   첫 설정: 은은한 반짝임 (테마 색)
+   ===================================================================== */
+.wiz-glint {
+  position: fixed;
+  z-index: 200;
+  width: var(--sz, 8px);
+  height: var(--sz, 8px);
+  margin: calc(var(--sz, 8px) / -2) 0 0 calc(var(--sz, 8px) / -2);
+  pointer-events: none;
+  background: var(--c, #c9a46a);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  animation: wizGlint 0.7s ease-out forwards;
+}
+@keyframes wizGlint {
+  0% { transform: translate(0, 0) scale(0.2) rotate(0deg); opacity: 0; }
+  30% { opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(1) rotate(90deg); opacity: 0; }
+}
+.wiz-stars { position: absolute; left: 0; right: 0; top: 0; height: 40px; pointer-events: none; overflow: hidden; z-index: 0; }
+.wiz-stars span {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  background: var(--c, #c9a46a);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  opacity: 0;
+  animation: wizTwinkle 3.6s ease-in-out infinite;
+}
+@keyframes wizTwinkle {
+  0%, 100% { opacity: 0; transform: scale(0.4); }
+  45% { opacity: 0.85; transform: scale(1); }
+  60% { opacity: 0.2; transform: scale(0.7); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wiz-stars span { animation: none; opacity: 0.45; }
+  .wiz-glint { display: none; }
+}
+.wiz-inner, .wiz-actions { position: relative; z-index: 1; }
+
+/* 크기조정바 중복 정리: 옛 장식 손잡이(::before)는 모두 숨기고 진짜 손잡이 하나만 */
+.mobile-shelf-sheet.has-grip::before,
+#modal-box-picker .modal-box.has-grip::before,
+.box-detail-sheet.has-grip::before { display: none !important; content: none !important; }

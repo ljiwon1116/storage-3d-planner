@@ -779,35 +779,35 @@
     const body = document.getElementById('mobile-shelf-sheet-body');
     body.innerHTML = '';
 
-    const makeBtn = (icon, label, cls, onClick) => {
+    const makeBtn = (icon, label, cls, onClick, sub) => {
       const b = document.createElement('button');
-      b.className = 'sheet-action-btn' + (cls ? ' ' + cls : '');
-      b.innerHTML = `<span>${label}</span>`;
+      b.className = 'sheet-action-btn sheet-menu-btn' + (cls ? ' ' + cls : '');
+      b.innerHTML = `<span class="smb-label">${label}</span>${sub ? `<span class="smb-sub">${sub}</span>` : ''}`;
       b.addEventListener('click', onClick);
       return b;
     };
 
     // 1. 상자 넣기 (고르기 창 열기)
-    body.appendChild(makeBtn('📦', '상자 넣기', 'primary', () => {
+    body.appendChild(makeBtn('', '상자 넣기', 'primary', () => {
       closeShelfSheet();
       state.pickerBrand = 'ALL';
       state.pickerCart = {};
       renderPickerModalContent();
       document.getElementById('modal-box-picker').classList.add('open');
-    }));
+    }, '원하는 상자를 직접 골라 넣어요'));
 
     // 2. 저장한 묶음 넣기
-    body.appendChild(makeBtn('⭐', '저장한 묶음 넣기', '', () => {
+    body.appendChild(makeBtn('', '저장한 묶음 넣기', '', () => {
       closeShelfSheet();
       state.pickerBrand = 'COMBOS';
       renderPickerModalContent();
       document.getElementById('modal-box-picker').classList.add('open');
-    }));
+    }, '전에 저장해 둔 상자 묶음을 그대로 넣어요'));
 
     // 3. 한 번에 채우기 → 브랜드 상관없이 / 특정 브랜드만
     body.appendChild(makeBtn('', '한 번에 채우기', '', () => {
       renderAutofillChoice(compIdx);
-    }));
+    }, 'AI가 이 칸에 맞는 알찬 조합을 골라 줘요'));
 
     // 4. 지금 놓은 것 보기/빼기
     if (compBoxes.length > 0) {
@@ -2648,6 +2648,54 @@
     }, 60);
   }
 
+  // ===== 첫 설정: 재는 법 안내 (그림 + 순서) =====
+  const WIZ_MEASURE = {
+    cabW: { fig: 'w', tips: ['문을 열고 줄자 끝을 안쪽 왼쪽 벽에 대요.', '오른쪽 벽까지 쭉 당겨서 재요.', '문틀이 아니라 안쪽 벽과 벽 사이예요.'] },
+    cabD: { fig: 'd', tips: ['장 바닥 앞 끝에 줄자를 대요.', '뒷벽에 닿을 때까지 재요.', '뒤에 배관이나 턱이 있으면 그 앞까지만 재요.'] },
+    cabH: { fig: 'h', tips: ['바닥 판 위에 줄자를 세워요.', '천장 판 아래까지 재요.'] },
+    cabFrame: { fig: 'frame', tips: ['문을 활짝 열어요.', '옆벽 안쪽에서 문틀 끝까지 재요.', '양쪽이 다르면 더 큰 쪽을 넣어요.'] },
+    cabShelves: { fig: 'count', tips: ['장 안의 선반 판을 세요.', '맨 아래 바닥 판과 맨 위 천장 판은 빼고 세요.'] },
+    drwW: { fig: 'w', tips: ['서랍을 끝까지 빼요.', '서랍 안쪽 왼쪽 벽에서 오른쪽 벽까지 재요.'] },
+    drwD: { fig: 'd', tips: ['서랍 앞판 안쪽에 줄자를 대요.', '서랍 뒷벽까지 재요.'] },
+    drwExposed: { fig: 'exposed', tips: ['서랍을 끝까지 빼요.', '앞판 안쪽에서 서랍장 몸통 앞면까지 재요.', '그만큼이 밖으로 나와 보이는 깊이예요.'] },
+    drwClear: { fig: 'h', tips: ['서랍 바닥에 줄자를 세워요.', '위 서랍 밑이나 위 판 아래까지 재요.', '서랍 벽보다 높으면 위에 걸려요.'] },
+    panW: { fig: 'pw', tips: ['팬트리 안에 들어가 맞은편 벽을 봐요.', '바닥에서 왼쪽 벽 끝부터 오른쪽 벽 끝까지 재요.'] },
+    panD: { fig: 'pd', tips: ['옆 선반이 있는 벽을 봐요.', '안쪽 벽부터 입구 문틀까지 재요.'] },
+    panH: { fig: 'h', tips: ['바닥에서 맨 위 선반 판 위까지 재요.', '천장까지가 아니에요. 선반이 끝나는 곳까지예요.'] },
+    panDepth: { fig: 'pdep', tips: ['벽에 줄자 끝을 대요.', '선반 판 앞 끝까지 재요.', '앞에 기둥이 있으면 기둥 앞면까지 재요.'] },
+    panCols: { fig: 'count', tips: ['세로 기둥 사이 칸을 세요.', '가운데 기둥이 1개면 2열이에요.'] },
+    panLevels: { fig: 'count', tips: ['한 열의 선반 판을 세요.', '판이 5개면 바닥 칸까지 6단이에요.'] }
+  };
+
+  // 재는 곳을 갈색 화살표로 보여주는 작은 그림 (선 그림, 단색)
+  function measureFigSvg(fig) {
+    const ln = 'fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" opacity=".55"';
+    const ac = 'fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"';
+    const head = (x, y, ang) => {
+      const a = (ang * Math.PI) / 180, s = 5;
+      const p1 = `${x + s * Math.cos(a + 2.6)},${y + s * Math.sin(a + 2.6)}`;
+      const p2 = `${x + s * Math.cos(a - 2.6)},${y + s * Math.sin(a - 2.6)}`;
+      return `<path d="M${p1} L${x},${y} L${p2}" ${ac}/>`;
+    };
+    const arrow = (x1, y1, x2, y2) => {
+      const ang = (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI;
+      return `<path d="M${x1},${y1} L${x2},${y2}" ${ac}/>${head(x2, y2, ang)}${head(x1, y1, ang + 180)}`;
+    };
+    // 비스듬히 본 상자 (앞면 + 윗면 + 옆면)
+    const box = `<path d="M18,26 L62,26 L62,58 L18,58 Z" ${ln}/><path d="M18,26 L34,14 L78,14 L62,26" ${ln}/><path d="M62,26 L78,14 L78,46 L62,58" ${ln}/>`;
+    let body = '';
+    if (fig === 'w') body = box + arrow(21, 52, 59, 52);
+    else if (fig === 'h') body = box + arrow(24, 29, 24, 55);
+    else if (fig === 'd') body = box + arrow(65, 27, 76, 18);
+    else if (fig === 'frame') body = box + `<rect x="18" y="26" width="7" height="32" fill="var(--accent)" opacity=".35"/>` + arrow(18, 62, 25, 62);
+    else if (fig === 'exposed') body = `<path d="M10,34 L50,34 L50,58 L10,58 Z" ${ln}/><path d="M40,30 L86,30 L86,58 L40,58" ${ln} stroke-dasharray="3 3"/><path d="M10,34 L22,26 L62,26" ${ln}/>` + arrow(13, 52, 47, 52);
+    else if (fig === 'pw') body = `<path d="M14,14 L82,14 L82,58" ${ln}/><path d="M14,14 L14,58" ${ln} stroke-dasharray="3 3"/>` + arrow(16, 20, 80, 20);
+    else if (fig === 'pd') body = `<path d="M14,14 L82,14 L82,58" ${ln}/><path d="M14,14 L14,58" ${ln} stroke-dasharray="3 3"/>` + arrow(76, 16, 76, 56);
+    else if (fig === 'pdep') body = `<path d="M14,14 L82,14 L82,58" ${ln}/><rect x="14" y="14" width="68" height="12" fill="currentColor" opacity=".12"/>` + arrow(48, 15, 48, 25);
+    else body = `<path d="M18,10 L78,10 L78,58 L18,58 Z" ${ln}/><path d="M18,26 L78,26 M18,42 L78,42" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/>`;
+    return `<svg class="wiz-measure-fig" viewBox="0 0 96 68" width="96" height="68" aria-hidden="true">${body}</svg>`;
+  }
+
   // ===== 팬트리: 열(기둥)과 단(선반) =====
   function pantryShelfCount() {
     return (state.spaceConfig.pantry.defaultShelves || []).length;
@@ -2732,6 +2780,46 @@
     if (state.activeCompartmentIdx > n) state.activeCompartmentIdx = n;
   }
 
+  // ===== 첫 설정: 은은한 반짝임 (테마 색, 움직임 줄이기 설정이면 안 함) =====
+  const reduceMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function wizSparkle(el) {
+    if (!el || reduceMotion()) return;
+    const r = el.getBoundingClientRect();
+    const host = document.body;
+    const colors = ['#c9a46a', '#e7d6b5', '#7d6244', '#f3e7cf'];
+    for (let i = 0; i < 6; i++) {
+      const s = document.createElement('span');
+      s.className = 'wiz-glint';
+      const ang = (Math.PI * 2 * i) / 6 + Math.random() * 0.6;
+      const dist = 26 + Math.random() * 22;
+      s.style.left = `${r.left + r.width / 2}px`;
+      s.style.top = `${r.top + r.height / 2}px`;
+      s.style.setProperty('--dx', `${Math.cos(ang) * (r.width / 2 + dist * 0.4)}px`);
+      s.style.setProperty('--dy', `${Math.sin(ang) * dist * 0.6}px`);
+      s.style.setProperty('--c', colors[i % colors.length]);
+      s.style.setProperty('--sz', `${6 + Math.random() * 5}px`);
+      host.appendChild(s);
+      setTimeout(() => s.remove(), 750);
+    }
+  }
+  // 질문 칸 위쪽에 아주 작게 깜빡이는 별 몇 개 (한 번만 만들어 둠)
+  function ensureWizStars() {
+    const panel = document.getElementById('wiz-panel');
+    if (!panel || panel.querySelector('.wiz-stars')) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'wiz-stars';
+    wrap.setAttribute('aria-hidden', 'true');
+    [[8, 14, 0], [22, 6, 1.4], [78, 10, 0.7], [90, 22, 2.1], [64, 4, 2.8]].forEach(([x, y, delay], i) => {
+      const s = document.createElement('span');
+      s.style.left = `${x}%`;
+      s.style.top = `${y}px`;
+      s.style.animationDelay = `${delay}s`;
+      s.style.setProperty('--c', ['#c9a46a', '#e7d6b5', '#7d6244'][i % 3]);
+      wrap.appendChild(s);
+    });
+    panel.appendChild(wrap);
+  }
+
   function getWizardSteps() {
     const c = state.spaceConfig.cabinet;
     const d = state.spaceConfig.drawer;
@@ -2773,6 +2861,7 @@
         },
         num({
           title: '안쪽 벽은<br>몇 mm인가요?',
+          measure: WIZ_MEASURE.panW,
           caption: '방 가로 (뒤 벽 길이)',
           hint: () => '입구에서 보이는 맞은편 벽 끝에서 끝까지 재요.',
           min: 600, max: 4000,
@@ -2781,6 +2870,7 @@
         }),
         num({
           title: '옆 벽은<br>몇 mm인가요?',
+          measure: WIZ_MEASURE.panD,
           caption: '방 깊이 (오른쪽 벽 길이)',
           hint: () => '안쪽 벽에서 입구까지 재요.',
           min: 600, max: 4000,
@@ -2789,6 +2879,7 @@
         }),
         num({
           title: '선반 전체 높이는<br>얼마인가요?',
+          measure: WIZ_MEASURE.panH,
           hint: () => '바닥에서 맨 위 선반 위까지 재요.',
           min: 600, max: 2800,
           get: () => p.h,
@@ -2796,6 +2887,7 @@
         }),
         num({
           title: '선반 깊이는<br>얼마인가요?',
+          measure: WIZ_MEASURE.panDepth,
           caption: '안쪽 벽 · 옆 벽 똑같이',
           hint: () => {
             const w = window.PackerEngine.getPantryWalkway(state.spaceConfig);
@@ -2809,6 +2901,7 @@
         }),
         num({
           title: '안쪽 벽은<br>몇 열로 나뉘나요?',
+          measure: WIZ_MEASURE.panCols,
           unit: '열', step: 1, min: 1, max: 6,
           hint: () => `세로 기둥이 ${Math.max(0, bayCount('A') - 1)}개예요. 기둥 위치는 3D 화면에서 바꿀 수 있어요.`,
           get: () => bayCount('A'),
@@ -2816,6 +2909,7 @@
         }),
         num({
           title: '옆 벽은<br>몇 열로 나뉘나요?',
+          measure: WIZ_MEASURE.panCols,
           unit: '열', step: 1, min: 0, max: 6,
           hint: () => (p.wallB === false ? '옆 벽에는 선반이 없어요.' : `세로 기둥이 ${Math.max(0, bayCount('B') - 1)}개예요.`),
           get: () => (p.wallB === false ? 0 : bayCount('B')),
@@ -2823,6 +2917,7 @@
         }),
         num({
           title: '선반은 몇 단인가요?',
+          measure: WIZ_MEASURE.panLevels,
           unit: '단', step: 1, min: 1, max: 9,
           hint: () => '모든 열이 같은 높이로 나뉘어요. 열마다 높이는 3D 화면에서 바꿔요.',
           get: () => pantryShelfCount() + 1,
@@ -2836,16 +2931,19 @@
         typeStep,
         num({
           title: '장 안쪽 가로 길이를<br>알려주세요.',
+          measure: WIZ_MEASURE.cabW,
           hint: () => '왼쪽 벽에서 오른쪽 벽까지, 안쪽을 재요.',
           min: 200, max: 3000, get: () => c.w, set: (v) => { c.w = v; }
         }),
         num({
           title: '안쪽 깊이는<br>얼마인가요?',
+          measure: WIZ_MEASURE.cabD,
           hint: () => '문 안쪽에서 뒷벽까지 재요.',
           min: 150, max: 1200, get: () => c.d, set: (v) => { c.d = v; }
         }),
         num({
           title: '안쪽 높이는<br>얼마인가요?',
+          measure: WIZ_MEASURE.cabH,
           hint: () => '바닥 판에서 천장 판까지 재요.',
           min: 200, max: 3000, get: () => c.h, set: (v) => { c.h = v; }
         }),
@@ -2864,6 +2962,7 @@
         },
         num({
           title: '문틀이 있나요?',
+          measure: WIZ_MEASURE.cabFrame,
           caption: '왼쪽 · 오른쪽 문틀 폭',
           hint: () => {
             const k = window.PackerEngine.getCabinetConstraints(state.spaceConfig);
@@ -2877,6 +2976,7 @@
         }),
         num({
           title: '선반은 몇 개인가요?',
+          measure: WIZ_MEASURE.cabShelves,
           unit: '개', step: 1, min: 0, max: 8,
           hint: () => `칸이 ${c.shelves.length + 1}개 생겨요. 높이는 3D 화면에서 바꿀 수 있어요.`,
           get: () => c.shelves.length,
@@ -2889,11 +2989,13 @@
       typeStep,
       num({
         title: '서랍 안쪽 가로 길이를<br>알려주세요.',
+          measure: WIZ_MEASURE.drwW,
         hint: () => '왼쪽 벽에서 오른쪽 벽까지, 안쪽을 재요.',
         min: 150, max: 1500, get: () => d.w, set: (v) => { d.w = v; }
       }),
       num({
         title: '서랍 깊이는<br>얼마인가요?',
+          measure: WIZ_MEASURE.drwD,
         hint: () => '앞판 안쪽에서 뒷벽까지 재요.',
         min: 150, max: 900,
         get: () => d.d,
@@ -2901,6 +3003,7 @@
       }),
       num({
         title: '끝까지 빼면<br>얼마나 보이나요?',
+          measure: WIZ_MEASURE.drwExposed,
         hint: () => {
           const hidden = Math.max(0, d.d - d.exposedD);
           return hidden > 0 ? `안쪽 ${hidden} mm는 다 빼도 가려져요.` : '서랍 안이 전부 보여요.';
@@ -2911,6 +3014,7 @@
       }),
       num({
         title: '위로 넣을 수 있는<br>높이는요?',
+          measure: WIZ_MEASURE.drwClear,
         hint: () => '서랍 바닥에서 위 판까지의 높이예요.',
         min: 40, max: 600, step: 5,
         get: () => d.clearanceH,
@@ -3010,6 +3114,7 @@
   }
 
   function renderWizard() {
+    ensureWizStars();
     const steps = getWizardSteps();
     state.wizStep = Math.max(0, Math.min(steps.length - 1, state.wizStep));
     const step = steps[state.wizStep];
@@ -3059,6 +3164,7 @@
           </span>
           <span class="wiz-check"></span>`;
         b.addEventListener('click', () => {
+          wizSparkle(b.querySelector('.wiz-check') || b);
           step.set(opt.value);
           afterChange();
           renderWizard();
@@ -3079,12 +3185,21 @@
           <button type="button" class="wiz-step-btn" data-d="1" aria-label="늘리기">${plusSvg}</button>
         </div>
         ${step.caption ? `<div class="wiz-value-caption">${step.caption}</div>` : ''}
+        ${step.measure ? `
+        <div class="wiz-measure">
+          ${measureFigSvg(step.measure.fig)}
+          <div class="wiz-measure-text">
+            <div class="wiz-measure-h">이렇게 재요</div>
+            <ol class="wiz-measure-list">${step.measure.tips.map((tip) => `<li>${tip}</li>`).join('')}</ol>
+          </div>
+        </div>` : ''}
       `;
       const input = ctrl.querySelector('.wiz-value-input');
       const apply = (v) => {
         const val = Math.max(step.min, Math.min(step.max, Math.round(Number(v) || 0)));
         step.set(val);
         input.value = step.get();
+        wizSparkle(ctrl.querySelector('.wiz-value'));
         afterChange();
       };
       ctrl.querySelectorAll('.wiz-step-btn').forEach((btn) => {
