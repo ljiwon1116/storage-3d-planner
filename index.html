@@ -6,7 +6,7 @@
   <title>수납 공간 꾸미기 - 옷장·서랍 3D로 짜보기</title>
   <meta name="theme-color" content="#f7f3ec" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <link rel="stylesheet" href="styles.css?v=1101e" />
+  <link rel="stylesheet" href="styles.css?v=1101d" />
   <script>
     // 실제로 보이는 화면 높이를 --vh 로 넣어요 (주소창·툴바가 생기고 없어질 때마다).
     // 브라우저마다 100vh 가 툴바를 포함해서 위아래가 잘리는 문제를 막아요.
@@ -371,16 +371,6 @@
         </div>
       </div>
       <div id="box-fine-backdrop" class="box-fine-backdrop" hidden></div>
-      <!-- 문 열기 / 서랍 열기: 작은 창 + 슬라이드바 -->
-      <div id="open-ctrl-pop" class="open-ctrl-pop" hidden>
-        <div class="ocp-head">
-          <span id="ocp-title" class="ocp-title">서랍 열기</span>
-          <span id="ocp-val" class="ocp-val">100%</span>
-        </div>
-        <input id="ocp-slider" class="ocp-slider" type="range" min="0" max="100" value="100" aria-labelledby="ocp-title" />
-        <div class="ocp-ends"><span id="ocp-min">닫힘</span><span id="ocp-max">다 열림</span></div>
-      </div>
-      <div id="open-ctrl-backdrop" class="box-fine-backdrop" hidden></div>
 
       <!-- 시점 전환 & 모바일 묶음선택 토글 캡슐 바 -->
       <div class="hud-pill-bar">
@@ -388,7 +378,11 @@
         <button id="btn-touch-multiselect" class="btn btn-sm" title="폰·태블릿에서 상자 여러 개를 손가락으로 한 번에 고르기">
           여러 개 고르기: 꺼짐
         </button>
-        <button id="btn-open-ctrl" class="btn btn-sm" type="button" aria-expanded="false" aria-controls="open-ctrl-pop">서랍 열기</button>
+        <div id="hud-drawer-controls" style="display:none;align-items:center;gap:4px;">
+          <span style="font-size:0.72rem;color:#3b8a64;font-weight:700;">서랍 열기:</span>
+          <input id="slider-drawer-open" type="range" min="0" max="100" value="100" style="width:75px;" />
+          <span id="drawer-open-pct" style="font-size:0.72rem;font-weight:600;">100%</span>
+        </div>
         <label class="checkbox-row" style="margin:0;">
           <input id="chk-show-deadzones" type="checkbox" checked />
           <span style="font-size:0.72rem;">꺼내기 힘든 곳</span>
@@ -689,11 +683,11 @@
   </div>
 
   <!-- 애플리케이션 스크립트 로드 -->
-  <script src="js/presets.js?v=1101e"></script>
-  <script src="js/items.js?v=1101e"></script>
-  <script src="js/packer.js?v=1101e"></script>
-  <script src="js/scene3d.js?v=1101e"></script>
-  <script src="js/app.js?v=1101e"></script>
+  <script src="js/presets.js?v=1101d"></script>
+  <script src="js/items.js?v=1101d"></script>
+  <script src="js/packer.js?v=1101d"></script>
+  <script src="js/scene3d.js?v=1101d"></script>
+  <script src="js/app.js?v=1101d"></script>
 
   <!-- 보관함 자세히 보기: 뒤는 흐리게, 고른 보관함만 크게 + 물건 넣기 -->
   <div id="box-detail" class="box-detail" aria-hidden="true">
@@ -719,6 +713,6 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="js/boxdetail.js?v=1101e"></script>
+  <script src="js/boxdetail.js?v=1101d"></script>
 </body>
 </html>
