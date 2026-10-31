@@ -156,12 +156,11 @@
     } catch (e) {}
     loadCatalogAndCombos();
 
-    // Vercel + Neon DB에 비동기 저장 (사진은 크니까 빼고 보냄)
-    const { image, ...forCloud } = newModel;
+    // Vercel + Neon DB에 비동기 저장
     fetch('/api/models', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(forCloud)
+      body: JSON.stringify(newModel)
     }).catch(() => {});
   }
 
@@ -2093,18 +2092,6 @@
         });
         chips.appendChild(chip);
       });
-      // 목록에 없는 상자 직접 추가 (종류 칩과는 조금 떨어진 오른쪽 끝)
-      const addBtn = document.createElement('button');
-      addBtn.type = 'button';
-      addBtn.className = 'kind-add-btn';
-      addBtn.innerHTML = '<span aria-hidden="true">＋</span> 직접 추가';
-      addBtn.setAttribute('aria-label', '목록에 없는 상자 직접 추가');
-      addBtn.addEventListener('click', openAddBoxModal);
-      const sep = document.createElement('span');
-      sep.className = 'kind-sep';
-      sep.setAttribute('aria-hidden', 'true');
-      chips.appendChild(sep);
-      chips.appendChild(addBtn);
       tabsEl.appendChild(chips);
     }
 
@@ -2447,125 +2434,6 @@
     setTimeout(() => {
       window.Scene3DManager.resize();
     }, 60);
-  }
-
-  // ---------- 목록에 없는 상자 직접 추가 ----------
-  let addBoxPhoto = null;   // 줄인 사진 (dataURL)
-  function openAddBoxModal() {
-    const m = document.getElementById('modal-add-box');
-    if (!m) return;
-    addBoxPhoto = null;
-    ['ab-name', 'ab-brand', 'ab-w', 'ab-d', 'ab-h'].forEach((id) => { document.getElementById(id).value = ''; });
-    document.getElementById('ab-stack').checked = true;
-    document.getElementById('ab-photo-preview').hidden = true;
-    document.getElementById('ab-photo-empty').hidden = false;
-    document.getElementById('ab-photo-clear').hidden = true;
-    document.getElementById('ab-name-err').hidden = true;
-    document.getElementById('ab-dim-err').hidden = true;
-    setAddBoxKind(state.pickerKind === 'basket' ? 'top_open' : state.pickerKind === 'lid' ? 'top_lid' : 'front_drawer');
-    m.classList.add('open');
-    setTimeout(() => document.getElementById('ab-name').focus(), 50);
-  }
-  function setAddBoxKind(kind) {
-    document.querySelectorAll('#ab-kind .sp-chip').forEach((c) => {
-      const on = c.dataset.kind === kind;
-      c.classList.toggle('selected', on);
-      c.setAttribute('aria-checked', on ? 'true' : 'false');
-    });
-  }
-  // 사진은 작게 줄여서 저장 (가장 긴 쪽 200px, JPEG)
-  function shrinkPhoto(file) {
-    return new Promise((resolve, reject) => {
-      if (!file || !/^image\//.test(file.type)) { reject(new Error('not image')); return; }
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => {
-        const s = Math.min(1, 200 / Math.max(img.width, img.height));
-        const cv = document.createElement('canvas');
-        cv.width = Math.max(1, Math.round(img.width * s));
-        cv.height = Math.max(1, Math.round(img.height * s));
-        const g = cv.getContext('2d');
-        g.fillStyle = '#ffffff';
-        g.fillRect(0, 0, cv.width, cv.height);
-        g.drawImage(img, 0, 0, cv.width, cv.height);
-        URL.revokeObjectURL(url);
-        resolve(cv.toDataURL('image/jpeg', 0.82));
-      };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('load fail')); };
-      img.src = url;
-    });
-  }
-  function bindAddBoxModal() {
-    const m = document.getElementById('modal-add-box');
-    if (!m) return;
-    const close = () => m.classList.remove('open');
-    document.getElementById('btn-close-add-box').addEventListener('click', close);
-    m.addEventListener('click', (e) => { if (e.target === m) close(); });
-    document.querySelectorAll('#ab-kind .sp-chip').forEach((c) => c.addEventListener('click', () => setAddBoxKind(c.dataset.kind)));
-    const input = document.getElementById('ab-photo-input');
-    input.addEventListener('change', async () => {
-      const f = input.files && input.files[0];
-      input.value = '';
-      if (!f) return;
-      try {
-        addBoxPhoto = await shrinkPhoto(f);
-        const pv = document.getElementById('ab-photo-preview');
-        pv.src = addBoxPhoto;
-        pv.hidden = false;
-        document.getElementById('ab-photo-empty').hidden = true;
-        document.getElementById('ab-photo-clear').hidden = false;
-      } catch (e) {
-        showToast('사진을 못 불러왔어요. 다른 사진을 골라 주세요');
-      }
-    });
-    document.getElementById('ab-photo-clear').addEventListener('click', () => {
-      addBoxPhoto = null;
-      document.getElementById('ab-photo-preview').hidden = true;
-      document.getElementById('ab-photo-empty').hidden = false;
-      document.getElementById('ab-photo-clear').hidden = true;
-    });
-    document.getElementById('btn-add-box-save').addEventListener('click', () => {
-      const clean = (s) => s.replace(/[<>&"'`]/g, '').trim();   // 화면에 그대로 찍히므로 꺾쇠 등은 뺌
-      const name = clean(document.getElementById('ab-name').value);
-      const brand = clean(document.getElementById('ab-brand').value) || '내 상자';
-      const num = (id) => Math.round(Number(document.getElementById(id).value));
-      const w = num('ab-w'), d = num('ab-d'), h = num('ab-h');
-      const okDim = [w, d, h].every((v) => Number.isFinite(v) && v >= 20 && v <= 2000);
-      document.getElementById('ab-name-err').hidden = !!name;
-      document.getElementById('ab-dim-err').hidden = okDim;
-      if (!name || !okDim) {
-        (name ? document.getElementById(okDim ? 'ab-name' : 'ab-w') : document.getElementById('ab-name')).focus();
-        return;
-      }
-      const accessType = (document.querySelector('#ab-kind .sp-chip.selected') || {}).dataset?.kind || 'front_drawer';
-      const newModel = {
-        id: 'custom-' + Date.now(),
-        brand,
-        lineup: '직접 추가',
-        name,
-        wTop: w, dTop: d, h,
-        wBot: w, dBot: d,
-        shapeType: 'box',
-        accessType,
-        stackable: document.getElementById('ab-stack').checked,
-        stackingOffset: 3,
-        hasFrontHandle: accessType === 'front_drawer',
-        color: '#efe7da'
-      };
-      if (addBoxPhoto) newModel.image = addBoxPhoto;
-      saveCustomModel(newModel);
-      // 방금 만든 상자를 담기 바구니에 1개 넣고 목록에서 보이게
-      state.pickerBrand = 'ALL';
-      state.pickerSearch = '';
-      const si = document.getElementById('picker-search-input');
-      if (si) si.value = '';
-      state.pickerKind = window.getModelKind(newModel);
-      state.pickerCart = state.pickerCart || {};
-      state.pickerCart[newModel.id] = 1;
-      close();
-      renderPickerModalContent();
-      showToast('목록에 추가했어요. 담기를 누르면 칸에 들어가요');
-    });
   }
 
   // ---------- 짧은 알림 · 확인 창 ----------
@@ -4002,7 +3870,6 @@
     document.getElementById('drag-guide-ok')?.addEventListener('click', closeDragGuide);
     document.getElementById('box-guide-ok')?.addEventListener('click', closeBoxGuide);
     setupResizableSheets();
-    bindAddBoxModal();
     document.getElementById('box-guide')?.addEventListener('click', (e) => {
       if (e.target.id === 'box-guide') closeBoxGuide();
     });
