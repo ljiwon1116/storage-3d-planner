@@ -1,0 +1,9 @@
+{
+  "name": "storagefit-3d-planner",
+  "version": "1.0.0",
+  "description": "3D 옷장/서랍 수납함 배치 시뮬레이터 (Vercel + Neon Serverless Postgres 연동)",
+  "private": true,
+  "dependencies": {
+    "@neondatabase/serverless": "^0.10.4"
+  }
+}
