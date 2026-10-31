@@ -4158,3 +4158,13 @@ body.ui-mode-mobile .sheet-action-btn { margin: 0 !important; }
   letter-spacing: -0.02em;
 }
 .box-detail-head > div:first-child { flex: 1 1 auto; min-width: 0; overflow: hidden; }
+
+
+/* 3D 화면이 끊겼을 때 안내 */
+.gl-lost { position: absolute; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(247, 243, 236, 0.86); }
+.gl-lost-card { max-width: 300px; width: 100%; padding: 20px; border-radius: 16px; background: #fff; box-shadow: 0 4px 16px rgba(28, 25, 22, 0.06); text-align: center; color: var(--text-title); }
+.gl-lost-t { font-size: 1rem; font-weight: 600; line-height: 1.4; }
+.gl-lost-s { margin: 4px 0 16px; font-size: 0.82rem; color: var(--text-meta); line-height: 1.5; }
+.gl-lost-btn { width: 100%; height: 48px; border: none; border-radius: 12px; background: var(--accent); color: #fff; font-family: inherit; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
+.gl-lost-btn:hover { background: var(--accent-hover); }
+.gl-lost-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }

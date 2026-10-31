@@ -274,6 +274,27 @@ window.Scene3DManager = (function () {
     renderer.domElement.addEventListener('pointermove', onPointerMove, { passive: false });
     window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('pointercancel', onPointerUp);
+    // 다른 앱으로 가거나 창을 벗어나면 누르던 동작은 모두 취소
+    window.addEventListener('blur', () => cancelGesture(true));
+    document.addEventListener('visibilitychange', () => { if (document.hidden) cancelGesture(true); });
+
+    // 3D 그리기(WebGL)가 끊기면 다시 이어 붙임 → 화면이 비거나 X 표시가 뜨는 문제 방지
+    renderer.domElement.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      contextLost = true;
+      cancelGesture(true);
+      setTimeout(() => {
+        if (!contextLost) return;
+        try { renderer.forceContextRestore(); } catch (err) {}
+      }, 800);
+      setTimeout(() => { if (contextLost) showReloadNotice(); }, 4000);
+    });
+    renderer.domElement.addEventListener('webglcontextrestored', () => {
+      contextLost = false;
+      hideReloadNotice();
+      if (lastRenderArgs) renderScene.apply(null, lastRenderArgs);   // 상자·가구를 다시 그림
+      if (containerEl) onWindowResize(containerEl);
+    });
     window.addEventListener('resize', () => onWindowResize(containerEl));
 
     animate();
@@ -292,7 +313,7 @@ window.Scene3DManager = (function () {
   function animate() {
     requestAnimationFrame(animate);
     if (controls) controls.update();
-    if (renderer && scene && camera) {
+    if (renderer && scene && camera && !contextLost) {
       renderer.render(scene, camera);
       updateBundleFloatingPopupPosition();
       updateShelfCalloutAnchors();
@@ -637,21 +658,7 @@ window.Scene3DManager = (function () {
     doorLine.position.set(doorX, 1, p.roomD / 2 - 15);
     cabinetGroup.add(doorLine);
 
-    // 출입문 틀 (나무색): 문이 어디 있는지 잘 보이게
-    {
-      const frameMat = new THREE.MeshStandardMaterial({ color: 0x9c7a55, roughness: 0.6 });
-      const doorH = Math.min(2100, Math.max(1800, H - 100));
-      const fw = 40, fz = p.roomD / 2 + 10;
-      [doorX - doorW / 2 - fw / 2, doorX + doorW / 2 + fw / 2].forEach((x) => {
-        const post = new THREE.Mesh(new THREE.BoxGeometry(fw, doorH, 40), frameMat);
-        post.position.set(x, doorH / 2, fz);
-        post.castShadow = true;
-        cabinetGroup.add(post);
-      });
-      const header = new THREE.Mesh(new THREE.BoxGeometry(doorW + fw * 2, fw, 40), frameMat);
-      header.position.set(doorX, doorH + fw / 2, fz);
-      cabinetGroup.add(header);
-    }
+    // 출입문 틀은 그리지 않음 (바닥 표시선 + 글자만)
 
     // 바닥 글자: 문 표시선 바로 안쪽에 '팬트리 출입문'
     {
@@ -682,6 +689,7 @@ window.Scene3DManager = (function () {
   }
 
   function renderScene(spaceConfig, placedBoxes, modelsMap, stateOpts) {
+    lastRenderArgs = [spaceConfig, placedBoxes, modelsMap, stateOpts];
     currentSpaceConfig = spaceConfig;
     currentBoxes = placedBoxes;
     currentModelsMap = modelsMap;
@@ -1228,7 +1236,53 @@ window.Scene3DManager = (function () {
   // 마우스 좌클릭 및 스마트폰 터치(pointerdown) 통합 처리
   const HOLD_MS = 380;              // 이만큼 꾹 누르면 옮기기 시작
   let holdTimer = null, holdPending = false, selectOnlyPending = false;
+  let gesturePointerId = null;      // 지금 동작을 시작한 손가락
+  const activePointers = new Set(); // 화면에 닿아 있는 손가락들
+  let contextLost = false, lastRenderArgs = null;
+
+  // 누르던 동작을 모두 깨끗이 취소 (두 손가락, 창 벗어남, 3D 끊김 등)
+  function cancelGesture(clearPointers) {
+    clearTimeout(holdTimer);
+    holdPending = false;
+    selectOnlyPending = false;
+    tapBoxId = null;
+    pendingUnbundleBoxId = null;
+    clickedEmptySpace = false;
+    if (isDragging) {
+      isDragging = false;
+      dragAnchorBoxId = null;
+      if (onBoxesMovedCallback) onBoxesMovedCallback();
+    }
+    if (controls) controls.enabled = true;
+    if (gesturePointerId !== null && renderer) {
+      try { renderer.domElement.releasePointerCapture(gesturePointerId); } catch (e) {}
+    }
+    gesturePointerId = null;
+    if (clearPointers) activePointers.clear();
+  }
+
+  function showReloadNotice() {
+    if (!containerEl || containerEl.querySelector('.gl-lost')) return;
+    const n = document.createElement('div');
+    n.className = 'gl-lost';
+    n.innerHTML = '<div class="gl-lost-card"><div class="gl-lost-t">3D 화면이 잠깐 끊겼어요</div><div class="gl-lost-s">놓은 상자는 저장돼 있어요.</div><button type="button" class="gl-lost-btn">다시 불러오기</button></div>';
+    n.querySelector('button').addEventListener('click', () => window.location.reload());
+    containerEl.appendChild(n);
+  }
+  function hideReloadNotice() {
+    const n = containerEl && containerEl.querySelector('.gl-lost');
+    if (n) n.remove();
+  }
+
   function onPointerDown(event) {
+    activePointers.add(event.pointerId);
+    // 두 번째 손가락이 닿으면 (크게·작게 보기) 상자 동작은 취소하고 화면 조작만
+    if (activePointers.size > 1) {
+      cancelGesture(false);
+      return;
+    }
+    gesturePointerId = event.pointerId;
+    try { renderer.domElement.setPointerCapture(event.pointerId); } catch (e) {}
     if (event.pointerType === 'mouse' && event.button !== 0) return;
 
     pointerDownScreenPos = { x: event.clientX, y: event.clientY };
@@ -1304,6 +1358,7 @@ window.Scene3DManager = (function () {
 
   // 드래그 시 수평(X, Z) 이동과 동시에 아래에 다른 수납함이 있으면 자동으로 위로 올라타도록(Auto-Stacking) 처리!
   function onPointerMove(event) {
+    if (gesturePointerId !== null && event.pointerId !== gesturePointerId) return;
     // 꾹 누르기 전에 손가락이 움직이면 옮기기 취소 (화면 돌리기도 안 함)
     if (holdPending && pointerDownScreenPos) {
       const d0 = Math.hypot(event.clientX - pointerDownScreenPos.x, event.clientY - pointerDownScreenPos.y);
@@ -1394,6 +1449,13 @@ window.Scene3DManager = (function () {
   }
 
   function onPointerUp(event) {
+    activePointers.delete(event.pointerId);
+    // 이 동작을 시작한 손가락이 아니면 무시 (두 손가락 조작 중 한 손가락만 뗀 경우 등)
+    if (gesturePointerId === null || event.pointerId !== gesturePointerId) return;
+    try { renderer.domElement.releasePointerCapture(event.pointerId); } catch (e) {}
+    gesturePointerId = null;
+    if (event.type === 'pointercancel') { cancelGesture(false); return; }
+
     const dist = Math.hypot(
       (event.clientX || 0) - pointerDownScreenPos.x,
       (event.clientY || 0) - pointerDownScreenPos.y

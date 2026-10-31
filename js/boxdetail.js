@@ -151,6 +151,15 @@
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     host.appendChild(renderer.domElement);
+    // 3D 그리기가 끊기면 다시 이어서 그 보관함을 다시 그림
+    renderer.domElement.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      setTimeout(() => { try { renderer.forceContextRestore(); } catch (err) {} }, 800);
+    });
+    renderer.domElement.addEventListener('webglcontextrestored', () => {
+      Object.keys(glbCache).forEach((k) => delete glbCache[k]);
+      if (cur) open(cur.box, cur.model, cur.onChange);
+    });
 
     scene = new THREE.Scene();
     scene.add(new THREE.HemisphereLight(0xffffff, 0xd8cfc2, 0.9));
