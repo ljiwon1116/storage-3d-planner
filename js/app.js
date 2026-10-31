@@ -2080,7 +2080,17 @@
       const chips = document.createElement('div');
       chips.className = 'kind-chips';
       const brandModels = state.catalogModels.filter((m) => state.pickerBrand === 'ALL' || m.brand === state.pickerBrand);
-      [['ALL', '전체'], ['drawer', '서랍형'], ['basket', '바구니형'], ['lid', '뚜껑형']].forEach(([key, label]) => {
+      // 종류 칩은 큰 도형 하나 안에 | 로 나눠서 넣어요
+      const seg = document.createElement('div');
+      seg.className = 'kind-seg';
+      [['ALL', '전체'], ['drawer', '서랍형'], ['basket', '바구니형'], ['lid', '뚜껑형']].forEach(([key, label], idx) => {
+        if (idx > 0) {
+          const bar = document.createElement('span');
+          bar.className = 'kind-bar';
+          bar.setAttribute('aria-hidden', 'true');
+          bar.textContent = '|';
+          seg.appendChild(bar);
+        }
         const n = key === 'ALL' ? brandModels.length : brandModels.filter((m) => window.getModelKind(m) === key).length;
         const chip = document.createElement('button');
         chip.type = 'button';
@@ -2091,8 +2101,9 @@
           state.pickerKind = key;
           renderPickerModalContent();
         });
-        chips.appendChild(chip);
+        seg.appendChild(chip);
       });
+      chips.appendChild(seg);
       // 목록에 없는 상자 직접 추가 (종류 칩과는 조금 떨어진 오른쪽 끝)
       const addBtn = document.createElement('button');
       addBtn.type = 'button';
