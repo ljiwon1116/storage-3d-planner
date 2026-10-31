@@ -4140,3 +4140,21 @@ body.ui-mode-mobile .sheet-action-btn { margin: 0 !important; }
   transform: none;
 }
 #modal-box-picker .picker-cart-bar .btn:active { transform: scale(0.98); }
+
+
+/* 칸 ＋ 버튼: 모든 가구에서 숫자 없이 ＋만 */
+#mobile-shelf-buttons .msab-num { display: none !important; }
+#mobile-shelf-buttons .msab-plus { margin-top: 0 !important; line-height: 1; }
+
+/* 넣을 물건 고르기: 안쪽 크기 / 설명을 줄을 나눠서, 설명은 한 줄 */
+.box-detail-summary .bd-sum-size { font-weight: 600; color: var(--text-title); line-height: 1.4; }
+.box-detail-summary .bd-sum-desc {
+  margin-top: 2px;
+  font-size: clamp(0.62rem, 2.9vw, 0.78rem);
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.02em;
+}
+.box-detail-head > div:first-child { flex: 1 1 auto; min-width: 0; overflow: hidden; }

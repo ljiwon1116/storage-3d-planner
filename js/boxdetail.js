@@ -424,10 +424,11 @@
       .filter((x) => x.it)
       .sort((a, b) => b.n - a.n)
       .map((x) => `<span class="bd-got">${x.it.name} <b>${x.n}개</b></span>`).join('');
+    const desc = (picks ? `모두 ${total}개 · 채운 정도 ${res.fill}%` : '여러 개 골라도 돼요. 큰 것부터 알아서 채워요') +
+      (res.left.length ? ` · <b class="bd-left">${res.left.map((m) => m.name).join(', ')}: 자리가 없어요</b>` : '');
     document.getElementById('box-detail-summary').innerHTML =
-      `안쪽 ${Math.round(inner.w)}x${Math.round(inner.d)}x${Math.round(inner.h)} mm · ` +
-      (picks ? `모두 ${total}개 · 채운 정도 ${res.fill}%` : '여러 개 골라도 돼요. 큰 것부터 알아서 채워요') +
-      (res.left.length ? ` · <b class="bd-left">${res.left.map((m) => m.name).join(', ')}: 자리가 없어요</b>` : '') +
+      `<div class="bd-sum-size">안쪽 ${Math.round(inner.w)}x${Math.round(inner.d)}x${Math.round(inner.h)} mm</div>` +
+      `<div class="bd-sum-desc">${desc}</div>` +
       (names ? `<div class="bd-got-list">${names}</div>` : '');
   }
 
