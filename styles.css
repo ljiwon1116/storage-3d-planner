@@ -3888,3 +3888,40 @@ body.ui-mode-mobile .picker-cart-bar .btn {
 
 body.ui-mode-mobile .selected-box-pill,
 body.ui-mode-mobile .bottom-center-hud { overflow: visible !important; }
+
+
+/* =====================================================================
+   고르는 창 맨 위 손잡이: 잡고 위아래로 끌면 창 높이 조절
+   ===================================================================== */
+.sheet-grip {
+  flex: 0 0 auto;
+  width: 100%;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ns-resize;
+  touch-action: none;           /* 끄는 동안 화면이 같이 밀리지 않게 */
+  user-select: none;
+  -webkit-user-select: none;
+}
+.sheet-grip span {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: #d8cebf;
+  transition: background-color 0.15s, width 0.15s;
+}
+.sheet-grip:hover span,
+.sheet-grip.dragging span { background: var(--accent); width: 52px; }
+.sheet-grip:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; border-radius: 8px; }
+/* 옛 장식 손잡이는 숨김 (진짜 손잡이로 바뀜) */
+body.ui-mode-mobile #modal-box-picker .modal-box.has-grip::before { display: none; }
+#modal-box-picker .modal-box.has-grip { padding-top: 0 !important; }
+.mobile-shelf-sheet.has-grip .mobile-shelf-sheet-head { padding-top: 0 !important; }
+.box-detail-sheet.has-grip { display: flex; flex-direction: column; }
+.box-detail-sheet.has-grip .box-detail-head { padding-top: 0 !important; }
+/* 창을 키우면 목록도 같이 늘어남 */
+#modal-box-picker .modal-box.has-grip .picker-grid { flex: 1 1 auto; max-height: none; min-height: 80px; }
+.mobile-shelf-sheet.has-grip #mobile-shelf-sheet-body { flex: 1 1 auto; min-height: 0; }
+.box-detail-sheet.has-grip .box-detail-list { flex: 1 1 auto; min-height: 0; }

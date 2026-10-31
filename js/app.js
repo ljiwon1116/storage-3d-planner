@@ -429,6 +429,7 @@
     }
 
     if (info.type === 'normal_click') {
+      setTimeout(maybeShowBoxGuide, 120);
       if (clickedBox.bundleGroupId) {
         const groupMembers = activePlan.boxes
           .filter((b) => b.compartmentIndex === clickedBox.compartmentIndex && b.bundleGroupId === clickedBox.bundleGroupId)
@@ -527,9 +528,12 @@
     };
   }
 
-  // 장 → 서랍형 상자, 서랍 → 바구니형 상자
-  function typeFillPool() {
-    const want = state.spaceConfig.type === 'cabinet' ? 'drawer' : 'basket';
+  // 장 → 서랍형 상자, 서랍 → 바구니형 상자 (kind로 직접 고를 수도: 'drawer' | 'basket' | 'mix')
+  function typeFillPool(kind) {
+    const want = kind || (state.spaceConfig.type === 'cabinet' ? 'drawer' : 'basket');
+    if (want === 'mix') {
+      return state.catalogModels.filter((m) => ['drawer', 'basket'].includes(window.getModelKind(m)));
+    }
     return state.catalogModels.filter((m) => window.getModelKind(m) === want);
   }
 
@@ -647,11 +651,11 @@
   }
 
   // 3D 화면의 '한 번에 채우기': 가구 종류에 맞는 상자로 한 칸 채우기
-  function runTypeFill(compIdx, brand) {
+  function runTypeFill(compIdx, brand, kind) {
     const plan = getActivePlan();
     const fillComp = window.PackerEngine.getCompartments(state.spaceConfig)[compIdx];
     if (fillComp && fillComp.reserved) return 0;   // 팬트리 '맨 아래 비워두기' 칸은 채우지 않음
-    let pool = typeFillPool();
+    let pool = typeFillPool(kind);
     if (brand) pool = pool.filter((m) => m.brand === brand);
     const isCab = state.spaceConfig.type === 'cabinet';
     // 누를 때마다 새 조합 (이전과 똑같으면 한 번 더 뽑음)
@@ -684,8 +688,9 @@
     const body = document.getElementById('mobile-shelf-sheet-body');
     const compartments = window.PackerEngine.getCompartments(state.spaceConfig);
     const comp = compartments[compIdx] || compartments[0];
-    const kind = state.spaceConfig.type === 'cabinet' ? '서랍형 상자' : '바구니형 상자';
-    const pool = typeFillPool().filter((m) => m.h <= comp.clearH);
+    const isPan = state.spaceConfig.type === 'pantry';
+    const kind = isPan ? '상자' : state.spaceConfig.type === 'cabinet' ? '서랍형 상자' : '바구니형 상자';
+    const pool = typeFillPool(isPan ? 'mix' : undefined).filter((m) => m.h <= comp.clearH);
     const brands = [...new Set(pool.map((m) => m.brand))];
 
     body.innerHTML = '';
@@ -693,10 +698,15 @@
     head.className = 'sheet-step-head';
     head.innerHTML = mode === 'brand'
       ? `<div class="sheet-step-title">어떤 브랜드로 채울까요?</div><div class="sheet-step-hint">이 칸에 맞는 ${kind}만 보여요.</div>`
-      : `<div class="sheet-step-title">어떻게 채울까요?</div><div class="sheet-step-hint">이 칸에 맞는 ${kind}로 채워요. 지금 놓인 상자는 바뀌어요.</div>`;
+      : `<div class="sheet-step-title">어떻게 채울까요?</div><div class="sheet-step-hint">${isPan ? '먼저 브랜드를 골라요. 다음에 상자 종류를 골라요.' : `이 칸에 맞는 ${kind}로 채워요. 지금 놓인 상자는 바뀌어요.`}</div>`;
     body.appendChild(head);
 
     const fillAndClose = (brand) => {
+      if (comp.reserved) {
+        head.querySelector('.sheet-step-hint').textContent = '맨 아래 칸은 비워두기로 했어요. "기둥·선반"에서 바꿀 수 있어요.';
+        return;
+      }
+      if (isPan) { renderPantryKindChoice(compIdx, brand); return; }
       const n = runTypeFill(compIdx, brand);
       if (n === 0) {
         head.querySelector('.sheet-step-hint').textContent = '이 칸에 들어가는 상자가 없어요.';
@@ -722,6 +732,36 @@
       if (mode === 'brand') renderAutofillChoice(compIdx);
       else openShelfSheet(compIdx);
     }));
+  }
+
+  // 팬트리 한 번에 채우기 2단계: 서랍형 · 바구니형 · 섞어서
+  function renderPantryKindChoice(compIdx, brand) {
+    const body = document.getElementById('mobile-shelf-sheet-body');
+    const comp = window.PackerEngine.getCompartments(state.spaceConfig)[compIdx];
+    const countOf = (k) => typeFillPool(k).filter((m) => m.h <= comp.clearH && (!brand || m.brand === brand)).length;
+
+    body.innerHTML = '';
+    const head = document.createElement('div');
+    head.className = 'sheet-step-head';
+    head.innerHTML = `<div class="sheet-step-title">어떤 상자로 채울까요?</div><div class="sheet-step-hint">${brand ? `${brand} 상자 중에서 골라요.` : '모든 브랜드 상자 중에서 골라요.'} 지금 놓인 상자는 바뀌어요.</div>`;
+    body.appendChild(head);
+
+    const go = (k) => {
+      const n = runTypeFill(compIdx, brand, k);
+      if (n === 0) {
+        head.querySelector('.sheet-step-hint').textContent = '이 칸에 들어가는 상자가 없어요.';
+        return;
+      }
+      closeShelfSheet();
+      refreshAll();
+    };
+    [['drawer', '서랍형', '앞으로 빼는 상자'], ['basket', '바구니형', '위가 열린 바구니·통'], ['mix', '섞어서', '서랍형과 바구니형을 같이']].forEach(([k, label, sub], i) => {
+      const n = countOf(k);
+      const b = sheetBtn(label, n ? `${sub} · ${n}가지` : '이 칸에 맞는 상자가 없어요', i === 2 ? 'primary' : '', () => go(k));
+      if (!n) b.disabled = true;
+      body.appendChild(b);
+    });
+    body.appendChild(sheetBtn('뒤로', '', 'ghost', () => renderAutofillChoice(compIdx, brand ? 'brand' : undefined)));
   }
 
   // 선반 ＋버튼 → 바텀시트 메뉴 열기
@@ -2410,6 +2450,80 @@
     img.src = url;
   }
 
+  // ---------- 고르는 창 맨 위 손잡이: 잡고 위아래로 끌면 창 높이가 바뀜 ----------
+  function makeSheetResizable(el, opts) {
+    if (!el || el.querySelector(':scope > .sheet-grip')) return;
+    const grip = document.createElement('div');
+    grip.className = 'sheet-grip';
+    grip.setAttribute('role', 'separator');
+    grip.setAttribute('aria-orientation', 'horizontal');
+    grip.setAttribute('aria-label', '창 높이 조절: 위아래로 끌어요');
+    grip.tabIndex = 0;
+    grip.innerHTML = '<span></span>';
+    el.insertBefore(grip, el.firstChild);
+    el.classList.add('has-grip');
+
+    const vh = () => (window.visualViewport ? window.visualViewport.height : window.innerHeight);
+    const apply = (h) => {
+      const hh = Math.round(Math.max(vh() * 0.22, Math.min(vh() * 0.92, h)));
+      el.style.height = hh + 'px';
+      el.style.maxHeight = 'none';
+      if (opts && opts.onResize) opts.onResize(hh);
+    };
+    let startY = 0, startH = 0, dragging = false;
+    grip.addEventListener('pointerdown', (e) => {
+      if (opts && opts.enabled && !opts.enabled()) return;
+      dragging = true;
+      startY = e.clientY;
+      startH = el.getBoundingClientRect().height;
+      grip.setPointerCapture(e.pointerId);
+      grip.classList.add('dragging');
+      e.preventDefault();
+    });
+    grip.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      apply(startH - (e.clientY - startY));   // 위로 끌면 커지고, 아래로 끌면 작아짐
+    });
+    const end = (e) => {
+      if (!dragging) return;
+      dragging = false;
+      grip.classList.remove('dragging');
+      try { grip.releasePointerCapture(e.pointerId); } catch (err) {}
+    };
+    grip.addEventListener('pointerup', end);
+    grip.addEventListener('pointercancel', end);
+    // 키보드: ↑↓ 로 조금씩
+    grip.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      e.preventDefault();
+      apply(el.getBoundingClientRect().height + (e.key === 'ArrowUp' ? 40 : -40));
+    });
+  }
+
+  function setupResizableSheets() {
+    makeSheetResizable(document.getElementById('mobile-shelf-sheet'));
+    makeSheetResizable(document.querySelector('#modal-box-picker .modal-box'));
+    const bdSheet = document.querySelector('.box-detail-sheet');
+    makeSheetResizable(bdSheet, {
+      // 보관함 자세히 보기는 아래에 붙어 있을 때만 (옆에 붙은 넓은 화면에서는 끔)
+      enabled: () => bdSheet.getBoundingClientRect().width >= window.innerWidth - 4,
+      onResize: (h) => {
+        const cv = document.getElementById('box-detail-canvas');
+        if (cv) cv.style.bottom = h + 'px';
+        clearTimeout(setupResizableSheets.t);
+        setupResizableSheets.t = setTimeout(() => window.dispatchEvent(new Event('resize')), 30);
+      }
+    });
+    // 화면을 돌리면 끌어서 바꾼 높이는 처음대로
+    window.addEventListener('orientationchange', () => {
+      [document.getElementById('mobile-shelf-sheet'), document.querySelector('#modal-box-picker .modal-box'), bdSheet].forEach((el) => {
+        if (el) { el.style.height = ''; el.style.maxHeight = ''; }
+      });
+      const cv = document.getElementById('box-detail-canvas');
+      if (cv) cv.style.bottom = '';
+    });
+  }
+
   // ---------- 3D 돌려 보는 법 안내 (처음 3D 화면에 들어왔을 때 한 번) ----------
   const STORAGE_KEY_GUIDE_SEEN = 'storagefit_drag_guide_seen_v1';
   function updateDragGuideText() {
@@ -2432,6 +2546,23 @@
     const el = document.getElementById('drag-guide');
     if (el) el.hidden = true;
     try { localStorage.setItem(STORAGE_KEY_GUIDE_SEEN, '1'); } catch (e) {}
+  }
+
+  // 상자를 처음 눌렀을 때 한 번: 고르기 · 한 번 더 = 안 채우기 · 꾹 끌기 = 옮기기
+  const STORAGE_KEY_BOX_GUIDE_SEEN = 'storagefit_box_guide_seen_v1';
+  function maybeShowBoxGuide() {
+    let seen = false;
+    try { seen = localStorage.getItem(STORAGE_KEY_BOX_GUIDE_SEEN) === '1'; } catch (e) {}
+    const el = document.getElementById('box-guide');
+    const drag = document.getElementById('drag-guide');
+    if (!el || seen || (drag && !drag.hidden)) return;
+    el.hidden = false;
+    document.getElementById('box-guide-ok')?.focus();
+  }
+  function closeBoxGuide() {
+    const el = document.getElementById('box-guide');
+    if (el) el.hidden = true;
+    try { localStorage.setItem(STORAGE_KEY_BOX_GUIDE_SEEN, '1'); } catch (e) {}
   }
 
   // ---------- 내 설정 저장 (다음에 링크를 다시 열어도 그대로) ----------
@@ -3517,6 +3648,11 @@
     window.addEventListener('pagehide', saveLocalNow);
     document.addEventListener('visibilitychange', () => { if (document.hidden) saveLocalNow(); });
     document.getElementById('drag-guide-ok')?.addEventListener('click', closeDragGuide);
+    document.getElementById('box-guide-ok')?.addEventListener('click', closeBoxGuide);
+    setupResizableSheets();
+    document.getElementById('box-guide')?.addEventListener('click', (e) => {
+      if (e.target.id === 'box-guide') closeBoxGuide();
+    });
     document.getElementById('btn-save-photo')?.addEventListener('click', savePhoto);
     document.getElementById('drag-guide')?.addEventListener('click', (e) => {
       if (e.target.id === 'drag-guide') closeDragGuide();

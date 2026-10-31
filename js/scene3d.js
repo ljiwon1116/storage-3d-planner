@@ -1163,6 +1163,8 @@ window.Scene3DManager = (function () {
   }
 
   // 마우스 좌클릭 및 스마트폰 터치(pointerdown) 통합 처리
+  const HOLD_MS = 380;              // 이만큼 꾹 누르면 옮기기 시작
+  let holdTimer = null, holdPending = false, selectOnlyPending = false;
   function onPointerDown(event) {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
 
@@ -1206,12 +1208,28 @@ window.Scene3DManager = (function () {
           if (selectedBoxIds.length >= 2 && selectedBoxIds.includes(hitBoxId)) {
             pendingUnbundleBoxId = hitBoxId;
             prepareGroupDrag(hitBoxId, planeY);
+          } else if (selectedBoxIds.length === 1 && selectedBoxIds[0] === hitBoxId) {
+            // 이미 고른 상자: 톡 = 안 채우기(자세히 보기), 꾹 누른 채 끌기 = 옮기기
+            tapBoxId = hitBoxId;
+            holdPending = true;
+            controls.enabled = false;
+            clearTimeout(holdTimer);
+            holdTimer = setTimeout(() => {
+              if (!holdPending) return;
+              holdPending = false;
+              tapBoxId = null;                 // 꾹 누른 뒤에는 자세히 보기를 열지 않음
+              prepareGroupDrag(hitBoxId, planeY);
+              hasDraggedBeyondThreshold = false;
+              if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e) {} }
+              if (onBoxInteractionCallback) onBoxInteractionCallback(hitBoxId, { type: 'drag_ready' });
+            }, HOLD_MS);
           } else {
+            // 처음 누른 상자: 고르기만
             if (onBoxInteractionCallback) {
               onBoxInteractionCallback(hitBoxId, { type: 'normal_click' });
             }
-            tapBoxId = hitBoxId;   // 손을 떼면 '자세히 보기'를 열지 판단
-            prepareGroupDrag(hitBoxId, planeY);
+            selectOnlyPending = true;
+            controls.enabled = false;
           }
         }
         return;
@@ -1223,6 +1241,11 @@ window.Scene3DManager = (function () {
 
   // 드래그 시 수평(X, Z) 이동과 동시에 아래에 다른 수납함이 있으면 자동으로 위로 올라타도록(Auto-Stacking) 처리!
   function onPointerMove(event) {
+    // 꾹 누르기 전에 손가락이 움직이면 옮기기 취소 (화면 돌리기도 안 함)
+    if (holdPending && pointerDownScreenPos) {
+      const d0 = Math.hypot(event.clientX - pointerDownScreenPos.x, event.clientY - pointerDownScreenPos.y);
+      if (d0 > 8) { holdPending = false; clearTimeout(holdTimer); tapBoxId = null; if (controls) controls.enabled = true; }
+    }
     if (!isDragging || !dragAnchorBoxId || !currentSpaceConfig) return;
 
     const dist = Math.hypot(
@@ -1312,6 +1335,26 @@ window.Scene3DManager = (function () {
       (event.clientX || 0) - pointerDownScreenPos.x,
       (event.clientY || 0) - pointerDownScreenPos.y
     );
+
+    // 처음 고른 상자: 고르기만 하고 끝
+    if (selectOnlyPending) {
+      selectOnlyPending = false;
+      if (controls) controls.enabled = true;
+      return;
+    }
+
+    // 고른 상자를 다시 톡: 안 채우기(자세히 보기)
+    if (holdPending || (!isDragging && tapBoxId)) {
+      const wasTap = holdPending && dist < 8;
+      holdPending = false;
+      clearTimeout(holdTimer);
+      if (controls) controls.enabled = true;
+      if (wasTap && tapBoxId && onBoxInteractionCallback) {
+        onBoxInteractionCallback(tapBoxId, { type: 'open_detail' });
+      }
+      tapBoxId = null;
+      return;
+    }
 
     if (isDragging) {
       isDragging = false;
