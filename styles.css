@@ -4123,3 +4123,20 @@ body.ui-mode-mobile .sheet-action-btn { margin: 0 !important; }
 .mobile-shelf-sheet.has-grip::before,
 #modal-box-picker .modal-box.has-grip::before,
 .box-detail-sheet.has-grip::before { display: none !important; content: none !important; }
+
+
+/* 담기 바: 칸이 담기 버튼보다 위아래로 조금 더 크게 (버튼이 칸 밖으로 안 넘침) */
+#modal-box-picker .picker-cart-bar {
+  box-sizing: border-box;
+  align-items: center !important;
+  min-height: calc(34px + 12px + 10px + env(safe-area-inset-bottom)) !important;
+  padding-top: 12px !important;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+  overflow: visible;
+}
+#modal-box-picker .picker-cart-bar .btn {
+  margin: 0 !important;
+  align-self: center;
+  transform: none;
+}
+#modal-box-picker .picker-cart-bar .btn:active { transform: scale(0.98); }
