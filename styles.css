@@ -93,7 +93,7 @@ body {
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.15s;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, transform 0.15s, opacity 0.15s;
 }
 
 .plan-tab:hover {
@@ -261,7 +261,7 @@ body {
   border-radius: 8px;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
-  transition: all 0.15s;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, transform 0.15s, opacity 0.15s;
 }
 
 .btn-how-to-use:hover, .btn-how-to-use.active {
@@ -321,7 +321,7 @@ body {
   flex-direction: column;
   gap: 3px;
   box-shadow: var(--shadow-sm);
-  transition: all 0.15s ease;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, transform 0.15s, opacity 0.15s;
 }
 
 .shelf-callout-card:hover {
@@ -479,7 +479,7 @@ body {
   border-radius: 10px;
   padding: 10px;
   cursor: pointer;
-  transition: all 0.16s ease;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, transform 0.15s, opacity 0.15s;
   text-align: left;
 }
 
@@ -645,7 +645,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  transition: all 0.15s;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, transform 0.15s, opacity 0.15s;
   font-family: inherit;
 }
 
@@ -1045,7 +1045,7 @@ body {
   border-radius: 999px;
   cursor: pointer;
   color: var(--text-sub);
-  transition: all 0.16s ease;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, transform 0.15s, opacity 0.15s;
 }
 
 .mode-switch-btn.active {
@@ -1200,7 +1200,7 @@ body.ui-mode-mobile .mobile-nav-bar {
   cursor: pointer;
   color: var(--text-sub);
   font-family: inherit;
-  transition: all 0.15s;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, transform 0.15s, opacity 0.15s;
 }
 
 .mobile-nav-tab .m-nav-icon {
@@ -1996,10 +1996,12 @@ body.ui-mode-mobile.mobile-step-setup .wiz-top {
 
 .wiz-progress-fill {
   height: 100%;
-  width: 0;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: left center;
   background: var(--text-main);
   border-radius: 999px;
-  transition: width 0.25s ease;
+  transition: transform 0.25s ease;
 }
 
 .wiz-top-spacer { width: 44px; }
@@ -2619,7 +2621,7 @@ body.ui-mode-mobile .alert-ok    { background: #ecf3ee; color: #36684d; }
   --sp-6: 24px; --sp-8: 32px; --sp-12: 48px;
 
   --tap: 44px;
-  --focus-ring: 0 0 0 3px rgba(125, 98, 68, 0.28);
+  --focus-ring: 0 0 0 2px #fffdf9, 0 0 0 4px #7d6244;
 }
 
 body { line-height: 1.5; color: var(--text-body); }
@@ -2750,7 +2752,7 @@ body.ui-mode-mobile .brand-nav-arrow,
 body.ui-mode-mobile .pick-minus,
 body.ui-mode-mobile .pick-plus,
 body.ui-mode-mobile .mobile-nav-tab {
-  transition: background-color 0.15s, box-shadow 0.15s, opacity 0.15s, transform 0.1s;
+  transition: background-color 0.15s, opacity 0.15s, transform 0.1s;
 }
 
 @media (hover: hover) {
@@ -2867,7 +2869,7 @@ body.ui-mode-mobile.mobile-step-build.mobile-setup-open .mobile-edit-setup-btn {
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.15s, box-shadow 0.15s, transform 0.1s;
+  transition: background-color 0.15s, transform 0.1s;
 }
 .sp-chip.selected { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); color: var(--accent); font-weight: 700; }
 
@@ -2885,7 +2887,7 @@ body.ui-mode-mobile.mobile-step-build.mobile-setup-open .mobile-edit-setup-btn {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background-color 0.15s, box-shadow 0.15s, transform 0.1s;
+  transition: background-color 0.15s, transform 0.1s;
 }
 .sp-input {
   flex: 1;
@@ -3364,7 +3366,7 @@ body.ui-mode-mobile .mobile-setup-popup { box-shadow: var(--shadow-sm); -webkit-
    ===================================================================== */
 :root { --vh: 1vh; }
 @supports (height: 1dvh) { :root { --vh: 1dvh; } }
-html { height: 100%; overflow: hidden; }
+html { height: 100%; overflow: hidden; overflow: clip; }
 body { min-height: 0; }
 
 /* 보관함 자세히 보기: 물건 목록이 화면 절반을 넘지 않게 */
@@ -3922,10 +3924,10 @@ body.ui-mode-mobile .bottom-center-hud { overflow: visible !important; }
   height: 4px;
   border-radius: 2px;
   background: #d8cebf;
-  transition: background-color 0.15s, width 0.15s;
+  transition: background-color 0.15s, transform 0.15s;
 }
 .sheet-grip:hover span,
-.sheet-grip.dragging span { background: var(--accent); width: 52px; }
+.sheet-grip.dragging span { background: var(--accent); transform: scaleX(1.3); }
 .sheet-grip:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; border-radius: 8px; }
 /* 옛 장식 손잡이는 숨김 (진짜 손잡이로 바뀜) */
 body.ui-mode-mobile #modal-box-picker .modal-box.has-grip::before { display: none; }
@@ -4543,7 +4545,7 @@ body.ui-mode-mobile .ui-mode-switch .mode-switch-btn,
 .open-ctrl-pop {
   position: fixed;
   z-index: 61;
-  width: min(260px, calc(100vw - 16px));
+  width: min(260px, calc(100% - 16px));
   padding: 10px 14px 8px;
   border-radius: 12px;
   background: #fff;
@@ -5203,3 +5205,15 @@ body.ui-wide #modal-box-picker.modal-backdrop { background: transparent; }
 
 /* 상자 고르기 창이 열린 동안엔 칸 ＋버튼 숨김 (3D가 칸 쪽으로 다가가서 위 버튼과 겹치지 않게) */
 body.picker-open #mobile-shelf-buttons { visibility: hidden; }
+
+/* 1105d · Hallmark 점검: 대비 · 작은 글자 · 화면 밖 처리 */
+html, body { overflow-x: hidden; overflow-x: clip; }
+.emp-unit { color: #6f665c; }                       /* 남는 공간 (cm): 3.9 → 5.6:1 */
+.sheet-menu-btn:not(.primary) .smb-sub { opacity: 1; color: #6b6156; } /* 칸 메뉴 설명글: 4.2 → 5.8:1 */
+body.ui-mode-mobile .btn-danger { color: #a8352e; }  /* 치우기: 4.3 → 5.9:1 */
+.header-maker { font-size: 0.72rem !important; }     /* 10.9px → 11.5px */
+.emp-cell span { font-size: 0.72rem; }               /* 위·앞·뒤 칩 10.9px → 11.5px */
+@media (prefers-reduced-motion: reduce) {
+  .wiz-progress-fill, .sheet-grip span { transition: none; }
+}
+.sheet-menu-btn.primary .smb-sub { opacity: 0.94; }    /* 진한 버튼 속 설명글: 4.2 → 5.4:1 */

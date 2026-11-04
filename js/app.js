@@ -4082,10 +4082,10 @@
       title: '어떤 가구를<br>정리할까요?',
       hint: () => '나중에 언제든 바꿀 수 있어요.',
       options: [
-        { value: 'cabinet', label: '문 달린 장', sub: '옷장 · 벽장 · 주방장' },
+        { value: 'cabinet', label: '문 달린 장', sub: '옷장, 벽장, 주방장' },
         { value: 'drawer', label: '빼는 서랍', sub: '앞으로 당겨 여는 서랍장' },
         { value: 'pantry', label: '팬트리', sub: 'ㄱ자로 걸어 들어가는 방' },
-        { value: 'fridge', label: '냉장고', sub: '양문형 · 4도어 · 2도어' }
+        { value: 'fridge', label: '냉장고', sub: '양문형, 4도어, 2도어' }
       ],
       get: () => state.spaceConfig.type,
       set: (v) => {
@@ -4392,8 +4392,8 @@
       : ['가구 종류', '가로', '깊이', '보이는 깊이', '넣을 수 있는 높이', '서랍 칸 수'];
 
     body.innerHTML = '';
-    const minusSvg = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg>';
-    const plusSvg = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+    const minusSvg = '<svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg>';
+    const plusSvg = '<svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
 
     steps.forEach((step, i) => {
       const row = document.createElement('div');
@@ -4470,8 +4470,8 @@
     const step = steps[state.wizStep];
     const isLast = state.wizStep === steps.length - 1;
 
-    document.getElementById('wiz-progress-fill').style.width =
-      `${((state.wizStep + 1) / steps.length) * 100}%`;
+    document.getElementById('wiz-progress-fill').style.transform =
+      `scaleX(${(state.wizStep + 1) / steps.length})`;
 
     const backBtn = document.getElementById('wiz-back');
     backBtn.style.visibility = (state.wizStep > 0 || state.wizFromBuild) ? 'visible' : 'hidden';
@@ -4523,8 +4523,8 @@
       });
       ctrl.appendChild(list);
     } else {
-      const minusSvg = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg>';
-      const plusSvg = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+      const minusSvg = '<svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg>';
+      const plusSvg = '<svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
       ctrl.innerHTML = `
         <div class="wiz-stepper">
           <button type="button" class="wiz-step-btn" data-d="-1" aria-label="줄이기">${minusSvg}</button>
@@ -4921,8 +4921,8 @@
       } else {
         has = !!window.PackerEngine.getPantryCorner(sc);
       }
-      if (!state.showDeadzones) showToast('빨간 표시를 숨겼어요');
-      else showToast(has ? '꺼내기 힘든 곳을 빨간색으로 보여줘요' : '이 가구에는 꺼내기 힘든 곳이 없어요');
+      // 화면에 바로 보이는 변화는 알림 없이, 아무 표시도 안 생길 때만 알려 줌
+      if (state.showDeadzones && !has) showToast('이 가구에는 꺼내기 힘든 곳이 없어요');
     });
 
     // 5. 시안(Plan) 추가 / 비우기 / 비교표 모달

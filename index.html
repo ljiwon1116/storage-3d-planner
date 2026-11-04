@@ -5,8 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>수납 공간 꾸미기 - 옷장·서랍 3D로 짜보기</title>
   <meta name="theme-color" content="#f7f3ec" />
+  <meta name="description" content="옷장, 서랍, 팬트리, 냉장고 크기를 넣으면 3D로 수납함을 미리 놓아 보고, 필요한 상자와 가격을 한눈에 볼 수 있어요." />
+  <meta property="og:title" content="수납 공간 꾸미기" />
+  <meta property="og:description" content="우리 집 수납 공간에 맞는 정리함을 3D로 미리 놓아 보세요." />
+  <meta property="og:type" content="website" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <link rel="stylesheet" href="styles.css?v=1105c" />
+  <link rel="stylesheet" href="styles.css?v=1105d" />
   <script>
     // 실제로 보이는 화면 높이를 --vh 로 넣어요 (주소창·툴바가 생기고 없어질 때마다).
     // 브라우저마다 100vh 가 툴바를 포함해서 위아래가 잘리는 문제를 막아요.
@@ -122,7 +126,7 @@
     </div>
 
     <!-- 3D 가구 선반과 우측 선반 공간 카드를 연결하는 리더라인 SVG -->
-    <svg id="shelf-leader-svg"></svg>
+    <svg id="shelf-leader-svg" aria-hidden="true"></svg>
 
     <!-- [모바일 전용] 각 선반 옆 ＋버튼 레이어 -->
     <div id="mobile-shelf-buttons"></div>
@@ -424,7 +428,7 @@
     <!-- [모바일 첫 설정] 한 화면에 질문 하나 (위: 진행바, 가운데: 3D 미리보기, 아래: 질문) -->
     <div id="wiz-top" class="wiz-top">
       <button id="wiz-back" class="wiz-back" type="button" aria-label="뒤로">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
       </button>
       <div class="wiz-progress"><div id="wiz-progress-fill" class="wiz-progress-fill"></div></div>
       <span class="wiz-top-spacer"></span>
@@ -452,11 +456,11 @@
     <!-- [모바일 모드 전용 하단 탭 네비게이션 바] -->
     <nav id="mobile-nav-bar" class="mobile-nav-bar">
       <button class="mobile-nav-tab active" data-mtab="none">
-        <svg class="m-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg>
+        <svg class="m-nav-svg" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg>
         <span class="m-nav-label">3D 화면</span>
       </button>
       <button class="mobile-nav-tab" data-mtab="errors">
-        <svg class="m-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l9 16H3l9-16z"/><path d="M12 10v4M12 17.2v.1"/></svg>
+        <svg class="m-nav-svg" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l9 16H3l9-16z"/><path d="M12 10v4M12 17.2v.1"/></svg>
         <span class="m-nav-label" id="mobile-nav-err-label">문제(0)</span>
       </button>
     </nav>
@@ -776,12 +780,12 @@
   </div>
 
   <!-- 애플리케이션 스크립트 로드 -->
-  <script src="js/units.js?v=1105c"></script>
-  <script src="js/presets.js?v=1105c"></script>
-  <script src="js/items.js?v=1105c"></script>
-  <script src="js/packer.js?v=1105c"></script>
-  <script src="js/scene3d.js?v=1105c"></script>
-  <script src="js/app.js?v=1105c"></script>
+  <script src="js/units.js?v=1105d"></script>
+  <script src="js/presets.js?v=1105d"></script>
+  <script src="js/items.js?v=1105d"></script>
+  <script src="js/packer.js?v=1105d"></script>
+  <script src="js/scene3d.js?v=1105d"></script>
+  <script src="js/app.js?v=1105d"></script>
 
   <!-- 보관함 자세히 보기: 뒤는 흐리게, 고른 보관함만 크게 + 물건 넣기 -->
   <div id="box-detail" class="box-detail" aria-hidden="true">
@@ -807,6 +811,6 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="js/boxdetail.js?v=1105c"></script>
+  <script src="js/boxdetail.js?v=1105d"></script>
 </body>
 </html>

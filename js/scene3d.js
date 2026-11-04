@@ -234,6 +234,8 @@ window.Scene3DManager = (function () {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     // 스마트폰 터치 드래그 시 브라우저 스크롤 방지
     renderer.domElement.style.touchAction = 'none';
+    renderer.domElement.setAttribute('role', 'img');
+    renderer.domElement.setAttribute('aria-label', '수납 공간 3D 화면. 칸 옆 더하기 버튼으로 상자를 넣어요');
     containerEl.innerHTML = '';
     containerEl.appendChild(renderer.domElement);
 
