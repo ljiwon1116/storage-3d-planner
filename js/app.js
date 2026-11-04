@@ -139,6 +139,12 @@
     ]);
     state.modelsMap = {};
     state.catalogModels.forEach((m) => {
+      // 사다리꼴 모델(내 상자·클라우드 포함): 하단 치수가 없거나 상단과 같으면 사방 5mm 작게 보정
+      if (m.shapeType === 'tapered' && typeof window.resolveBottomDims === 'function') {
+        const bot = window.resolveBottomDims(m);
+        m.wBot = bot.wBot;
+        m.dBot = bot.dBot;
+      }
       state.modelsMap[m.id] = m;
     });
 
@@ -2321,6 +2327,7 @@
       filterBtn.addEventListener('click', () => {
         state.pickerFilterOpen = !state.pickerFilterOpen;
         renderPickerModalContent();
+        if (state.pickerFilterOpen) maybeShowFilterGuide(); // 처음 필터를 열면 사용법 안내
       });
       chips.appendChild(filterBtn);
 
@@ -2345,7 +2352,9 @@
         panel.className = 'picker-filter-panel';
         panel.innerHTML = `
           <div class="pfp-top-actions">
-            <span class="pfp-top-title">상세 조건 필터 (중복 체크 가능)</span>
+            <span class="pfp-top-title">상세 조건 필터 (중복 체크 가능)
+              <button type="button" class="pfp-help-btn" data-act="help" aria-label="필터 사용법 보기">사용법</button>
+            </span>
             <div class="pfp-top-btns">
               <button type="button" class="pfp-action-btn" data-act="check-all">모두 체크</button>
               <button type="button" class="pfp-action-btn" data-act="uncheck-all">모두 해제</button>
@@ -2455,6 +2464,7 @@
           updateFilterBtnLabel();
           renderCardsOnly();
         });
+        panel.querySelector('[data-act="help"]').addEventListener('click', () => showFilterGuide());
         panel.querySelector('[data-act="fit-comp"]').addEventListener('click', () => {
           state.pickerFilters.wMax = String(Math.round(activeComp.w));
           state.pickerFilters.dMax = String(Math.round(activeComp.d));
@@ -3286,6 +3296,25 @@
     try { localStorage.setItem(STORAGE_KEY_BOX_GUIDE_SEEN, '1'); } catch (e) {}
   }
 
+  // 상자 고르기 창 '필터' 사용법: 처음 필터를 열 때 한 번 + 필터 창의 '사용법' 버튼으로 언제든
+  const STORAGE_KEY_FILTER_GUIDE_SEEN = 'storagefit_filter_guide_seen_v1';
+  function showFilterGuide() {
+    const el = document.getElementById('filter-guide');
+    if (!el) return;
+    el.hidden = false;
+    document.getElementById('filter-guide-ok')?.focus();
+  }
+  function maybeShowFilterGuide() {
+    let seen = false;
+    try { seen = localStorage.getItem(STORAGE_KEY_FILTER_GUIDE_SEEN) === '1'; } catch (e) {}
+    if (!seen) showFilterGuide();
+  }
+  function closeFilterGuide() {
+    const el = document.getElementById('filter-guide');
+    if (el) el.hidden = true;
+    try { localStorage.setItem(STORAGE_KEY_FILTER_GUIDE_SEEN, '1'); } catch (e) {}
+  }
+
   // ---------- 내 설정 저장 (다음에 링크를 다시 열어도 그대로) ----------
   const STORAGE_KEY_STATE = 'storagefit_state_v1';
   let saveTimer = null;
@@ -4018,12 +4047,39 @@
 
     // 선반 높이 팝업 열기/닫기
     document.getElementById('btn-mobile-shelf-height')?.addEventListener('click', () => {
+      // 이미 열려 있으면 한 번 더 눌러 닫기 ('장 설정' 버튼과 같은 동작)
+      if (document.body.classList.contains('mobile-shelfh-open')) {
+        document.body.classList.remove('mobile-shelfh-open');
+        return;
+      }
       document.body.classList.remove('mobile-setup-open');
       renderShelfHeightPopup();
       document.body.classList.add('mobile-shelfh-open');
     });
     document.getElementById('btn-mobile-shelfh-close')?.addEventListener('click', () => {
       document.body.classList.remove('mobile-shelfh-open');
+    });
+
+    // '장 설정'·'선반 높이' 작은 창: 창 바깥(투명 배경)을 누르거나 Esc를 누르면 닫기
+    const closeMobilePopups = () => {
+      const active = document.activeElement;
+      if (active && active.closest && active.closest('#mobile-setup-popup, #mobile-shelfh-popup')) {
+        active.blur(); // 입력 중이던 값이 change 이벤트로 먼저 반영되도록
+      }
+      document.body.classList.remove('mobile-setup-open', 'mobile-shelfh-open');
+    };
+    const mobilePopupBackdrop = document.getElementById('mobile-popup-backdrop');
+    mobilePopupBackdrop?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();   // 뒤의 3D 화면에 터치가 넘어가 상자가 골라지지 않도록
+      e.stopPropagation();
+      closeMobilePopups();
+    });
+    mobilePopupBackdrop?.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); });
+    window.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (document.body.classList.contains('mobile-setup-open') || document.body.classList.contains('mobile-shelfh-open')) {
+        closeMobilePopups();
+      }
     });
 
     // 선반 바텀시트 닫기
@@ -4430,10 +4486,10 @@
       const h = Math.max(20, Number(document.getElementById('new-box-h').value) || 120);
       const shapeType = document.getElementById('new-box-shape').value;
       const wBot = shapeType === 'tapered'
-        ? Math.max(10, Number(document.getElementById('new-box-wbot').value) || wTop - 20)
+        ? Math.max(10, Number(document.getElementById('new-box-wbot').value) || wTop - 10)
         : wTop;
       const dBot = shapeType === 'tapered'
-        ? Math.max(10, Number(document.getElementById('new-box-dbot').value) || dTop - 20)
+        ? Math.max(10, Number(document.getElementById('new-box-dbot').value) || dTop - 10)
         : dTop;
       const accessType = document.getElementById('new-box-access').value;
       const stackable = document.getElementById('new-box-stackable').checked;
@@ -4544,6 +4600,14 @@
     document.addEventListener('visibilitychange', () => { if (document.hidden) saveLocalNow(); });
     document.getElementById('drag-guide-ok')?.addEventListener('click', closeDragGuide);
     document.getElementById('box-guide-ok')?.addEventListener('click', closeBoxGuide);
+    document.getElementById('filter-guide-ok')?.addEventListener('click', closeFilterGuide);
+    document.getElementById('filter-guide')?.addEventListener('click', (e) => {
+      if (e.target.id === 'filter-guide') closeFilterGuide(); // 바깥을 눌러도 닫힘
+    });
+    window.addEventListener('keydown', (e) => {
+      const fg = document.getElementById('filter-guide');
+      if (e.key === 'Escape' && fg && !fg.hidden) { e.stopPropagation(); closeFilterGuide(); }
+    }, true);
     setupResizableSheets();
     bindAddBoxModal();
     bindOpenCtrl();

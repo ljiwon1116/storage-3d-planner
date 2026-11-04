@@ -4956,3 +4956,48 @@ body.ui-mode-mobile .ui-mode-switch .mode-switch-btn,
   font-size: 0.74rem;
   color: #8a7f72;
 }
+
+/* ---------- '장 설정'·'선반 높이' 작은 창: 바깥을 누르면 닫히는 투명 배경 ---------- */
+.mobile-popup-backdrop {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 41;              /* 3D 화면·버튼(26) 위, 작은 창(42·43) 아래 */
+  background: transparent;  /* 선반 높이를 바꾸는 동안 3D가 그대로 보이도록 */
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+body.mobile-shelfh-open .mobile-popup-backdrop,
+body.ui-mode-mobile.mobile-step-build.mobile-setup-open .mobile-popup-backdrop { display: block; }
+/* 창이 열려 있어도 '장 설정'·'선반 높이' 버튼은 바로 누를 수 있게 배경 위로 */
+body.ui-mode-mobile.mobile-step-build.mobile-shelfh-open .mobile-edit-setup-btn,
+body.ui-mode-mobile.mobile-step-build.mobile-shelfh-open .mobile-shelfh-btn,
+body.ui-mode-mobile.mobile-step-build.mobile-setup-open .mobile-edit-setup-btn,
+body.ui-mode-mobile.mobile-step-build.mobile-setup-open .mobile-shelfh-btn { z-index: 44; }
+
+/* ---------- 상자 고르기 창 '필터' 사용법 ---------- */
+.filter-guide { position: fixed; z-index: 280; }           /* 상자 고르기 창(100)·직접 추가 창(260) 위 */
+.filter-guide .drag-guide-card {
+  max-height: calc(calc(var(--vh, 1vh) * 100) - 48px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.filter-guide .drag-guide-title { margin-top: 0; }
+.pfp-help-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  margin-left: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-meta);
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  vertical-align: middle;
+  cursor: pointer;
+}
+.pfp-help-btn:hover { color: var(--accent); border-color: var(--accent); }
+.pfp-help-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

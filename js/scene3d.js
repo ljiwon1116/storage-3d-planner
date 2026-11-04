@@ -35,6 +35,17 @@ window.Scene3DManager = (function () {
   let onBundleScreenPosCallback = null;
   let onShelfAnchorsCallback = null;
 
+  // 사다리꼴 수납함 하단 치수: 등록값이 상단보다 작으면 그대로, 없거나 같으면 사방 5mm씩 작게 (presets.js 공용 규칙)
+  function resolveBottomDims(model) {
+    if (typeof window.resolveBottomDims === 'function') return window.resolveBottomDims(model);
+    const wT = model.wTop, dT = model.dTop;
+    if (model.shapeType !== 'tapered') return { wBot: wT, dBot: dT };
+    return {
+      wBot: (model.wBot > 0 && model.wBot < wT) ? model.wBot : Math.max(10, wT - 10),
+      dBot: (model.dBot > 0 && model.dBot < dT) ? model.dBot : Math.max(10, dT - 10)
+    };
+  }
+
   function createFrustumGeometry(wTop, dTop, wBot, dBot, h) {
     const hwT = wTop / 2, hdT = dTop / 2;
     const hwB = wBot / 2, hdB = dBot / 2;
@@ -88,8 +99,8 @@ window.Scene3DManager = (function () {
     const group = new THREE.Group();
 
     const wT = model.wTop, dT = model.dTop;
-    const wB = model.shapeType === 'tapered' ? (model.wBot || wT) : wT;
-    const dB = model.shapeType === 'tapered' ? (model.dBot || dT) : dT;
+    const bot = resolveBottomDims(model);
+    const wB = bot.wBot, dB = bot.dBot;
     const h = model.h;
 
     const geom = createFrustumGeometry(wT, dT, wB, dB, h);
@@ -335,10 +346,11 @@ window.Scene3DManager = (function () {
     const anchors = compartments.map((comp) => {
       if (isDrawer) {
         const t = comp.tierIndex || comp.index || 0;
-        const isTop = t === 0;
+        const isTop = t === getOpenDrawerTier(currentSpaceConfig); // 열린 단
+        const baseY = drawerTierBaseY(currentSpaceConfig, t);
         const tierCenterY = isTop
-          ? Math.min(45, comp.clearH * 0.25)
-          : -14 - 8 - (t - 1) * (comp.clearH + 8) - (comp.clearH - 2) * 0.5;
+          ? baseY + Math.min(45, comp.clearH * 0.25)
+          : baseY + Math.max(40, comp.clearH - 2) * 0.5;
         const edgeX = comp.ox + comp.w + (isTop ? 18 : 26);
         const edgeZ = isTop
           ? comp.oz + comp.d + drawerOpenRatio * exposedD * 0.45
@@ -348,7 +360,7 @@ window.Scene3DManager = (function () {
 
         const cv = new THREE.Vector3(
           0,
-          isTop ? comp.clearH * 0.35 : tierCenterY,
+          isTop ? baseY + comp.clearH * 0.35 : tierCenterY,
           isTop ? drawerOpenRatio * exposedD * 0.45 : -8 + (comp.d + 30) / 2 + 20
         );
         cv.project(camera);
@@ -421,7 +433,8 @@ window.Scene3DManager = (function () {
 
     const bpos = window.PackerEngine.localToWorld(comp, (minX + maxX) / 2, (minZ + maxZ) / 2);
     const worldX = bpos.x;
-    const worldY = comp.yStart + maxTopY + 30;
+    const drawerBaseY = currentSpaceConfig.type === 'drawer' ? drawerTierBaseY(currentSpaceConfig, getOpenDrawerTier(currentSpaceConfig)) : 0;
+    const worldY = comp.yStart + drawerBaseY + maxTopY + 30;
     const worldZ = bpos.z + slideZ;
 
     const pos3D = new THREE.Vector3(worldX, worldY, worldZ);
@@ -449,6 +462,21 @@ window.Scene3DManager = (function () {
 
   // 첨부 샘플 이미지와 같은 깔끔한 웜톤 가정집 실내 배경 (벽면 + 따뜻한 마루 바닥)
   // 1~6단 서랍장: 아래 닫힌 서랍 칸들(tiers - 1개) + 받침 높이
+  // 서랍장: 지금 열려 있는 단 (＋버튼으로 고른 단만 열리고 나머지는 닫힘)
+  function getOpenDrawerTier(spaceConfig) {
+    const d = (spaceConfig && spaceConfig.drawer) || {};
+    const tiers = Math.min(6, Math.max(1, Math.round(Number(d.tiers) || 2)));
+    return Math.min(tiers - 1, Math.max(0, Math.round(Number(activeCompartmentIdx) || 0)));
+  }
+
+  // 서랍장: t단 서랍 바닥의 높이 (1단 = 0, 아래 단일수록 낮아짐)
+  function drawerTierBaseY(spaceConfig, t) {
+    if (!t) return 0;
+    const clearH = window.PackerEngine.getDrawerConstraints(spaceConfig).clearanceH;
+    const lowFrontH = Math.max(40, clearH - 2);
+    return -14 - 8 - (t - 1) * (clearH + 8) - lowFrontH;
+  }
+
   function drawerLowerBodyH(spaceConfig) {
     const d = (spaceConfig && spaceConfig.drawer) || {};
     const tiers = Math.min(6, Math.max(1, Math.round(Number(d.tiers) || 2)));
@@ -989,9 +1017,16 @@ window.Scene3DManager = (function () {
     });
     const chestEdgeMat = new THREE.LineBasicMaterial({ color: 0x8c6d4e });
 
+    const openTier = getOpenDrawerTier(spaceConfig);
+    const openBaseY = drawerTierBaseY(spaceConfig, openTier);
+
     const lowerBodyH = drawerLowerBodyH(spaceConfig);
     const lowerGeom = new THREE.BoxGeometry(W + 52, lowerBodyH, D + 30);
-    const lowerMesh = new THREE.Mesh(lowerGeom, chestWoodMat);
+    // 아래 단 서랍이 열려 있으면 몸통을 반투명하게 해서 서랍 안쪽(빼지 않은 부분)도 보이게
+    const lowerBodyMat = openTier > 0
+      ? new THREE.MeshStandardMaterial({ color: 0xc8a47e, roughness: 0.65, transparent: true, opacity: xrayMode ? 0.15 : 0.3, depthWrite: false })
+      : chestWoodMat;
+    const lowerMesh = new THREE.Mesh(lowerGeom, lowerBodyMat);
     lowerMesh.position.set(0, -14 - lowerBodyH / 2, -8);
     lowerMesh.castShadow = true;
     lowerMesh.receiveShadow = true;
@@ -1000,15 +1035,15 @@ window.Scene3DManager = (function () {
     lowerLine.position.copy(lowerMesh.position);
     drawerStaticGroup.add(lowerLine);
 
-    // 아래 단들: 닫혀 있는 서랍 칸 (tiers - 1개, 앞판 + 손잡이). 맨 위 칸(1단)만 열려요
-    const closedTiers = Math.max(0, tiers - 1);
+    // 닫혀 있는 서랍 칸 (앞판 + 손잡이). ＋버튼으로 고른 단(openTier)만 열려요
     const lowFrontH = Math.max(40, clearH - 2);
     const lowFrontZ = -8 + (D + 30) / 2 + 9;
     const lowFrontMat = new THREE.MeshStandardMaterial({ color: 0xd2b08c, roughness: 0.5 });
     const lowHandleMat = new THREE.MeshStandardMaterial({ color: 0x6e5034, metalness: 0.2, roughness: 0.4 });
     const lowHandleGeom = new THREE.BoxGeometry(Math.min(140, W * 0.32), 14, 22);
-    for (let i = 0; i < closedTiers; i++) {
-      const lowFrontY = -14 - 8 - i * (clearH + 8) - lowFrontH / 2;
+    for (let t = 0; t < tiers; t++) {
+      if (t === openTier) continue;
+      const lowFrontY = drawerTierBaseY(spaceConfig, t) + lowFrontH / 2;
       const lowFrontGeom = new THREE.BoxGeometry(W + 44, lowFrontH, 18);
       const lowFront = new THREE.Mesh(lowFrontGeom, lowFrontMat);
       lowFront.position.set(0, lowFrontY, lowFrontZ);
@@ -1034,7 +1069,7 @@ window.Scene3DManager = (function () {
     const lintelGeom = new THREE.BoxGeometry(W + 52, 8, 8);
     const lintelMat = new THREE.MeshBasicMaterial({ color: 0xd97706 });
     const lintelMesh = new THREE.Mesh(lintelGeom, lintelMat);
-    lintelMesh.position.set(0, clearH, D / 2);
+    lintelMesh.position.set(0, openBaseY + clearH, D / 2);
     drawerStaticGroup.add(lintelMesh);
 
     // 서랍장 몸통의 옆판·뒤판 (반투명): 서랍 칸이 옆으로 뚫려 보이지 않게
@@ -1063,7 +1098,7 @@ window.Scene3DManager = (function () {
     addChestPart(W + 52, clearH + 14, sideT, 0, (clearH - 14) / 2, -8 - (D + 30) / 2 + sideT / 2);
 
     const slideOffsetZ = drawerOpenRatio * exposedD;
-    drawerSlidingGroup.position.set(0, 0, slideOffsetZ);
+    drawerSlidingGroup.position.set(0, openBaseY, slideOffsetZ);
 
     const drawerWallMat = new THREE.MeshStandardMaterial({
       color: 0xe6d7c3,
@@ -1161,7 +1196,7 @@ window.Scene3DManager = (function () {
   function buildPlacedBoxes(spaceConfig, placedBoxes, modelsMap) {
     const compartments = window.PackerEngine.getCompartments(spaceConfig);
     const isMultiBundle = selectedBoxIds.length >= 2;
-    const activeDrawerTier = Math.min(compartments.length - 1, Math.max(0, activeCompartmentIdx || 0));
+    const activeDrawerTier = spaceConfig.type === 'drawer' ? getOpenDrawerTier(spaceConfig) : 0;
     const visibleBoxes = spaceConfig.type === 'drawer'
       ? placedBoxes.filter((b) => (b.compartmentIndex || 0) === activeDrawerTier)
       : placedBoxes;
@@ -1241,6 +1276,31 @@ window.Scene3DManager = (function () {
     mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   }
 
+  // 상자 b 위에 물리적으로 얹혀 있는 상자들(바로 윗단)을 찾음
+  const STACK_TOUCH_TOL = 6;   // 윗면과 바닥면 높이 차이 허용치(mm)
+  const STACK_EDGE_MARGIN = 4; // computeStackingY와 같은 가장자리 여유(mm)
+  function findBoxesRestingOn(b) {
+    const m = currentModelsMap[b.modelId];
+    if (!m) return [];
+    const dims = window.PackerEngine.getOrientedDims(m, b.rot || 0);
+    const result = [];
+    currentBoxes.forEach((o) => {
+      if (o.id === b.id || o.compartmentIndex !== b.compartmentIndex) return;
+      const om = currentModelsMap[o.modelId];
+      if (!om) return;
+      const od = window.PackerEngine.getOrientedDims(om, o.rot || 0);
+      const overlapX = o.x < b.x + dims.w - STACK_EDGE_MARGIN && o.x + od.w > b.x + STACK_EDGE_MARGIN;
+      const overlapZ = o.z < b.z + dims.d - STACK_EDGE_MARGIN && o.z + od.d > b.z + STACK_EDGE_MARGIN;
+      if (!overlapX || !overlapZ) return;
+      // 같은 적층형 모델이면 홈(stackingOffset)만큼 맞물려 낮게 얹힘
+      const offset = (om.id === m.id && m.stackable) ? (m.stackingOffset || 0) : 0;
+      const topY = (b.y || 0) + dims.h;
+      const oy = o.y || 0;
+      if (oy >= topY - offset - STACK_TOUCH_TOL && oy <= topY + STACK_TOUCH_TOL) result.push(o);
+    });
+    return result;
+  }
+
   function prepareGroupDrag(hitBoxId, planeY) {
     dragPlane.set(new THREE.Vector3(0, 1, 0), -planeY);
     const intersectPoint = new THREE.Vector3();
@@ -1250,34 +1310,63 @@ window.Scene3DManager = (function () {
     dragStartWorldPoint.copy(intersectPoint);
     dragInitialPositions = {};
 
-    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, minBaseY = Infinity;
-    const activeIds = selectedBoxIds.includes(hitBoxId) ? selectedBoxIds : [hitBoxId];
+    const baseIds = selectedBoxIds.includes(hitBoxId) ? selectedBoxIds.slice() : [hitBoxId];
 
-    activeIds.forEach((id) => {
+    // 1) 끄는 상자들 위에 얹힌 상자를 재귀적으로 모두 찾아 함께 옮김 (스택 트리)
+    const activeSet = new Set(baseIds.filter((id) => currentBoxes.some((b) => b.id === id)));
+    const parentsOf = {}; // id -> 이 상자를 받치고 있는(같이 움직이는) 상자 id 목록
+    const queue = Array.from(activeSet);
+    while (queue.length) {
+      const id = queue.shift();
       const b = currentBoxes.find((item) => item.id === id);
-      if (!b) return;
-      if ((b.y || 0) < minBaseY) minBaseY = b.y || 0;
-    });
-    if (!isFinite(minBaseY)) minBaseY = 0;
+      if (!b) continue;
+      findBoxesRestingOn(b).forEach((o) => {
+        (parentsOf[o.id] = parentsOf[o.id] || []).push(id);
+        if (!activeSet.has(o.id)) {
+          activeSet.add(o.id);
+          queue.push(o.id);
+        }
+      });
+    }
+    const activeIds = Array.from(activeSet);
 
+    // 2) 같이 움직이는 상자 위에 얹힌 것은 '윗단', 아닌 것은 '기준(바닥) 상자'
+    //    윗단은 자기를 받치는 기준 상자들(rootIds)을 따라 상대 위치(relX, relY, relZ) 그대로 이동
+    const rootsCache = {};
+    const findRoots = (id, seen) => {
+      if (rootsCache[id]) return rootsCache[id];
+      const parents = (parentsOf[id] || []).filter((pid) => !seen.has(pid));
+      if (!parents.length) return (rootsCache[id] = [id]);
+      seen.add(id);
+      const roots = new Set();
+      parents.forEach((pid) => findRoots(pid, seen).forEach((r) => roots.add(r)));
+      seen.delete(id);
+      return (rootsCache[id] = Array.from(roots));
+    };
+
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
     activeIds.forEach((id) => {
       const b = currentBoxes.find((item) => item.id === id);
       if (!b) return;
       const m = currentModelsMap[b.modelId];
       if (!m) return;
       const dims = window.PackerEngine.getOrientedDims(m, b.rot || 0);
+      const isStacked = !!(parentsOf[id] && parentsOf[id].length);
       dragInitialPositions[id] = {
         x: b.x,
+        y: b.y || 0,
         z: b.z,
-        relY: Math.max(0, (b.y || 0) - minBaseY),
         w: dims.w,
-        d: dims.d
+        d: dims.d,
+        isRoot: !isStacked,
+        rootIds: isStacked ? findRoots(id, new Set()) : [id]
       };
       if (b.x < minX) minX = b.x;
       if (b.x + dims.w > maxX) maxX = b.x + dims.w;
       if (b.z < minZ) minZ = b.z;
       if (b.z + dims.d > maxZ) maxZ = b.z + dims.d;
     });
+    if (!activeIds.length || !isFinite(minX)) return;
 
     dragBundleBounds = { minX, maxX, minZ, maxZ };
     isDragging = true;
@@ -1361,7 +1450,8 @@ window.Scene3DManager = (function () {
 
         const compartments = window.PackerEngine.getCompartments(currentSpaceConfig);
         const comp = compartments[targetBox.compartmentIndex] || compartments[0];
-        const planeY = comp.yStart;
+        const planeY = comp.yStart + (currentSpaceConfig.type === 'drawer'
+          ? drawerTierBaseY(currentSpaceConfig, getOpenDrawerTier(currentSpaceConfig)) : 0);
 
         const isMultiTrigger = event.shiftKey || touchMultiSelectMode;
 
@@ -1480,27 +1570,39 @@ window.Scene3DManager = (function () {
         }
       });
 
-      // 2) 아래에 다른(드래그 중이 아닌) 수납함이 있으면 자동으로 위로 올라타는 Y 높이 계산!
-      let maxSupportY = 0;
+      // 2) 기준(바닥) 상자만 지지 높이(Y)를 다시 계산 — 같이 움직이는 스택 상자는 받침에서 제외
+      //    (자기 스택 위로 올라타며 Y가 계속 치솟는 문제 방지)
+      const newRootY = {};
       movingIds.forEach((id) => {
+        const initPos = dragInitialPositions[id];
+        if (!initPos || !initPos.isRoot) return;
         const b = currentBoxes.find((item) => item.id === id);
         if (!b) return;
-        const supportY = window.PackerEngine.computeStackingY(
+        newRootY[id] = window.PackerEngine.computeStackingY(
           currentSpaceConfig,
           currentBoxes,
           b,
           currentModelsMap,
           movingIds
         );
-        if (supportY > maxSupportY) maxSupportY = supportY;
       });
 
+      // 3) 기준 상자는 새 지지 높이로, 윗단 상자는 드래그 시작 때의 상대 높이를 그대로 유지
       movingIds.forEach((id) => {
         const b = currentBoxes.find((item) => item.id === id);
         const initPos = dragInitialPositions[id];
-        if (b && initPos) {
-          b.y = Math.round(maxSupportY + (initPos.relY || 0));
+        if (!b || !initPos) return;
+        if (initPos.isRoot) {
+          b.y = Math.round(newRootY[id] || 0);
+          return;
         }
+        let liftY = -Infinity;
+        (initPos.rootIds || []).forEach((rid) => {
+          const r = dragInitialPositions[rid];
+          if (r && newRootY[rid] !== undefined) liftY = Math.max(liftY, newRootY[rid] - r.y);
+        });
+        if (!isFinite(liftY)) liftY = 0;
+        b.y = Math.max(0, Math.round(initPos.y + liftY));
       });
 
       if (onBoxesMovedCallback) onBoxesMovedCallback();
@@ -1650,8 +1752,8 @@ window.Scene3DManager = (function () {
     const buildOverlayMesh = (model, hexColor, wireColor, opacity) => {
       if (!model) return null;
       const wT = model.wTop, dT = model.dTop;
-      const wB = model.shapeType === 'tapered' ? (model.wBot || wT) : wT;
-      const dB = model.shapeType === 'tapered' ? (model.dBot || dT) : dT;
+      const bot = resolveBottomDims(model);
+      const wB = bot.wBot, dB = bot.dBot;
       const geom = createFrustumGeometry(wT, dT, wB, dB, model.h);
 
       const g = new THREE.Group();

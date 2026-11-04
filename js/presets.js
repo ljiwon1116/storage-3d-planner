@@ -702,6 +702,31 @@ window.DEFAULT_STORAGE_MODELS = [
   }))
 ];
 
+// 사다리꼴(바구니 모양) 수납함의 하단 치수 계산
+// - 하단 치수가 상단보다 작게 등록돼 있으면 그대로 사용
+// - 없거나 상단과 같으면(또는 더 크면) 전·후·좌·우 5mm씩, 즉 가로·세로 각 10mm 작게 자동 보정
+window.TAPERED_DEFAULT_INSET = 5;
+window.resolveBottomDims = function (model) {
+  const wTop = Number(model && model.wTop) || 0;
+  const dTop = Number(model && model.dTop) || 0;
+  if (!model || model.shapeType !== 'tapered') return { wBot: wTop, dBot: dTop };
+  const inset = window.TAPERED_DEFAULT_INSET * 2;
+  const wB = Number(model.wBot);
+  const dB = Number(model.dBot);
+  return {
+    wBot: (wB > 0 && wB < wTop) ? wB : Math.max(10, wTop - inset),
+    dBot: (dB > 0 && dB < dTop) ? dB : Math.max(10, dTop - inset)
+  };
+};
+
+// 기본 카탈로그의 사다리꼴 모델에 보정된 하단 치수를 미리 반영 (치수 표시·비교·3D가 같은 값을 쓰도록)
+window.DEFAULT_STORAGE_MODELS.forEach((m) => {
+  if (m.shapeType !== 'tapered') return;
+  const b = window.resolveBottomDims(m);
+  m.wBot = b.wBot;
+  m.dBot = b.dBot;
+});
+
 // 기본 제공 저장된 조합 프리셋 (Shift+클릭으로 저장한 조합과 동일한 구조)
 window.DEFAULT_SAVED_COMBOS = [
   {

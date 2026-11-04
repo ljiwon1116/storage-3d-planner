@@ -1,98 +1,164 @@
-# 🏡 StorageFit 3D - 옷장·서랍 3D 수납함 배치 시뮬레이터
-
-> 우리 집 옷장이나 서랍의 실제 치수(문설주/경첩 사각지대, 서랍 노출 깊이 등)를 입력하고,  
-> 브랜드별 수납함(무인양품, 이케아, 다이소, 루틴랩 등)의 3D 적층 및 배치 가능 여부를 사전에 검증·시뮬레이션하는 웹 애플리케이션입니다.
-
----
-
-## 🛠️ 기술 스택 (Tech Stack)
-- **Frontend:** Vanilla HTML5, CSS3, JavaScript (ES6+), Three.js (r128 CDN), OrbitControls
-- **Backend / Serverless:** Vercel Serverless Functions (`api/*.js`)
-- **Database:** Neon Serverless PostgreSQL (`@neondatabase/serverless`)
-- **Deployment:** GitHub + Vercel (`https://[project-name].vercel.app`)
-- **Zero-Build Architecture:** 별도의 Node 번들링 과정 없이 브라우저에서 `index.html`을 바로 열어도 동작하며, Vercel 배포 시 서버리스 API 및 Neon DB가 완전 자동 연동됩니다.
+# 🏡 StorageFit 3D (옷장·서랍·팬트리 3D 수납 플래너)
+> **Claude Code 인수인계 및 개발 가이드 문서 (Handoff Guide)**  
+> **현재 버전:** `1104b` (2026-11-04 기준)  
+> **라이브 주소:** [https://storage3dplanner.vercel.app](https://storage3dplanner.vercel.app)  
+> **원격 저장소:** [https://github.com/ljiwon1116/storage-3d-planner.git](https://github.com/ljiwon1116/storage-3d-planner.git) (`gh-pages` 브랜치)  
+> **실사용자:** 인스타그램 인테리어/수납 크리에이터 @joshleeliving (이지원)
 
 ---
 
-## 📁 프로젝트 폴더 구조 (Project Structure)
+## 📌 1. 프로젝트 개요 & 핵심 철학
+
+이 프로젝트는 집안의 **여닫이 옷장, 슬라이딩 서랍, 팬트리(ㄱ자 선반)** 등의 실제 치수를 입력하고, 시중 브랜드(**무인양품, 다이소, 루틴랩**)의 수납함을 3D로 직접 또는 자동으로 배치해 보며 공간 적합성과 적층 가능 여부를 검증하는 **모바일 중심 3D 수납 시뮬레이터 웹앱**입니다.
+
+### 🎯 핵심 기술 및 설계 원칙
+- **Zero-Build Vanilla Architecture:**
+  - 번들러(Webpack/Vite/Next.js) 없이 순수 `HTML5`, `CSS3`, `Vanilla JavaScript(ES6+)`, `Three.js (r128 CDN)`로 동작합니다.
+  - 빌드 단계 없이 브라우저나 로컬 웹 서버에서 `index.html`을 바로 열어도 100% 동일하게 동작하며, `gh-pages` 브랜치에 Push하면 Vercel에서 정적 웹으로 즉시 배포됩니다.
+- **모바일 First & 마디아(Madia) 디자인 원칙:**
+  - 주요 타겟 사용자가 인스타그램 모바일 방문자이므로 데스크탑 모드 대신 모바일 반응형 뷰에 집중합니다.
+  - **위계:** 폰트 크기 과장보다 굵기(Weight)와 명도(Contrast) 차이로 시각 위계 표현.
+  - **간격:** 4px, 8px, 12px, 16px, 24px의 4/8 배수 그리드 준수.
+  - **버튼:** 한 화면/팝업 내 가장 중요한 Primary Action 버튼은 오직 1개로 제한.
+  - **선/여백:** 과도한 테두리선을 지양하고 면 분할과 넉넉한 여백(Negative Space) 활용.
+  - **컬러:** 아이보리/베이지 웜톤 테마 (`#FAF7F2`, `#4A3E3D`), 유치한 컬러 이모지 지양, 정돈된 라인 아이콘 적용.
+
+---
+
+## 📁 2. 파일 구조 및 역할
 
 ```
 storage-3d-planner/
-├── index.html            # 메인 UI 구조 (모바일/PC 스위처, 3D 스테이지, 모바일 하단 탭 바, 모달)
-├── styles.css            # 웜톤 테마 및 모바일 상하 분할 뷰(ui-mode-mobile) / PC 플로팅 뷰(ui-mode-pc)
-├── schema.sql            # Neon DB 테이블 스키마 정의 (storage_models, saved_combos, shared_plans)
-├── package.json          # Vercel 배포 시 @neondatabase/serverless 의존성 설치용
-├── vercel.json           # Vercel 정적 라우팅 및 서버리스 함수(api/) 설정
-├── README.md             # 프로젝트 개요 및 KIRO 인수인계 문서
-│
+├── index.html            # 메인 HTML 마크업 (위저드, 3D 뷰포트, 상자 고르기 창, 팝업, 모달)
+├── styles.css            # 전체 UI 스타일시트 (아이보리 웜톤 테마, 모바일 바텀시트, 팝업 애니메이션)
+├── manifest.json         # PWA 매니페스트 설정
+├── icons/                # PWA 및 파비콘 아이콘
+├── models/               # 3D GLB 모델 파일 (수납함 및 생활 물품 23종)
 ├── js/
-│   ├── presets.js        # 브랜드 카탈로그(무인양품/이케아/다이소/루틴랩), 저장 조합 프리셋, SVG 썸네일 생성기
-│   ├── packer.js         # 2D/3D 적층 계산 엔진 (computeStackingY, 간섭 검증, 자동 채우기 알고리즘)
-│   ├── scene3d.js        # Three.js 3D 렌더러 (가구/선반/도어/경첩/수납함 렌더링, 레이캐스팅, 드래그 적층)
-│   └── app.js            # 메인 앱 컨트롤러 (UI 모드 전환, 탭 네비게이션, Neon DB 동기화, 이벤트 바인딩)
-│
-└── api/
-    ├── _db.js            # Neon PostgreSQL 연결 및 테이블 자동 생성(CREATE TABLE IF NOT EXISTS)
-    ├── bootstrap.js      # 앱 구동 시 카탈로그 모델, 저장 조합, 공유 배치도를 일괄 조회하는 엔드포인트
-    ├── models.js         # 커스텀 수납함 모델 조회/등록 (GET, POST)
-    ├── combos.js         # 저장된 묶음 조합 조회/등록/삭제 (GET, POST, DELETE)
-    └── plans.js          # 3D 배치도 단축 링크 공유 저장/불러오기 (GET, POST: ?plan=단축ID)
+│   ├── presets.js        # 수납함 카탈로그 데이터 (무인양품, 다이소, 루틴랩), 사다리꼴/적층 여부, 썸네일 SVG
+│   ├── items.js          # 수납함 내부용 생활 물건 데이터 (23개 생활 물품: 햇반, 신라면, 수건 등)
+│   ├── packer.js         # 3D 칸 공간 분할 및 자동 채우기 알고리즘, 서랍형 바닥 우선 배치, 적층 Y 계산
+│   ├── scene3d.js        # Three.js 3D 씬 매니저 (가구 3종 렌더링, 수납함 메쉬 생성, 드래그&적층, 워터마크)
+│   ├── app.js            # 메인 애플리케이션 컨트롤러 (전역 state, 이벤트 바인딩, 필터, 팝업 제어)
+│   └── boxdetail.js      # 수납함 상세 보기 및 내부 물건(23종) 배치 시뮬레이터
+└── README.md             # 본 인수인계 문서
+```
+
+### 핵심 모듈 상세 설명
+
+| 모듈 | 핵심 역할 및 주요 함수 |
+|---|---|
+| **`index.html`** | - 상단 헤더, 가구 설정 위저드, 3D Canvas, 하단 액션 HUD 바<br>- `#modal-box-picker`: 상자 추가 팝업 및 조건 필터 패널<br>- `#mobile-setup-popup`: 장 설정 팝업<br>- `#mobile-shelfh-popup`: 선반 높이 조절 팝업<br>- `#modal-export`: 내보내기/사진 저장 모달 |
+| **`js/presets.js`** | - `DEFAULT_STORAGE_MODELS`: 각 브랜드별 수납함 데이터<br>- 필드: `id, brandKey, name, w, d, h, shapeType('box'\|'tapered'), canStack, price, link, thumbPath`<br>- `wBot, dBot`: 사다리꼴(tapered) 모델의 하단 치수 |
+| **`js/scene3d.js`** | - `buildCabinetScene`, `buildDrawerScene`, `buildPantryScene`: 가구 형태별 3D 구축<br>- `buildStorageBoxMesh`: 수납함 3D 메쉬 생성 (`createFrustumGeometry`로 사다리꼴 렌더링 지원)<br>- `prepareGroupDrag`, `onPointerMove`: 수납함 드래그 이동 및 자동 적층 감지<br>- `captureSceneDataUrl`: 워터마크(`made by joshleeliving`) 및 여백 오버레이 사진 생성 |
+| **`js/packer.js`** | - `getCompartmentsRaw`: 가구 치수 및 선반 위치로부터 3D 유효 공간(칸) 산출<br>- `autoPackCompartment`: 공간 채우기 알고리즘 (서랍형 바닥 우선 채우기 등 포함)<br>- `computeStackingY`: 특정 (X, Z) 위치에서 다른 상자 위에 올라탈 때의 지지 높이(Y) 계산 |
+| **`js/app.js`** | - `state`: 전역 상태 관리 객체<br>- `initBoxPickerFilterPanel`: 형태/적층/크기범위/투명도 필터링 로직<br>- `exportPlan`: 내보내기 및 여백 치수 오버레이 토글 상태 제어 |
+
+---
+
+## 🧠 3. 전역 상태 (`state`) 구조
+
+`js/app.js`의 `state` 객체가 모든 런타임 데이터를 보유합니다:
+
+```javascript
+state = {
+  spaceConfig: {
+    category: 'cabinet', // 'cabinet'(옷장), 'drawer'(슬라이딩 서랍), 'pantry'(ㄱ자 팬트리)
+    cabinet: { w: 800, d: 600, h: 2000, frameD: 0, doorSide: 'both', shelves: [...] },
+    drawer: { w: 800, d: 500, h: 200, exposedD: 450, clearanceH: 50, tiers: 2 },
+    pantry: { innerW: 1200, sideW: 1000, cornerPos: 'left', depth: 400, tiers: 4, ... }
+  },
+  placedBoxes: [
+    // 각 칸(shelfIndex)에 배치된 수납함 인스턴스 배열
+    {
+      id: "box_1730689999999",
+      shelfIndex: 0,
+      modelId: "daiso_drawer_wide_01",
+      name: "층층이 서랍장 와이드",
+      w: 260, d: 350, h: 140,
+      x: 100, y: 0, z: 200,
+      rot: 0, // 0 또는 90도 회전
+      color: "#f5f5f5"
+    }
+  ],
+  selectedShelfIndex: 0,
+  selectedBoxIds: [],
+  filterState: {
+    types: ['drawer', 'basket', 'lid'],
+    canStackOnly: false,
+    widthRange: { min: 0, max: 1000 },
+    depthRange: { min: 0, max: 1000 },
+    heightRange: { min: 0, max: 1000 },
+    transparency: ['opaque', 'translucent', 'transparent']
+  }
+};
 ```
 
 ---
 
-## ✨ 핵심 구현 기능 (Key Features)
+## 🚨 4. Claude Code 우선 해결 작업 (Active Issues / Next Tasks)
 
-### 1. 📱 모바일 최적화 Split View (기본값) & 🖥️ PC 뷰 스위처
-- 상단 헤더 로고 옆 `[📱 모바일 | 🖥️ PC]` 버튼으로 언제든 인터페이스 즉시 전환.
-- **모바일 모드 (`ui-mode-mobile`):**
-  - **상단 50%:** 카드 겹침 없는 100% 온전한 3D 가구 뷰포트 (드래그, 줌, 회전, 미니 카메라 HUD).
-  - **중앙 하단 탭 바:**
-    1. `🚪 가구·치수` (기본 활성): 가구 종류(여닫이 장/슬라이딩 서랍), 내부 치수, 문틀·경첩 폭, 문 개방각도 조절.
-    2. `📦 선반·수납함`: 선반 칸 전환, 수납함 추가, 배치 목록, 저장 조합, 자동 채우기.
-    3. `📏 선반위치`: 중간 선반 높이 및 두께 조절.
-    4. `⚠️ 에러(N)`: 문틀 간섭, 높이 초과 경고 목록 확인 및 3D 하이라이트.
-    5. `🔽 접기`: 하단 패널을 접어 3D 전체 화면 모드로 전환.
-- **PC 모드 (`ui-mode-pc`):**
-  - 넓은 화면에 맞춘 3D 지시선(Leader line) 연결형 선반 콜아웃 및 다중 플로팅 카드.
+아래 3가지 이슈는 최근 사용자 피드백을 통해 접수된 핵심 개선 과제입니다. Claude Code는 이어서 즉시 구현할 수 있습니다.
 
-### 2. 🧱 자동 적층 (Auto-Stacking)
-- 수납함을 드래그하여 이미 배치된 다른 수납함 위로 가져가면 바닥에 겹치지 않고 `packer.js`의 `computeStackingY`가 작동해 자동으로 2단, 3단 위로 올라탑니다.
-- 수납함 선택 시 뜨는 HUD에서 `➕ 위로 1단 더 쌓기` 버튼으로 동일 규격을 즉시 수직 적층 가능.
+### Task 1. 여러 개 적층된 수납함 드래그 이동 시 스택 전체 묶음 이동 및 Y좌표 계산 버그 수정
+- **증상 스크린샷:** `media_1793759119855_970b3298.png` (수납함들이 하늘 위로 치솟아 천장을 뚫고 나가는 현상)
+- **발생 원인:**
+  1. `js/scene3d.js`의 `prepareGroupDrag`에서 사용자가 맨 아래 상자를 잡고 드래그할 때, 그 상자 위에 얹혀 있는 상자들(위쪽 스택)이 `activeIds`에 포함되지 않아 바닥 상자만 분리되어 이동함.
+  2. 만약 다중 선택되어 같이 이동하더라도, `onPointerMove`에서 각 상자마다 `computeStackingY`를 독립적으로 다시 계산하면서 자기 스택의 상자들을 지지면으로 잘못 인식하거나 Y좌표가 위로 누적 팽창함.
+- **수정 가이드 (`js/scene3d.js`):**
+  1. **스택 트리 자동 탐색:** `prepareGroupDrag(hitBoxId)` 시, `hitBoxId`의 윗면 영역에 올라타 있는 모든 상자(재귀적으로 그 위에 또 올라탄 상자들까지)를 찾아 `activeIds`에 자동으로 합류시킵니다.
+  2. **상대 좌표 유지 (Relative Offset Drag):**
+     - 맨 아래 기준 상자(Base Box)의 지지 Y 위치만 **"움직이는 스택 상자들을 제외한 외부 바닥/선반/외부 상자"** 기준으로 계산합니다.
+     - 윗단 상자들은 독립적으로 재계산하지 않고, 드래그 시작 시점의 `relX, relY, relZ` 오프셋을 기준 상자의 새 위치에 그대로 더해 함께 평행 이동시킵니다.
 
-### 3. 🚪 여닫이 장 문짝 & 개방각도 시뮬레이션
-- `양문형(좌+우)`, `좌여닫이`, `우여닫이` 옵션 지원.
-- 문틀 없음(0) 설정 시에도 문 너비가 내부 너비와 같게 유지되며 3D 문짝/경첩/손잡이가 사라지지 않음.
-- `🚪 문 개방각도` 버튼 및 슬라이더로 `0°(닫힘) ~ 120°(활짝)`까지 각도 실시간 회전.
+### Task 2. 팝업창 외부(Backdrop) 터치/클릭 시 닫기
+- **증상:** 모바일 화면에서 '장 설정'(`#mobile-setup-popup`), '선반 높이'(`#mobile-shelfh-popup`), '상세 조정' 등의 팝업을 연 후 닫기 버튼이 화면 상단에 있거나 멀어 한 손으로 닫기 어려움.
+- **요구사항:** 팝업 외부의 반투명 배경 영역 또는 바깥 화면을 터치/클릭하면 열려있는 팝업이 부드럽게 닫히도록 개선.
+- **수정 가이드 (`js/app.js` 및 `index.html`):**
+  - 바텀시트/팝업 바깥 영역에 백드롭 오버레이 요소(`#popup-backdrop` 등)를 배치하거나, `document.addEventListener('pointerdown', ...)`에서 클릭 타겟이 `.mobile-popup` 내부가 아닐 때 `document.body.classList.remove('mobile-setup-open', 'mobile-shelfh-open')`을 수행하도록 연결.
 
-### 4. 🗄️ 슬라이딩 서랍 인출 시뮬레이션
-- 실제 내부 깊이 vs 최대로 열었을 때 노출되는 깊이(Exposed D) 구분.
-- 슬라이더를 통해 서랍이 앞으로 열리는 애니메이션 및 안쪽 미노출 사각지대 시각화.
-
-### 5. 📦 최신 수납함 카탈로그 및 2단계 자동 채우기
-- **브랜드 라인업:**
-  - 무인양품 (PP 서랍식 케이스, PP 파일박스, 소프트박스 등)
-  - 이케아 (SKUBB, VARIERA, KUGGIS 등)
-  - 다이소 (시스템 정리함, 모듈형 서랍장 등)
-  - **루틴랩 (투명 서랍 3L, 6L, 9L)**
-- **2단계 자동 채우기:** 1. 브랜드 선택 → 2. 해당 브랜드 상세 규격 선택 후 조건별 일괄 자동 채우기 실행.
-
-### 6. 🌐 Vercel + Neon DB 클라우드 동기화 & 공유
-- Vercel 배포 후 Neon DB 연결 시 상단 배지가 `🟢 Neon DB 연동됨`으로 표시.
-- `🔗 링크 공유` 버튼 클릭 시 현재 3D 배치 상태가 Neon DB에 저장되고 단축 링크(`?plan=xxxxxxx`) 생성 및 클립보드 복사.
-- 로컬 파일 환경에서도 URL 해시(`?state=...`) 기반 인코딩 공유 지원.
+### Task 3. 사다리꼴(Tapered) 수납함 3D 치수 및 사각뿔대 렌더링 보정
+- **요구사항:**
+  - `shapeType === 'tapered'` (사다리꼴 형태)로 등록된 수납함:
+    1. `wBot`, `dBot` 치수가 상단 치수(`wTop`, `dTop`)와 다르게 명시되어 있으면 실제 치수 그대로 적용.
+    2. 만약 `wBot` / `dBot` 치수 정보가 없거나 상단 치수와 같다면, **상단보다 전·후·좌·우 각 0.5cm (5mm) 작게** (즉, `wBot = wTop - 10mm`, `dBot = dTop - 10mm`) 기본 세팅하여 3D 화면상에서 확연한 사다리꼴로 보이게 렌더링.
+- **수정 가이드 (`js/presets.js`, `js/scene3d.js`):**
+  - `buildStorageBoxMesh` 및 치수 계산 함수에서 `m.shapeType === 'tapered'`일 때:
+    ```javascript
+    const wTop = m.w;
+    const dTop = m.d;
+    const wBot = (m.wBot && m.wBot < wTop) ? m.wBot : (wTop - 10);
+    const dBot = (m.dBot && m.dBot < dTop) ? m.dBot : (dTop - 10);
+    ```
+    이 치수로 `createFrustumGeometry(wTop, dTop, wBot, dBot, h)`를 생성하여 사다리꼴 형태를 정확히 시각화.
 
 ---
 
-## 🤖 KIRO AI 개발 이어가기 가이드 (For KIRO AI Agent)
+## 🚀 5. 배포 및 테스트 절차
 
-KIRO AI로 이 프로젝트를 이어서 작업할 때는 다음 원칙을 준수하세요:
+1. **로컬 테스트:**
+   - 별도 빌드 명령 없이 브라우저에서 `index.html`을 열거나 VS Code Live Server (`http://127.0.0.1:5500`) 실행.
+2. **캐시 버스팅 (Cache Busting):**
+   - 코드를 수정하여 배포할 때는 `index.html`의 CSS/JS 호출 쿼리스트링 버전을 증가시킵니다:
+     ```html
+     <link rel="stylesheet" href="styles.css?v=1104c">
+     <script src="js/presets.js?v=1104c"></script>
+     <script src="js/scene3d.js?v=1104c"></script>
+     <script src="js/app.js?v=1104c"></script>
+     ```
+3. **깃 커밋 & 배포:**
+   - 반드시 변경 내역을 사용자와 확인/승인한 뒤 푸시합니다:
+     ```bash
+     git add .
+     git commit -m "1104c: fix stack drag logic, outside popup close, tapered box default dims"
+     git push origin gh-pages
+     ```
+   - 푸시 완료 후 약 30초 내에 Vercel([https://storage3dplanner.vercel.app](https://storage3dplanner.vercel.app))에 자동 반영됩니다.
 
-1. **상태 관리 일원화:**
-   - 전역 상태는 `js/app.js` 내부의 `state` 객체에서 일괄 관리됩니다.
-   - 모바일 모드와 PC 모드는 동일한 DOM 요소(`input`, `select` 등)를 공유하며 CSS 클래스(`body.ui-mode-mobile` / `body.ui-mode-pc`)로 레이아웃만 변경됩니다.
-2. **3D 렌더링 동기화:**
-   - 뷰포트 크기 변경이나 레이아웃 전환 시 반드시 `window.Scene3DManager.resize()`를 호출해야 카메라 비율과 렌더러가 올바르게 업데이트됩니다.
-3. **새 수납함 추가 시:**
-   - 기본 모델은 `js/presets.js`의 `window.DEFAULT_STORAGE_MODELS`에 추가하세요.
-   - 사용자 등록 커스텀 모델은 `localStorage` 및 `POST /api/models`를 통해 Neon DB에 영구 반영됩니다.
+---
+
+## 💬 6. 사용자 커뮤니케이션 가이드
+
+- **호칭 및 어조:** 정중하고 친절한 한국어, 전문적인 인테리어/개발 어시스턴트 어조.
+- **보고 방식:** 작업 진행 도중 불필요한 중간 잡담을 생략하고, 기능 구현과 테스트가 완료된 후 한 번에 명확하게 요약하여 보고합니다.
+- **기술적 용어 사용:** 사용자에게 보고할 때는 'three.js frustum geometry' 같은 내부 엔지니어링 용어 대신 "사다리꼴 수납함의 하단 치수를 상단보다 사방 0.5cm씩 좁혀 실제 제품처럼 보이도록 3D 표현을 다듬었습니다"처럼 직관적인 어휘를 사용합니다.

@@ -6,7 +6,7 @@
   <title>수납 공간 꾸미기 - 옷장·서랍 3D로 짜보기</title>
   <meta name="theme-color" content="#f7f3ec" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <link rel="stylesheet" href="styles.css?v=1104b" />
+  <link rel="stylesheet" href="styles.css?v=1104d" />
   <script>
     // 실제로 보이는 화면 높이를 --vh 로 넣어요 (주소창·툴바가 생기고 없어질 때마다).
     // 브라우저마다 100vh 가 툴바를 포함해서 위아래가 잘리는 문제를 막아요.
@@ -97,6 +97,9 @@
         <button id="box-guide-ok" class="drag-guide-ok" type="button">알겠어요</button>
       </div>
     </div>
+
+    <!-- [모바일 전용] '장 설정'·'선반 높이' 작은 창 바깥을 누르면 닫히도록 깔리는 투명 배경 -->
+    <div id="mobile-popup-backdrop" class="mobile-popup-backdrop" aria-hidden="true"></div>
 
     <!-- [모바일 전용] 3D 화면 위 '장 설정' 돌아가기 버튼 -->
     <button id="btn-mobile-edit-setup" class="mobile-edit-setup-btn" type="button">장 설정</button>
@@ -487,6 +490,21 @@
     </div>
   </div>
 
+  <!-- 상자 고르기 창 '필터' 사용법 (처음 필터를 열 때 + 필터 창의 '사용법' 버튼) -->
+  <div id="filter-guide" class="drag-guide filter-guide" hidden>
+    <div class="drag-guide-card" role="dialog" aria-modal="true" aria-labelledby="filter-guide-title">
+      <h3 id="filter-guide-title" class="drag-guide-title">필터 사용법</h3>
+      <ul class="drag-guide-list">
+        <li><b>수납함 형태</b>서랍형·바구니형·뚜껑형 중 보고 싶은 것만 체크해요. 여러 개를 같이 고를 수 있어요.</li>
+        <li><b>적층 가능 여부</b>위로 쌓을 상자를 찾을 때는 '적층 가능'만 체크해요.</li>
+        <li><b>찾는 사이즈</b>가로·세로·높이를 최소~최대 mm로 적어요. '현재 칸 이하로'를 누르면 지금 칸에 들어가는 상자만 보여요.</li>
+        <li><b>투명 · 반투명 여부</b>안이 보이는 상자만 보고 싶을 때 써요.</li>
+        <li><b>필터 옆 숫자</b>조건에 맞는 상자 개수예요. '모두 체크'를 누르면 처음처럼 전부 보여요.</li>
+      </ul>
+      <button id="filter-guide-ok" class="drag-guide-ok" type="button">알겠어요</button>
+    </div>
+  </div>
+
   <!-- ==================== 팝업: 목록에 없는 상자 직접 추가 ==================== -->
   <div id="modal-add-box" class="modal-backdrop">
     <div class="modal-box add-box-modal" role="dialog" aria-modal="true" aria-labelledby="add-box-title">
@@ -748,11 +766,11 @@
   </div>
 
   <!-- 애플리케이션 스크립트 로드 -->
-  <script src="js/presets.js?v=1104b"></script>
-  <script src="js/items.js?v=1104b"></script>
-  <script src="js/packer.js?v=1104b"></script>
-  <script src="js/scene3d.js?v=1104b"></script>
-  <script src="js/app.js?v=1104b"></script>
+  <script src="js/presets.js?v=1104d"></script>
+  <script src="js/items.js?v=1104d"></script>
+  <script src="js/packer.js?v=1104d"></script>
+  <script src="js/scene3d.js?v=1104d"></script>
+  <script src="js/app.js?v=1104d"></script>
 
   <!-- 보관함 자세히 보기: 뒤는 흐리게, 고른 보관함만 크게 + 물건 넣기 -->
   <div id="box-detail" class="box-detail" aria-hidden="true">
@@ -778,6 +796,6 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="js/boxdetail.js?v=1104b"></script>
+  <script src="js/boxdetail.js?v=1104d"></script>
 </body>
 </html>
