@@ -317,6 +317,10 @@ window.Scene3DManager = (function () {
     const h = container.clientHeight;
     if (w === 0 || h === 0) return;
     camera.aspect = w / h;
+    if (camera.view && camera.view.enabled) {
+      camera.view.fullWidth = w; camera.view.width = w;
+      camera.view.fullHeight = h; camera.view.height = h;
+    }
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
   }
@@ -1823,6 +1827,55 @@ window.Scene3DManager = (function () {
     clickedEmptySpace = false;
   }
 
+  // 상자 고르기 창이 아래를 덮는 동안: 고른 칸이 창 위쪽 빈 화면 가운데 오게 (창 닫으면 원래대로)
+  let pickerFocusSaved = null;
+  function focusCompartmentAbove(compIdx, coverFrac) {
+    if (!currentSpaceConfig || !camera || !controls || !containerEl) return;
+    const comps = window.PackerEngine.getCompartments(currentSpaceConfig);
+    const comp = comps[compIdx];
+    if (!comp) return;
+    if (!pickerFocusSaved) pickerFocusSaved = { pos: camera.position.clone(), target: controls.target.clone() };
+    let center;
+    if (currentSpaceConfig.type === 'drawer') {
+      const exposedD = window.PackerEngine.getDrawerConstraints(currentSpaceConfig).exposedD;
+      const t = comp.tierIndex || comp.index || 0;
+      const isTop = t === getOpenDrawerTier(currentSpaceConfig);
+      const baseY = drawerTierBaseY(currentSpaceConfig, t);
+      center = new THREE.Vector3(0, baseY + comp.clearH * 0.4, isTop ? drawerOpenRatio * exposedD * 0.45 : -8 + (comp.d + 30) / 2);
+    } else {
+      const p = window.PackerEngine.localToWorld(comp, comp.w * 0.5, comp.d * 0.5);
+      center = new THREE.Vector3(p.x, comp.yStart + comp.clearH * 0.45, p.z);
+    }
+    const cw = containerEl.clientWidth, ch = containerEl.clientHeight;
+    const cover = Math.max(0, Math.min(0.75, coverFrac || 0));
+    const visFrac = 1 - cover;
+    // 칸이 보이는 영역에 알맞게 들어오는 거리
+    const fovV = THREE.MathUtils.degToRad(camera.fov);
+    const tanV = Math.tan(fovV / 2);
+    const aspect = cw / ch;
+    const spanH = Math.max(comp.clearH, comp.d * 0.5) * 1.6;
+    const spanW = Math.max(comp.w, comp.d * 0.6) * 1.3;
+    const dist = Math.max(spanH / (2 * tanV * visFrac), spanW / (2 * tanV * aspect), 500);
+    const dir = pickerFocusSaved.pos.clone().sub(pickerFocusSaved.target).normalize();
+    controls.target.copy(center);
+    camera.position.copy(center).add(dir.multiplyScalar(dist));
+    // 화면을 위로 밀어서 칸 중심이 창 위 빈 곳 가운데 오게
+    camera.setViewOffset(cw, ch, 0, Math.round((ch * cover) / 2), cw, ch);
+    camera.updateProjectionMatrix();
+    controls.update();
+  }
+  function clearCompartmentFocus() {
+    if (!camera || !controls) return;
+    camera.clearViewOffset();
+    camera.updateProjectionMatrix();
+    if (pickerFocusSaved) {
+      camera.position.copy(pickerFocusSaved.pos);
+      controls.target.copy(pickerFocusSaved.target);
+      controls.update();
+    }
+    pickerFocusSaved = null;
+  }
+
   function setCameraView(viewType) {
     if (!currentSpaceConfig || !camera || !controls) return;
     const { W, D, H } = window.PackerEngine.getSpaceDims(currentSpaceConfig);
@@ -1962,6 +2015,8 @@ window.Scene3DManager = (function () {
     init,
     renderScene,
     setCameraView,
+    focusCompartmentAbove,
+    clearCompartmentFocus,
     initCompareViewer,
     renderCompareModels,
     createFrustumGeometry,

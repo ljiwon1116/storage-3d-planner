@@ -154,13 +154,15 @@
       const saved = localStorage.getItem(STORAGE_KEY_CUSTOM_MODELS);
       if (saved) custom = JSON.parse(saved);
     } catch (e) {}
-    state.catalogModels = mergeUniqueById([
+    const allModels = mergeUniqueById([
       ...window.DEFAULT_STORAGE_MODELS,
       ...state.cloudModels,
       ...custom
     ]);
+    // hidden: 목록에서는 숨기지만 예전에 놓은 상자는 계속 보이게 (중복 정리한 상품)
+    state.catalogModels = allModels.filter((m) => !m.hidden);
     state.modelsMap = {};
-    state.catalogModels.forEach((m) => {
+    allModels.forEach((m) => {
       // 사다리꼴 모델(내 상자·클라우드 포함): 하단 치수가 없거나 상단과 같으면 사방 5mm 작게 보정
       if (m.shapeType === 'tapered' && typeof window.resolveBottomDims === 'function') {
         const bot = window.resolveBottomDims(m);
@@ -1170,6 +1172,7 @@
       closeShelfSheet();
       state.pickerBrand = 'ALL';
       state.pickerCart = {};
+      state.pickerLiveIds = {};
       renderPickerModalContent();
       document.getElementById('modal-box-picker').classList.add('open');
     }, '원하는 상자를 직접 골라 넣어요'));
@@ -2502,7 +2505,12 @@
       const hMin = pf.hMin !== '' && Number.isFinite(Number(pf.hMin)) ? Number(pf.hMin) : null;
       const hMax = pf.hMax !== '' && Number.isFinite(Number(pf.hMax)) ? Number(pf.hMax) : null;
 
-      return state.catalogModels.filter((m) => {
+      // 루틴랩 상품을 맨 위에 (나머지는 원래 순서 그대로)
+      const ordered = [
+        ...state.catalogModels.filter((m) => m.brand === '루틴랩'),
+        ...state.catalogModels.filter((m) => m.brand !== '루틴랩')
+      ];
+      return ordered.filter((m) => {
         if (state.pickerBrand !== 'ALL' && m.brand !== state.pickerBrand) return false;
         // 수납함 형태 (체크된 항목이 있을 때만 해당 항목으로 필터링)
         if (pf.kinds.length > 0 && pf.kinds.length < 3) {
@@ -2862,17 +2870,14 @@
         };
 
         const addOne = () => {
-          state.pickerCart[model.id] = (state.pickerCart[model.id] || 0) + 1;
+          if (!pickerLiveAdd(model.id)) return;
           updatePickerCartBar();
           syncQty();
           card.classList.add('pick-bump');
           setTimeout(() => card.classList.remove('pick-bump'), 180);
         };
         const removeOne = () => {
-          const cur = state.pickerCart[model.id] || 0;
-          if (cur <= 0) return;
-          if (cur - 1 <= 0) delete state.pickerCart[model.id];
-          else state.pickerCart[model.id] = cur - 1;
+          if (!pickerLiveRemove(model.id)) return;
           updatePickerCartBar();
           syncQty();
         };
@@ -2917,26 +2922,76 @@
     // 저장한 묶음 탭에서는 담기 바 숨김
     bar.style.display = state.pickerBrand === 'COMBOS' ? 'none' : 'flex';
     const total = Object.values(state.pickerCart).reduce((a, b) => a + b, 0);
-    countEl.textContent = `고른 상자 ${total}개`;
-    btn.textContent = total > 0 ? `칸에 넣기 (${total}개)` : '칸에 넣기';
-    btn.disabled = total === 0;
+    countEl.textContent = `넣은 상자 ${total}개`;
+    btn.textContent = '다 넣었어요';
+    btn.disabled = false;
+  }
+
+  // 상자 고르기 창에서 ＋ / − 를 누르면 뒤의 3D에 바로 넣고 빼기
+  function pickerLiveAdd(modelId) {
+    if (!state.pickerLiveIds) state.pickerLiveIds = {};
+    const ok = addBoxToActiveSpace(modelId, 0);
+    if (!ok) {
+      showToast('자리가 모자라서 더 넣을 수 없어요', { type: 'warn' });
+      return false;
+    }
+    const newId = state.selectedBoxIds[state.selectedBoxIds.length - 1];
+    (state.pickerLiveIds[modelId] = state.pickerLiveIds[modelId] || []).push(newId);
+    state.pickerCart[modelId] = state.pickerLiveIds[modelId].length;
+    return true;
+  }
+  function pickerLiveRemove(modelId) {
+    const ids = (state.pickerLiveIds && state.pickerLiveIds[modelId]) || [];
+    if (!ids.length) return false;
+    const id = ids.pop();
+    const activePlan = getActivePlan();
+    const gone = activePlan.boxes.find((b) => b.id === id);
+    activePlan.boxes = activePlan.boxes.filter((b) => b.id !== id);
+    if (gone) settleBoxes(activePlan.boxes, [gone.compartmentIndex]);
+    state.selectedBoxIds = state.selectedBoxIds.filter((x) => x !== id);
+    if (ids.length) state.pickerCart[modelId] = ids.length;
+    else delete state.pickerCart[modelId];
+    refreshAll();
+    return true;
   }
 
   // 바구니에 담은 상자들을 현재 칸에 한 번에 넣기
-  function applyPickerCart() {
-    const entries = Object.entries(state.pickerCart);
-    if (entries.length === 0) return;
-    let skipped = 0;
-    entries.forEach(([modelId, qty]) => {
-      for (let i = 0; i < qty; i++) {
-        if (addBoxToActiveSpace(modelId, 0) === false) skipped += 1;
+  // 폰: 상자 고르기 창이 열려 있는 동안 고른 칸을 창 위 빈 화면에 보여 주기
+  function watchPickerFocus() {
+    const modal = document.getElementById('modal-box-picker');
+    if (!modal || modal.dataset.focusWatch) return;
+    modal.dataset.focusWatch = '1';
+    let wasOpen = false;
+    const apply = () => {
+      const open = modal.classList.contains('open');
+      const S = window.Scene3DManager;
+      if (!S || !S.focusCompartmentAbove) return;
+      if (open && state.uiMode === 'mobile') {
+        requestAnimationFrame(() => {
+          const box = modal.querySelector('.modal-box');
+          const canvas = document.getElementById('canvas-wrapper');
+          if (!box || !canvas) return;
+          const cr = canvas.getBoundingClientRect();
+          const br = box.getBoundingClientRect();
+          const cover = (cr.bottom - br.top) / Math.max(1, cr.height);
+          S.focusCompartmentAbove(state.activeCompartmentIdx || 0, cover);
+        });
+        wasOpen = true;
+      } else if (!open && wasOpen) {
+        S.clearCompartmentFocus();
+        wasOpen = false;
       }
-    });
+    };
+    new MutationObserver(apply).observe(modal, { attributes: true, attributeFilter: ['class'] });
+  }
+
+  // 넣기는 이미 3D에 바로 반영돼 있으니, 창만 닫기
+  function applyPickerCart() {
     state.pickerCart = {};
+    state.pickerLiveIds = {};
     updatePickerCartBar();
     document.getElementById('modal-box-picker').classList.remove('open');
     refreshAll();
-    if (skipped > 0) showToast(`자리가 모자라서 ${skipped}개는 넣지 못했어요`);
   }
 
   function renderSelectedBoxInspector() {
@@ -3215,10 +3270,10 @@
         state.pickerFilters.kinds.push(newKind);
       }
       state.pickerCart = state.pickerCart || {};
-      state.pickerCart[newModel.id] = 1;
       close();
+      const added = pickerLiveAdd(newModel.id);
       renderPickerModalContent();
-      showToast('목록에 추가했어요. 칸에 넣기를 누르면 들어가요');
+      if (added) showToast('목록에 추가하고 칸에 1개 넣었어요');
     });
   }
 
@@ -4544,6 +4599,7 @@
 
     // 상자 고르기 창의 '담기' 버튼
     document.getElementById('btn-picker-cart-add')?.addEventListener('click', applyPickerCart);
+    watchPickerFocus();
 
     // 좌상단 & 좌하단 아코디언 토글
     document.getElementById('btn-toggle-space-card').addEventListener('click', () => {

@@ -5189,3 +5189,7 @@ body.ui-mode-mobile .mobile-shelfh-popup { width: min(340px, calc(100% - 24px));
 /* 1104z: 질문 다시 보기 — 안내는 아래 작은 줄로 (글자 키워도 단어 중간에서 줄바뀜 없음) */
 .sp-restart { display: flex; flex-direction: column; align-items: center; gap: 2px; padding-top: var(--sp-2); padding-bottom: var(--sp-2); white-space: nowrap; }
 .sp-restart-sub { font-size: 0.74rem; font-weight: 400; text-decoration: none; color: var(--text-meta); }
+
+/* 1105b: 상자 고르기 — ＋/− 가 바로 3D에 반영되니 뒤 화면이 잘 보이게 */
+body.ui-mode-mobile #modal-box-picker.modal-backdrop { background: rgba(45, 34, 26, 0.06); }
+body.ui-wide #modal-box-picker.modal-backdrop { background: transparent; }

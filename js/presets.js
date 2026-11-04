@@ -91,6 +91,7 @@ window.DEFAULT_STORAGE_MODELS = [
   },
   {
     id: 'muji-pp-drawer-wide-thin-2p',
+    hidden: true, // 같은 상자·같은 링크라 목록에선 숨김 (예전 계획 호환용)
     brand: '무인양품',
     lineup: '폴리프로필렌 케이스·서랍식',
     name: '폴리프로필렌 케이스·서랍식·가로와이드·얇은형·2개',
@@ -125,6 +126,7 @@ window.DEFAULT_STORAGE_MODELS = [
   },
   {
     id: 'muji-pp-drawer-deep-2p',
+    hidden: true, // 같은 상자·같은 링크라 목록에선 숨김 (예전 계획 호환용)
     brand: '무인양품',
     lineup: '폴리프로필렌 케이스·서랍식',
     name: '폴리프로필렌 케이스·서랍식·깊은형·2개',
@@ -159,6 +161,7 @@ window.DEFAULT_STORAGE_MODELS = [
   },
   {
     id: 'muji-pp-drawer-shallow-2p',
+    hidden: true, // 같은 상자·같은 링크라 목록에선 숨김 (예전 계획 호환용)
     brand: '무인양품',
     lineup: '폴리프로필렌 케이스·서랍식',
     name: '폴리프로필렌 케이스·서랍식·얕은형·2개',
