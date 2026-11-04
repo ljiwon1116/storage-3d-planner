@@ -19,9 +19,10 @@ window.PackerEngine = (function () {
     return { W: c.w, D: c.d, H: c.h };
   }
 
-  // 0-1. ㄱ자 팬트리: 기둥으로 나뉜 열(bay) 목록
+  // 0-1. ㄱ자 · ㄷ자 팬트리: 기둥으로 나뉜 열(bay) 목록
   // - 'A' = 안쪽(뒤) 벽: 방 왼쪽 끝부터 오른쪽으로
-  // - 'B' = 오른쪽 옆 벽: 안쪽 구석(뒤 선반 끝)부터 입구 쪽으로
+  // - 'B' = 옆 벽: 안쪽 구석(뒤 선반 끝)부터 입구 쪽으로 (ㄱ자는 입구 반대쪽 벽, ㄷ자는 오른쪽 벽)
+  // - 'C' = ㄷ자(doorSide 'center')의 왼쪽 벽
   // 좌표: 방 가운데가 (0,0). 뒤 벽 면은 z = -roomD/2, 오른쪽 벽 면은 x = +roomW/2
   function getPantryBays(spaceConfig) {
     const p = spaceConfig.pantry;
@@ -40,12 +41,15 @@ window.PackerEngine = (function () {
     };
     const postsA = makeWall('A', p.roomW, p.postsA, 0);
     const startB = Math.min(p.roomD - 100, p.depthA);
+    const isU = p.doorSide === 'center';
     const postsB = p.wallB === false ? [] : makeWall('B', p.roomD, p.postsB, startB);
+    const postsC = p.wallB === false || !isU ? [] : makeWall('C', p.roomD, p.postsC || p.postsB, startB);
     if (p.wallB === false) {
-      for (let i = bays.length - 1; i >= 0; i--) if (bays[i].wall === 'B') bays.splice(i, 1);
+      for (let i = bays.length - 1; i >= 0; i--) if (bays[i].wall !== 'A') bays.splice(i, 1);
     }
     bays.forEach((b) => {
-      const leftSide = p.doorSide === 'right';   // 입구가 오른쪽이면 옆 선반은 왼쪽 벽
+      // 왼쪽 벽 선반: ㄱ자 오른쪽 입구의 옆 벽, 또는 ㄷ자의 C 벽
+      const leftSide = b.wall === 'C' || (!isU && p.doorSide === 'right');
       if (b.wall === 'A') {
         b.d = p.depthA;
         b.ox = -p.roomW / 2 + b.s0;
@@ -66,21 +70,28 @@ window.PackerEngine = (function () {
       const sh = (p.bayShelves && p.bayShelves[b.key]) || p.defaultShelves || [];
       b.shelves = [...sh].sort((x, y) => x.bottomY - y.bottomY);
     });
-    return { bays, postsA, postsB, startB };
+    return { bays, postsA, postsB, postsC, startB, isU };
   }
 
   // 0-2. 팬트리 구석: 안쪽 벽 선반 중 옆 선반에 막혀 손이 잘 안 닿는 구간 (안쪽 벽 왼쪽 끝 기준 mm)
-  function getPantryCorner(spaceConfig) {
+  // ㄷ자는 양쪽 구석 두 곳
+  function getPantryCorners(spaceConfig) {
     const p = spaceConfig.pantry;
-    if (!p || p.wallB === false) return null;
-    return p.doorSide === 'right' ? { s0: 0, s1: p.depthB } : { s0: p.roomW - p.depthB, s1: p.roomW };
+    if (!p || p.wallB === false) return [];
+    const left = { s0: 0, s1: p.depthB }, right = { s0: p.roomW - p.depthB, s1: p.roomW };
+    if (p.doorSide === 'center') return [left, right];
+    return [p.doorSide === 'right' ? left : right];
+  }
+  function getPantryCorner(spaceConfig) {
+    return getPantryCorners(spaceConfig)[0] || null;
   }
 
   // 0-3. 팬트리 걷는 길 폭: 안쪽 선반 앞 · 옆 선반 앞
   function getPantryWalkway(spaceConfig) {
     const p = spaceConfig.pantry;
     const front = p.roomD - p.depthA;                          // 안쪽 선반 앞에서 입구까지
-    const side = p.wallB === false ? p.roomW : p.roomW - p.depthB; // 옆 선반 앞에서 맞은편 벽까지
+    const sides = p.wallB === false ? 0 : (p.doorSide === 'center' ? 2 : 1);
+    const side = p.roomW - p.depthB * sides; // 옆 선반 앞에서 맞은편 벽(ㄷ자는 맞은편 선반)까지
     return { front, side, min: Math.min(front, side), ok: Math.min(front, side) >= 600 };
   }
 
@@ -179,12 +190,14 @@ window.PackerEngine = (function () {
       const out = [];
       bays.forEach((b) => {
         let curY = 0;
-        const wallName = b.wall === 'A' ? '안쪽 벽' : '옆 벽';
+        const isU = p.doorSide === 'center';
+        const wallName = b.wall === 'A' ? '안쪽 벽' : b.wall === 'C' ? '왼쪽 벽' : isU ? '오른쪽 벽' : '옆 벽';
+        const wallShort = b.wall === 'A' ? '안' : b.wall === 'C' ? '왼' : isU ? '오' : '옆';
         const pushComp = (yEnd, lvl) => {
           out.push({
             index: out.length,
             name: `${wallName} ${b.col + 1}번 칸 ${lvl + 1}층`,
-            short: `${b.wall === 'A' ? '안' : '옆'}${b.col + 1}-${lvl + 1}`,
+            short: `${wallShort}${b.col + 1}-${lvl + 1}`,
             bayKey: b.key, wall: b.wall, col: b.col, level: lvl, s0: b.s0,
             reserved: !!p.keepFloor && lvl === 0,
             yStart: curY, yEnd, clearH: Math.max(0, yEnd - curY),
@@ -471,10 +484,9 @@ window.PackerEngine = (function () {
 
       // (D-2) 팬트리 구석: 옆 선반에 막혀 손이 잘 안 닿는 곳
       if (spaceConfig.type === 'pantry' && comp.wall === 'A') {
-        const corner = getPantryCorner(spaceConfig);
-        if (corner) {
-          const a0 = (comp.s0 || 0) + xMin, a1 = (comp.s0 || 0) + xMax;
-          if (a1 > corner.s0 + 0.5 && a0 < corner.s1 - 0.5) {
+        const a0 = (comp.s0 || 0) + xMin, a1 = (comp.s0 || 0) + xMax;
+        if (getPantryCorners(spaceConfig).some((corner) => a1 > corner.s0 + 0.5 && a0 < corner.s1 - 0.5)) {
+          {
             setSeverity('warn');
             issues.push(`[구석] '${model.name}' 상자가 구석에 있어요. 옆 선반에 막혀 꺼내기 힘들어요.`);
           }
@@ -886,6 +898,7 @@ window.PackerEngine = (function () {
     getPantryBays,
     getFridgeLayout,
     getPantryCorner,
+    getPantryCorners,
     getPantryWalkway,
     localToWorld,
     worldDeltaToLocal,

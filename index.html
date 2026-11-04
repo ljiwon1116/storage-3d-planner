@@ -10,7 +10,7 @@
   <meta property="og:description" content="우리 집 수납 공간에 맞는 정리함을 3D로 미리 놓아 보세요." />
   <meta property="og:type" content="website" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <link rel="stylesheet" href="styles.css?v=1105d" />
+  <link rel="stylesheet" href="styles.css?v=1105e" />
   <script>
     // 실제로 보이는 화면 높이를 --vh 로 넣어요 (주소창·툴바가 생기고 없어질 때마다).
     // 브라우저마다 100vh 가 툴바를 포함해서 위아래가 잘리는 문제를 막아요.
@@ -741,10 +741,13 @@
         <div class="export-section-title">사진 저장</div>
         <p class="export-section-desc">3D 화면을 사진으로 저장해요.</p>
         <div class="export-margin-opt-box">
-          <label class="export-margin-main-toggle">
-            <input type="checkbox" id="chk-export-show-margins" checked />
-            <span>남는 공간도 같이 표시하기</span>
-          </label>
+          <div class="export-margin-head">
+            <label class="export-margin-main-toggle">
+              <input type="checkbox" id="chk-export-show-margins" checked />
+              <span>남는 공간도 같이 표시하기</span>
+            </label>
+            <button id="btn-export-dirs-toggle" class="export-dirs-toggle" type="button" aria-expanded="false" aria-controls="export-margin-dirs">방향 고르기</button>
+          </div>
           <div id="export-margin-dirs" class="export-margin-dirs">
             <label class="export-dir-chip"><input type="checkbox" value="top" checked /><span>위</span></label>
             <label class="export-dir-chip"><input type="checkbox" value="left" checked /><span>왼쪽</span></label>
@@ -760,15 +763,22 @@
       <!-- 2. 총 구매비용 -->
       <div class="export-section">
         <div class="export-section-title">총 구매비용</div>
-        <div id="export-cost-total" class="export-cost-total">계산 중...</div>
-                <button id="btn-export-cost-view" class="btn" type="button" style="width:100%;height:44px;border-radius:10px;margin-top:8px;">칸별 금액 보기</button>
+        <div class="export-cost-row">
+          <div id="export-cost-total" class="export-cost-total">계산 중...</div>
+          <button id="btn-export-cost-view" class="btn export-cost-view" type="button">칸별 금액 보기</button>
+        </div>
       </div>
 
       <!-- 3. 구매 링크 모음 -->
-      <div class="export-section">
+      <div class="export-section" id="export-links-section">
         <div class="export-section-title">구매 링크 모음</div>
         <p class="export-section-desc">제품을 누르면 구매 페이지로 가요.</p>
         <div id="export-links-list" class="export-links-list"></div>
+      </div>
+
+      <!-- 아래에 구매 링크가 있다는 표시: 링크가 화면에 보이면 숨김 -->
+      <div id="export-more-hint" class="export-more-hint" hidden>
+        <button id="btn-export-more" type="button">아래에 구매 링크가 있어요 <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
       </div>
     </div>
   </div>
@@ -780,12 +790,12 @@
   </div>
 
   <!-- 애플리케이션 스크립트 로드 -->
-  <script src="js/units.js?v=1105d"></script>
-  <script src="js/presets.js?v=1105d"></script>
-  <script src="js/items.js?v=1105d"></script>
-  <script src="js/packer.js?v=1105d"></script>
-  <script src="js/scene3d.js?v=1105d"></script>
-  <script src="js/app.js?v=1105d"></script>
+  <script src="js/units.js?v=1105e"></script>
+  <script src="js/presets.js?v=1105e"></script>
+  <script src="js/items.js?v=1105e"></script>
+  <script src="js/packer.js?v=1105e"></script>
+  <script src="js/scene3d.js?v=1105e"></script>
+  <script src="js/app.js?v=1105e"></script>
 
   <!-- 보관함 자세히 보기: 뒤는 흐리게, 고른 보관함만 크게 + 물건 넣기 -->
   <div id="box-detail" class="box-detail" aria-hidden="true">
@@ -811,6 +821,6 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="js/boxdetail.js?v=1105d"></script>
+  <script src="js/boxdetail.js?v=1105e"></script>
 </body>
 </html>

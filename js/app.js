@@ -36,8 +36,9 @@
       postW: 25,        // 세로 기둥 굵기
       postsA: [750],    // 뒤 벽 기둥 위치 (왼쪽 끝에서)
       postsB: [],       // 옆 벽 기둥 위치 (안쪽 구석에서)
+      postsC: [],       // ㄷ자 왼쪽 벽 기둥 위치 (안쪽 구석에서)
       doorW: 800,       // 입구 폭 (그림 표시용)
-      doorSide: 'left', // 입구 쪽: 'left'(옆 선반은 오른쪽 벽) | 'right'(옆 선반은 왼쪽 벽)
+      doorSide: 'left', // 입구 쪽: 'left'(옆 선반은 오른쪽 벽) | 'right'(옆 선반은 왼쪽 벽) | 'center'(ㄷ자, 양쪽 벽)
       keepFloor: false, // 맨 아래 칸 비워두기 (쌀통·생수·청소기 자리)
       defaultShelves: [400, 800, 1200, 1600, 2000].map((y, i) => ({ id: `ps-${i}`, bottomY: y, thickness: 18 })),
       bayShelves: {}    // 열마다 따로 바꾼 선반 { A0: [...], B0: [...] }
@@ -1382,7 +1383,8 @@
     const { bays, startB } = window.PackerEngine.getPantryBays(state.spaceConfig);
     if (!bays.some((b) => b.key === state.pantryBay)) state.pantryBay = bays[0] ? bays[0].key : 'A0';
     const bay = bays.find((b) => b.key === state.pantryBay);
-    const bayLabel = (b) => `${b.wall === 'A' ? '안쪽' : '옆'} ${b.col + 1}번 칸`;
+    const isU = p.doorSide === 'center';
+    const bayLabel = (b) => `${b.wall === 'A' ? '안쪽' : b.wall === 'C' ? '왼쪽' : isU ? '오른쪽' : '옆'} ${b.col + 1}번 칸`;
     const clampNum = (v, lo, hi, dflt) => Math.max(lo, Math.min(hi, Number.isFinite(Number(v)) ? Number(v) : dflt));
     const after = (redraw) => { refreshAll(); if (redraw !== false) renderShelfHeightPopup(); };
 
@@ -1391,7 +1393,7 @@
       ${walk.ok ? '' : `<div class="pp-warn">걷는 길이 ${window.Units.len(walk.min)}로 좁아요. 60 cm 이상이 좋아요. 선반 깊이를 줄여 보세요.</div>`}
       <div class="pp-sec">
         <label class="pp-toggle"><span>맨 아래 칸 비워두기 <span class="pp-cap">쌀통·생수·청소기 자리</span></span><input id="pp-keep-floor" type="checkbox" ${p.keepFloor ? 'checked' : ''}></label>
-        <div class="pp-h" style="margin-top:8px;">입구 쪽</div>
+        <div class="pp-h" style="margin-top:8px;">모양과 입구</div>
         <div class="pp-chips" id="pp-door"></div>
       </div>
       <div class="pp-sec">
@@ -1414,7 +1416,7 @@
         <div class="pp-h">선반 깊이 · 기둥 굵기</div>
         <div class="pp-grid2">
           <label class="pp-field"><span>안쪽 벽 깊이</span><input id="pp-depth-a" type="number" data-unit="mm" class="input-box" step="10" value="${p.depthA}"></label>
-          <label class="pp-field"><span>옆 벽 깊이</span><input id="pp-depth-b" type="number" data-unit="mm" class="input-box" step="10" value="${p.depthB}" ${p.wallB === false ? 'disabled' : ''}></label>
+          <label class="pp-field"><span>${isU ? '양쪽 벽 깊이' : '옆 벽 깊이'}</span><input id="pp-depth-b" type="number" data-unit="mm" class="input-box" step="10" value="${p.depthB}" ${p.wallB === false ? 'disabled' : ''}></label>
           <label class="pp-field"><span>기둥 굵기</span><input id="pp-post-w" type="number" data-unit="mm" class="input-box" step="5" value="${p.postW}"></label>
         </div>
       </div>`;
@@ -1430,13 +1432,16 @@
       after();
     });
     const doorEl = body.querySelector('#pp-door');
-    [['left', '왼쪽 입구'], ['right', '오른쪽 입구']].forEach(([v, label]) => {
+    [['left', 'ㄱ자, 왼쪽 입구'], ['right', 'ㄱ자, 오른쪽 입구'], ['center', 'ㄷ자, 가운데 입구']].forEach(([v, label]) => {
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = 'sp-chip' + ((p.doorSide || 'left') === v ? ' selected' : '');
       chip.textContent = label;
       chip.addEventListener('click', () => {
+        snapPantryComps();
+        if (v === 'center' && !p.postsC) p.postsC = [...(p.postsB || [])];
         p.doorSide = v;
+        clampPantryBoxes();
         after();
         window.Scene3DManager.setCameraView('iso');
       });
@@ -1517,13 +1522,16 @@
     // 기둥 위치
     const postsEl = body.querySelector('#pp-posts');
     const wallRow = (wall) => {
-      if (wall === 'B' && p.wallB === false) return;
-      const key = wall === 'A' ? 'postsA' : 'postsB';
+      if (wall !== 'A' && p.wallB === false) return;
+      if (wall === 'C' && !isU) return;
+      const key = 'posts' + wall;
+      if (!p[key]) p[key] = [];
       const lo = wall === 'A' ? 0 : startB;
       const hi = wall === 'A' ? p.roomW : p.roomD;
       const wrap = document.createElement('div');
       wrap.className = 'pp-post-wall';
-      wrap.innerHTML = `<div class="pp-sub">${wall === 'A' ? '안쪽 벽 (왼쪽 끝부터)' : '옆 벽 (안쪽 구석부터)'}</div>`;
+      const wallTitle = wall === 'A' ? '안쪽 벽 (왼쪽 끝부터)' : wall === 'C' ? '왼쪽 벽 (안쪽 구석부터)' : isU ? '오른쪽 벽 (안쪽 구석부터)' : '옆 벽 (안쪽 구석부터)';
+      wrap.innerHTML = `<div class="pp-sub">${wallTitle}</div>`;
       const posts = [...(p[key] || [])].sort((a, b) => a - b);
       posts.forEach((pos, i) => {
         const row = document.createElement('div');
@@ -1570,10 +1578,16 @@
     };
     wallRow('A');
     wallRow('B');
+    wallRow('C');
 
     const bindNum = (id, set) => body.querySelector(id).addEventListener('change', (e) => { set(Number(e.target.value)); after(); });
     bindNum('#pp-depth-a', (v) => { snapPantryComps(); p.depthA = clampNum(v, 150, Math.min(900, p.roomD - 200), 400); clampPantryBoxes(); });
-    bindNum('#pp-depth-b', (v) => { p.depthB = clampNum(v, 150, Math.min(900, p.roomW - 200), 400); });
+    bindNum('#pp-depth-b', (v) => {
+      snapPantryComps();
+      const maxB = isU ? Math.max(150, Math.floor((p.roomW - 600) / 2)) : Math.min(900, p.roomW - 200);
+      p.depthB = clampNum(v, 150, Math.min(900, maxB), 400);
+      clampPantryBoxes();
+    });
     bindNum('#pp-post-w', (v) => { p.postW = clampNum(v, 0, 80, 25); });
   }
 
@@ -2645,6 +2659,8 @@
           <span>필터</span>
           <span class="picker-filter-count">${count}</span>
         `;
+        const popLabel = document.querySelector('#modal-box-picker .pfp-pop-label');
+        if (popLabel) popLabel.textContent = `상자 ${count}개 보기`;
       };
       updateFilterBtnLabel();
       filterBtn.addEventListener('click', () => {
@@ -2668,7 +2684,8 @@
       chips.appendChild(addBtn);
       tabsEl.appendChild(chips);
 
-      // 필터 패널이 열려 있으면 바로 아래에 표시
+      // 필터는 상자 고르기 위에 뜨는 창으로 (목록과 스크롤이 섞이지 않게)
+      document.querySelectorAll('#modal-box-picker .pfp-pop').forEach((el) => el.remove());
       if (state.pickerFilterOpen) {
         const pf = state.pickerFilters;
         const panel = document.createElement('div');
@@ -2818,7 +2835,25 @@
           renderCardsOnly();
         });
 
-        tabsEl.appendChild(panel);
+        const pop = document.createElement('div');
+        pop.className = 'pfp-pop';
+        pop.innerHTML = `
+          <div class="pfp-pop-card" role="dialog" aria-modal="true" aria-label="필터">
+            <div class="pfp-pop-head">
+              <span class="pfp-pop-title">필터</span>
+              <button type="button" class="pfp-pop-close" aria-label="필터 닫기">✕</button>
+            </div>
+            <div class="pfp-pop-body"></div>
+            <div class="pfp-pop-foot">
+              <button type="button" class="btn btn-primary pfp-pop-done"><span class="pfp-pop-label">상자 ${getFilteredCatalogModels().length}개 보기</span></button>
+            </div>
+          </div>`;
+        pop.querySelector('.pfp-pop-body').appendChild(panel);
+        const closeFilter = () => { state.pickerFilterOpen = false; renderPickerModalContent(); };
+        pop.addEventListener('click', (e) => { if (e.target === pop) closeFilter(); });
+        pop.querySelector('.pfp-pop-close').addEventListener('click', closeFilter);
+        pop.querySelector('.pfp-pop-done').addEventListener('click', closeFilter);
+        document.getElementById('modal-box-picker').appendChild(pop);
       }
     }
 
@@ -3961,7 +3996,7 @@
     const cols = Math.max(1, Math.round(n));
     const posts = [];
     for (let i = 1; i < cols; i++) posts.push(Math.round((start + ((end - start) * i) / cols) / 5) * 5);
-    if (wall === 'A') p.postsA = posts; else p.postsB = posts;
+    if (wall === 'A') p.postsA = posts; else { p.postsB = posts; p.postsC = [...posts]; }   // ㄷ자 양쪽 벽은 똑같이
     p.bayShelves = {};   // 열이 바뀌면 열마다 높이는 처음 값으로
     clampPantryBoxes();
   }
@@ -4084,7 +4119,7 @@
       options: [
         { value: 'cabinet', label: '문 달린 장', sub: '옷장, 벽장, 주방장' },
         { value: 'drawer', label: '빼는 서랍', sub: '앞으로 당겨 여는 서랍장' },
-        { value: 'pantry', label: '팬트리', sub: 'ㄱ자로 걸어 들어가는 방' },
+        { value: 'pantry', label: '팬트리', sub: 'ㄱ자, ㄷ자로 걸어 들어가는 방' },
         { value: 'fridge', label: '냉장고', sub: '양문형, 4도어, 2도어' }
       ],
       get: () => state.spaceConfig.type,
@@ -4164,14 +4199,20 @@
         typeStep,
         {
           kind: 'choice',
-          title: '입구는<br>어느 쪽인가요?',
-          hint: () => '방에 들어가서 정면을 볼 때 입구가 있는 쪽이에요.',
+          title: '팬트리는<br>어떤 모양인가요?',
+          hint: () => '방에 들어가서 정면을 볼 때 선반이 있는 벽으로 골라요.',
           options: [
-            { value: 'left', label: '왼쪽 입구', sub: '선반은 안쪽 벽과 오른쪽 벽' },
-            { value: 'right', label: '오른쪽 입구', sub: '선반은 안쪽 벽과 왼쪽 벽' }
+            { value: 'left', label: 'ㄱ자, 왼쪽 입구', sub: '선반은 안쪽 벽과 오른쪽 벽' },
+            { value: 'right', label: 'ㄱ자, 오른쪽 입구', sub: '선반은 안쪽 벽과 왼쪽 벽' },
+            { value: 'center', label: 'ㄷ자, 가운데 입구', sub: '선반은 안쪽 벽과 양쪽 벽' }
           ],
           get: () => p.doorSide || 'left',
-          set: (v) => { p.doorSide = v; }
+          set: (v) => {
+            snapPantryComps();
+            if (v === 'center' && !p.postsC) p.postsC = [...(p.postsB || [])];
+            p.doorSide = v;
+            clampPantryBoxes();
+          }
         },
         num({
           title: '안쪽 벽은<br>몇 cm인가요?',
@@ -4185,7 +4226,7 @@
         num({
           title: '옆 벽은<br>몇 cm인가요?',
           measure: WIZ_MEASURE.panD,
-          caption: '방 깊이 (오른쪽 벽 길이)',
+          caption: '방 깊이 (옆 벽 길이)',
           hint: () => '안쪽 벽에서 입구까지 재요.',
           min: 600, max: 4000,
           get: () => p.roomD,
@@ -4202,7 +4243,7 @@
         num({
           title: '선반 깊이는<br>얼마인가요?',
           measure: WIZ_MEASURE.panDepth,
-          caption: '안쪽 벽 · 옆 벽 똑같이',
+          caption: '모든 벽 똑같이',
           hint: () => {
             const w = window.PackerEngine.getPantryWalkway(state.spaceConfig);
             return w.ok
@@ -4225,7 +4266,7 @@
           title: '옆 벽은 기둥으로<br>몇 칸이 나뉘나요?',
           measure: WIZ_MEASURE.panCols,
           unit: '칸', step: 1, min: 0, max: 6,
-          hint: () => (p.wallB === false ? '옆 벽에는 선반이 없어요.' : `세로 기둥이 ${Math.max(0, bayCount('B') - 1)}개예요.`),
+          hint: () => (p.wallB === false ? '옆 벽에는 선반이 없어요.' : `세로 기둥이 ${Math.max(0, bayCount('B') - 1)}개예요.${p.doorSide === 'center' ? ' 양쪽 벽이 똑같이 나뉘어요.' : ''}`),
           get: () => (p.wallB === false ? 0 : bayCount('B')),
           set: (v) => { if (v <= 0) { p.wallB = false; } else { p.wallB = true; setPantryCols('B', v); } }
         }),
@@ -5316,9 +5357,17 @@
       const chkMain = document.getElementById('chk-export-show-margins');
       if (!previewEl) return;
       const enabled = chkMain ? chkMain.checked : true;
-      if (dirsEl) dirsEl.style.display = enabled ? 'flex' : 'none';
-      if (!enabled) {
+      const open = enabled && !!state.exportDirsOpen;   // 방향 고르기는 접어 둠 (창이 길어져 구매 링크가 안 보여서)
+      if (dirsEl) dirsEl.style.setProperty('display', open ? 'grid' : 'none', 'important');
+      const tgl = document.getElementById('btn-export-dirs-toggle');
+      if (tgl) {
+        tgl.hidden = !enabled;
+        tgl.textContent = open ? '접기' : '방향 고르기';
+        tgl.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
+      if (!open) {
         previewEl.style.display = 'none';
+        updateExportMoreHint();
         return;
       }
       const { show, dirs } = getSelectedMarginDirs();
@@ -5340,6 +5389,25 @@
           <span class="emp-cells">${dirs.map((k) => `<span class="emp-cell"><span>${{ top: '위', left: '왼쪽', right: '오른쪽', front: '앞', back: '뒤' }[k]}</span><b>${window.Units.cm(m[k])}</b></span>`).join('')}</span>
         </div>
       `).join('');
+    }
+
+    // 저장·구매 창: 구매 링크가 아직 화면 아래에 있으면 '아래에 구매 링크가 있어요' 표시
+    function updateExportMoreHint() {
+      const box = document.querySelector('#modal-export .modal-box');
+      const sec = document.getElementById('export-links-section');
+      const hint = document.getElementById('export-more-hint');
+      if (!box || !sec || !hint) return;
+      if (!box.getClientRects().length) { hint.hidden = true; return; }
+      const below = sec.getBoundingClientRect().top > box.getBoundingClientRect().bottom - 72;
+      hint.hidden = !below;
+    }
+    function scrollExportToLinks() {
+      const box = document.querySelector('#modal-export .modal-box');
+      const sec = document.getElementById('export-links-section');
+      const head = box && box.querySelector('.modal-header');
+      if (!box || !sec) return;
+      const top = box.scrollTop + sec.getBoundingClientRect().top - box.getBoundingClientRect().top - (head ? head.offsetHeight : 0) - 8;
+      box.scrollTo({ top, behavior: 'smooth' });
     }
 
     function renderExportModal() {
@@ -5429,7 +5497,7 @@
               card.innerHTML = `
                 <div class="export-item-thumb" style="position:relative;">
                   ${thumbHtml}
-                  ${count > 1 ? `<span style="position:absolute;top:6px;right:6px;padding:1px 6px;border-radius:999px;background:rgba(59,42,26,0.82);color:#fff;font-size:10px;font-weight:600;">${count}개</span>` : ''}
+                  ${count > 1 ? `<span class="export-qty-badge">${count}개</span>` : ''}
                 </div>
                 <div class="export-item-name">${model.name}</div>
               `;
@@ -5456,6 +5524,11 @@
       if (exportModal) {
         exportModal.classList.add('open');
         exportModal.style.display = 'flex';
+        const box = exportModal.querySelector('.modal-box');
+        if (box) box.scrollTop = 0;
+        // 창이 그려진 뒤에 구매 링크가 화면 안에 있는지 다시 봄 (열리는 움직임이 끝난 뒤에도 한 번 더)
+        requestAnimationFrame(updateExportMoreHint);
+        setTimeout(updateExportMoreHint, 420);
       }
     }
 
@@ -5472,6 +5545,18 @@
       if (e.target === exportModal) closeExportModal();
     });
     document.getElementById('chk-export-show-margins')?.addEventListener('change', updateExportMarginPreview);
+    document.getElementById('btn-export-dirs-toggle')?.addEventListener('click', () => {
+      state.exportDirsOpen = !state.exportDirsOpen;
+      updateExportMarginPreview();
+      updateExportMoreHint();
+    });
+    document.querySelector('#modal-export .modal-box')?.addEventListener('scroll', updateExportMoreHint, { passive: true });
+    if (window.ResizeObserver) {
+      const exBox = document.querySelector('#modal-export .modal-box');
+      if (exBox) new ResizeObserver(() => updateExportMoreHint()).observe(exBox);
+    }
+    window.addEventListener('resize', updateExportMoreHint);
+    document.getElementById('btn-export-more')?.addEventListener('click', scrollExportToLinks);
     document.querySelectorAll('#export-margin-dirs input[type="checkbox"]').forEach((c) => {
       c.addEventListener('change', updateExportMarginPreview);
     });
