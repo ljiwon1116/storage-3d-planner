@@ -6,6 +6,24 @@ const ROUTINELAB_URL = 'https://smartstore.naver.com/nuber/products/13818484744'
 // 아이리스 BC 시리즈 구매 링크 (전 사이즈 공통)
 const IRIS_BC_URL = 'https://brand.naver.com/iriskorea/products/315482921';
 
+// 코멧 쿠팡 구매 링크 (제품마다). 쿠팡 인플루언서 링크를 받으면 '' 안에 넣어요
+const COMET_URLS = {
+  'comet-basket-l': '',
+  'comet-basket-m': '',
+  'comet-fridge-tray': '',
+  'comet-clear-drawer-wide-l': '',
+  'comet-livingbox-pantry-m': '',
+  'comet-livingbox-pantry-l': '',
+  'comet-pantry-drawer-l': '',
+  'comet-pantry-drawer-m': '',
+  'comet-pantry-drawer-s': '',
+  'comet-simple-pantry-bin': '',
+  'comet-window-pantry-l': '',
+  'comet-clear-organizer-s': '',
+  'comet-clear-organizer-l': '',
+  'comet-clear-organizer-open': ''
+};
+
 window.DEFAULT_STORAGE_MODELS = [
   // 1. 무인양품 (MUJI) - 폴리프로필렌 케이스·서랍식 (9종)
   {
@@ -367,91 +385,49 @@ window.DEFAULT_STORAGE_MODELS = [
     image: 'img/muji/muji-pp-closet-deep.png'
   },
 
-  // 2. 이케아 (IKEA)
-  {
-    id: 'ikea-skubb-s',
+  // 2. 이케아 (IKEA) — 2026-11 이케아 장바구니 기준 (가격·링크·사진은 이케아 코리아 공식 사이트)
+  ...[
+    // [id, lineup, name, 가로, 깊이, 높이, accessType, 적층, 앞손잡이, color, 가격, 상품 주소]
+    ['ikea-uppdatera-50x12', 'UPPDATERA (우프다테라)', 'UPPDATERA 수납함 앤트러싸이트 50x12cm', 124, 500, 100, 'top_open', false, true, '#4b4d50', 9900, 'p/uppdatera-box-anthracite-10580800/'],
+    ['ikea-samla-22l', 'SAMLA (삼라)', 'SAMLA 수납함+뚜껑 투명 39x28x28cm 22L', 390, 280, 280, 'top_lid', true, true, '#eef2f4', 5900, 'p/samla-box-with-lid-transparent-s39440828/'],
+    ['ikea-kuggis-bb-18x26x8', 'KUGGIS (쿠기스)', 'KUGGIS 수납함 블랙블루 18x26x8cm', 180, 260, 80, 'top_open', false, true, '#2c3a4b', 4500, 'p/kuggis-box-black-blue-40610198/'],
+    ['ikea-kuggis-lid-13x18x8', 'KUGGIS (쿠기스)', 'KUGGIS 수납함+뚜껑 화이트/대나무 13x18x8cm', 130, 180, 80, 'top_lid', true, true, '#f6f4ef', 3900, 'p/kuggis-box-with-lid-white-bamboo-s49561283/'],
+    ['ikea-samla-5l', 'SAMLA (삼라)', 'SAMLA 수납함+뚜껑 투명 28x20x14cm 5L', 280, 200, 140, 'top_lid', true, true, '#eef2f4', 2400, 'p/samla-box-with-lid-transparent-s19440848/'],
+    ['ikea-kuggis-lid-37x54x21', 'KUGGIS (쿠기스)', 'KUGGIS 수납함+뚜껑 화이트/대나무 37x54x21cm', 370, 540, 210, 'top_lid', true, true, '#f6f4ef', 34900, 'p/kuggis-box-with-lid-white-bamboo-s59561292/'],
+    ['ikea-samla-130l', 'SAMLA (삼라)', 'SAMLA 수납함+뚜껑 투명 79x57x43cm 130L', 790, 570, 430, 'top_lid', true, true, '#eef2f4', 26900, 'p/samla-box-with-lid-transparent-s09440820/'],
+    ['ikea-kuggis-lg-37x54x21', 'KUGGIS (쿠기스)', 'KUGGIS 수납함 라이트그레이 37x54x21cm', 370, 540, 210, 'top_open', false, true, '#cfcdc8', 24900, 'p/kuggis-box-light-grey-10599159/'],
+    ['ikea-kuggis-cube-32', 'KUGGIS (쿠기스)', 'KUGGIS 수납상자+뚜껑 화이트 32x32x32cm', 320, 320, 320, 'top_lid', true, true, '#f4f4f2', 24900, 'p/kuggis-storage-box-with-lid-white-80526876/'],
+    ['ikea-samla-55l', 'SAMLA (삼라)', 'SAMLA 수납함+뚜껑 투명 79x57x18cm 55L', 790, 570, 180, 'top_lid', true, true, '#eef2f4', 19900, 'p/samla-box-with-lid-transparent-s69440817/'],
+    ['ikea-samla-45l', 'SAMLA (삼라)', 'SAMLA 수납함+뚜껑 투명 57x39x28cm 45L', 570, 390, 280, 'top_lid', true, true, '#eef2f4', 9900, 'p/samla-box-with-lid-transparent-s39440767/'],
+    ['ikea-sockerbit-38x51x30', 'SOCKERBIT (소케르비트)', 'SOCKERBIT 수납함+뚜껑 화이트 38x51x30cm', 380, 510, 300, 'top_lid', true, false, '#f5f5f3', 12900, 'p/sockerbit-box-with-lid-white-00316066/'],
+    ['ikea-kuggis-lid-26x35x15', 'KUGGIS (쿠기스)', 'KUGGIS 수납함+뚜껑 화이트/대나무 26x35x15cm', 260, 350, 150, 'top_lid', true, true, '#f6f4ef', 16900, 'p/kuggis-box-with-lid-white-bamboo-s19561289/'],
+    ['ikea-sopprot-51', 'SOPPROT (소프로트)', 'SOPPROT 인출식수납유닛 투명화이트 51x46x20.5cm', 510, 460, 205, 'front_drawer', true, true, '#f1f2f1', 35000, 'p/sopprot-pull-out-storage-unit-transparent-white-20376479/'],
+    ['ikea-sopprot-34', 'SOPPROT (소프로트)', 'SOPPROT 인출식수납유닛 투명화이트 34x46x20.5cm', 340, 460, 205, 'front_drawer', true, true, '#f1f2f1', 25000, 'p/sopprot-pull-out-storage-unit-transparent-white-80376481/'],
+    ['ikea-sockerbit-38x76x30', 'SOCKERBIT (소케르비트)', 'SOCKERBIT 수납상자+뚜껑 화이트 38x76x30cm', 380, 760, 300, 'top_lid', true, false, '#f5f5f3', 39900, 'p/sockerbit-storage-box-with-lid-white-20522089/'],
+    ['ikea-kuggis-lid-18x26x15', 'KUGGIS (쿠기스)', 'KUGGIS 수납함+뚜껑 화이트/대나무 18x26x15cm', 180, 260, 150, 'top_lid', true, true, '#f6f4ef', 9400, 'p/kuggis-box-with-lid-white-bamboo-s99561285/'],
+    ['ikea-kuggis-lid-18x26x8', 'KUGGIS (쿠기스)', 'KUGGIS 수납함+뚜껑 화이트/대나무 18x26x8cm', 180, 260, 80, 'top_lid', true, true, '#f6f4ef', 8000, 'p/kuggis-box-with-lid-white-bamboo-s59561287/'],
+    ['ikea-sockerbit-38x25x15', 'SOCKERBIT (소케르비트)', 'SOCKERBIT 수납함+뚜껑 화이트 38x25x15cm', 380, 250, 150, 'top_lid', true, false, '#f5f5f3', 6900, 'p/sockerbit-box-with-lid-white-50316064/'],
+    ['ikea-samla-11l', 'SAMLA (삼라)', 'SAMLA 수납함+뚜껑 투명 39x28x14cm 11L', 390, 280, 140, 'top_lid', true, true, '#eef2f4', 4900, 'p/samla-box-with-lid-transparent-s49440837/'],
+    ['ikea-kuggis-lg-18x26x15', 'KUGGIS (쿠기스)', 'KUGGIS 수납함 라이트그레이 18x26x15cm', 180, 260, 150, 'top_open', false, true, '#cfcdc8', 5900, 'p/kuggis-box-light-grey-30599158/'],
+    ['ikea-sopprot-17', 'SOPPROT (소프로트)', 'SOPPROT 인출식수납유닛 투명화이트 17x46x20.5cm', 170, 460, 205, 'front_drawer', true, true, '#f1f2f1', 15000, 'p/sopprot-pull-out-storage-unit-transparent-white-60376482/'],
+    ['ikea-kuggis-bb-26x35x15', 'KUGGIS (쿠기스)', 'KUGGIS 수납함 블랙블루 26x35x15cm', 260, 350, 150, 'top_open', false, true, '#2c3a4b', 9900, 'p/kuggis-box-black-blue-80610200/']
+  ].map(([id, lineup, name, w, d, h, accessType, stackable, hasFrontHandle, color, price, pip]) => ({
+    id,
     brand: '이케아',
-    lineup: 'SKUBB (스쿠브)',
-    name: 'SKUBB 수납박스 소 (14x14)',
-    wTop: 140, dTop: 140, h: 130,
-    wBot: 140, dBot: 140,
+    lineup,
+    name,
+    wTop: w, dTop: d, h,
+    wBot: w, dBot: d,
     shapeType: 'box',
-    accessType: 'top_open',
-    stackable: false,
-    stackingOffset: 0,
-    hasFrontHandle: false,
-    color: '#f7f4ef'
-  },
-  {
-    id: 'ikea-skubb-m',
-    brand: '이케아',
-    lineup: 'SKUBB (스쿠브)',
-    name: 'SKUBB 수납박스 중 (28x14)',
-    wTop: 280, dTop: 140, h: 130,
-    wBot: 280, dBot: 140,
-    shapeType: 'box',
-    accessType: 'top_open',
-    stackable: false,
-    stackingOffset: 0,
-    hasFrontHandle: false,
-    color: '#efeae2'
-  },
-  {
-    id: 'ikea-skubb-l',
-    brand: '이케아',
-    lineup: 'SKUBB (스쿠브)',
-    name: 'SKUBB 수납박스 대 (28x28)',
-    wTop: 280, dTop: 280, h: 130,
-    wBot: 280, dBot: 280,
-    shapeType: 'box',
-    accessType: 'top_open',
-    stackable: false,
-    stackingOffset: 0,
-    hasFrontHandle: false,
-    color: '#e5ddd0'
-  },
-  {
-    id: 'ikea-variera-s',
-    brand: '이케아',
-    lineup: 'VARIERA (바리에라)',
-    name: 'VARIERA 바구니 소 (24x17)',
-    wTop: 240, dTop: 170, h: 105,
-    wBot: 210, dBot: 145,
-    shapeType: 'tapered',
-    accessType: 'front_open',
-    stackable: false,
-    stackingOffset: 0,
-    hasFrontHandle: true,
-    color: '#ffffff'
-  },
-  {
-    id: 'ikea-variera-l',
-    brand: '이케아',
-    lineup: 'VARIERA (바리에라)',
-    name: 'VARIERA 바구니 대 (33.5x24)',
-    wTop: 335, dTop: 240, h: 145,
-    wBot: 300, dBot: 205,
-    shapeType: 'tapered',
-    accessType: 'front_open',
-    stackable: false,
-    stackingOffset: 0,
-    hasFrontHandle: true,
-    color: '#f8f6f2'
-  },
-  {
-    id: 'ikea-kuggis-m',
-    brand: '이케아',
-    lineup: 'KUGGIS (쿠기스)',
-    name: 'KUGGIS 뚜껑 수납함 (26x35x15)',
-    wTop: 260, dTop: 350, h: 150,
-    wBot: 245, dBot: 335,
-    shapeType: 'tapered',
-    accessType: 'top_lid',
-    stackable: true,
-    stackingOffset: 5,
-    hasFrontHandle: true,
-    color: '#d9e2dc'
-  },
+    accessType,
+    stackable,
+    stackingOffset: stackable ? 2 : 0,
+    hasFrontHandle,
+    color,
+    price,
+    url: 'https://www.ikea.com/kr/ko/' + pip,
+    image: `img/ikea/${id}.jpg`
+  })),
 
   // 3. 다이소 (DAISO) — 캡처 62종 전체 라인업 (적층 가능 여부 및 다이소몰 상세페이지 링크 반영)
   ...[
@@ -598,92 +574,41 @@ window.DEFAULT_STORAGE_MODELS = [
     image: 'img/routinelab/routinelab-drawer-9l.png'
   },
 
-  // 5. 코멧 (쿠팡) — 사용자 제공 규격 (가로×세로×높이 cm → mm)
-  {
-    id: 'comet-multi-box-xl',
+  // 5. 코멧 (쿠팡) — 2026-11 쿠팡 장바구니 기준 (가격은 묶음 가격, packQty = 묶음 개수)
+  //    구매 링크는 아래 COMET_URLS에 쿠팡 인플루언서 링크를 넣으면 돼요
+  ...[
+    // [id, lineup, name, 가로, 깊이, 높이, accessType, 적층, 앞손잡이, color, 가격, 묶음개수]
+    ['comet-basket-l', '심플한 다용도 바스켓', '심플한 다용도 바스켓 L (4개)', 309, 198, 121, 'top_open', false, true, '#f3f1ec', 7390, 4],
+    ['comet-basket-m', '심플한 다용도 바스켓', '심플한 다용도 바스켓 M (6개)', 254, 171, 100, 'top_open', false, true, '#f3f1ec', 6970, 6],
+    ['comet-fridge-tray', '냉장고 정리 트레이', '투명 냉장고 정리 트레이 11×9×10cm (10개)', 110, 90, 100, 'top_open', false, false, '#eef2f4', 6310, 10],
+    ['comet-clear-drawer-wide-l', '클리어 시스템 수납장', '폭 넓은 클리어 시스템 수납장 와이드서랍', 385, 480, 235, 'front_drawer', true, true, '#eef3f6', 14890, 1],
+    ['comet-livingbox-pantry-m', '리빙박스 팬트리 정리함', '심플한 리빙박스 팬트리 정리함 M (4개)', 370, 265, 162, 'top_lid', true, false, '#f3f1ec', 11890, 4],
+    ['comet-livingbox-pantry-l', '리빙박스 팬트리 정리함', '심플한 리빙박스 팬트리 정리함 L (4개)', 370, 265, 235, 'top_lid', true, false, '#f3f1ec', 13470, 4],
+    ['comet-pantry-drawer-l', '투명창 서랍 펜트리 정리함', '투명창 서랍 다용도 펜트리 정리함 대형 (2개)', 230, 335, 115, 'front_drawer', true, true, '#f4f4f2', 17990, 2],
+    ['comet-pantry-drawer-m', '투명창 서랍 펜트리 정리함', '투명창 서랍 다용도 펜트리 정리함 중형 (2개)', 170, 240, 90, 'front_drawer', true, true, '#f4f4f2', 11050, 2],
+    ['comet-pantry-drawer-s', '투명창 서랍 펜트리 정리함', '투명창 서랍 다용도 펜트리 정리함 소형 (2개)', 150, 200, 85, 'front_drawer', true, true, '#f4f4f2', 8990, 2],
+    ['comet-simple-pantry-bin', '심플한 팬트리 정리함', '국내생산 심플한 팬트리 정리함 (6개)', 140, 284, 147, 'front_open', false, true, '#f3f1ec', 12480, 6],
+    ['comet-window-pantry-l', '투명창 팬트리 정리함', '속이 보이는 투명창 팬트리 정리함 L (4개)', 142, 285, 149, 'front_open', true, true, '#f3f1ec', 11990, 4],
+    ['comet-clear-organizer-s', '다용도 수납정리함', '투명 다용도 수납정리함 소형', 250, 180, 110, 'top_open', false, false, '#eef2f4', 5190, 1],
+    ['comet-clear-organizer-l', '다용도 수납정리함', '투명 다용도 수납정리함 대형', 350, 240, 140, 'top_open', false, false, '#eef2f4', 6980, 1],
+    ['comet-clear-organizer-open', '다용도 수납정리함', '투명 다용도 수납정리함 오픈형', 330, 220, 150, 'front_open', false, true, '#eef2f4', 5310, 1]
+  ].map(([id, lineup, name, w, d, h, accessType, stackable, hasFrontHandle, color, price, packQty]) => ({
+    id,
     brand: '코멧',
-    lineup: '다용도 정리함',
-    name: '다용도 정리함 특대형',
-    wTop: 505, dTop: 500, h: 400,
-    wBot: 505, dBot: 500,
+    lineup,
+    name,
+    wTop: w, dTop: d, h,
+    wBot: w, dBot: d,
     shapeType: 'box',
-    accessType: 'top_lid',
-    stackable: true,
-    stackingOffset: 0,
-    hasFrontHandle: false,
-    color: '#eceae5'
-  },
-  {
-    id: 'comet-clear-drawer-wide-l',
-    brand: '코멧',
-    lineup: '클리어 시스템 수납 서랍',
-    name: '클리어 시스템 수납 서랍 와이드 대형',
-    wTop: 384, dTop: 482, h: 284,
-    wBot: 384, dBot: 482,
-    shapeType: 'box',
-    accessType: 'front_drawer',
-    stackable: true,
-    stackingOffset: 2,
-    hasFrontHandle: true,
-    color: '#eef3f6'
-  },
-  {
-    id: 'comet-cosmetic-clear',
-    brand: '코멧',
-    lineup: '모던 투명 화장품 정리함',
-    name: '모던 투명 화장품 정리함',
-    wTop: 300, dTop: 190, h: 365,
-    wBot: 300, dBot: 190,
-    shapeType: 'box',
-    accessType: 'top_lid',
-    stackable: false,
-    stackingOffset: 0,
-    hasFrontHandle: true,
-    color: '#f1f4f6'
-  },
-  // 코멧 홈 투명창 서랍 다용도 펜트리 정리함 (2개입) — 사용자 제공 규격
-  {
-    id: 'comet-pantry-drawer-l',
-    brand: '코멧',
-    lineup: '투명창 서랍 펜트리 정리함',
-    name: '투명창 서랍 펜트리 정리함 대형',
-    wTop: 230, dTop: 335, h: 115,
-    wBot: 230, dBot: 335,
-    shapeType: 'box',
-    accessType: 'front_drawer',
-    stackable: true,
-    stackingOffset: 0,
-    hasFrontHandle: true,
-    color: '#f4f4f2'
-  },
-  {
-    id: 'comet-pantry-drawer-m',
-    brand: '코멧',
-    lineup: '투명창 서랍 펜트리 정리함',
-    name: '투명창 서랍 펜트리 정리함 중형',
-    wTop: 170, dTop: 240, h: 90,
-    wBot: 170, dBot: 240,
-    shapeType: 'box',
-    accessType: 'front_drawer',
-    stackable: true,
-    stackingOffset: 0,
-    hasFrontHandle: true,
-    color: '#f4f4f2'
-  },
-  {
-    id: 'comet-pantry-drawer-s',
-    brand: '코멧',
-    lineup: '투명창 서랍 펜트리 정리함',
-    name: '투명창 서랍 펜트리 정리함 소형',
-    wTop: 150, dTop: 200, h: 85,
-    wBot: 150, dBot: 200,
-    shapeType: 'box',
-    accessType: 'front_drawer',
-    stackable: true,
-    stackingOffset: 0,
-    hasFrontHandle: true,
-    color: '#f4f4f2'
-  },
+    accessType,
+    stackable,
+    stackingOffset: stackable ? 2 : 0,
+    hasFrontHandle,
+    color,
+    price,
+    ...(packQty > 1 ? { packQty } : {}),
+    ...(COMET_URLS[id] ? { url: COMET_URLS[id] } : {})
+  })),
 
   // 6. 아이리스 (네이버) — BC 시리즈 라인업 (폭×깊이×높이 mm, 사진: img/iris/)
   ...[
@@ -756,16 +681,14 @@ window.DEFAULT_SAVED_COMBOS = [
     ]
   },
   {
-    id: 'combo-ikea-skubb-set',
-    name: '이케아 SKUBB 서랍 정리 4종 세트',
-    totalW: 565,
-    totalD: 280,
-    maxH: 130,
+    id: 'combo-ikea-kuggis-set',
+    name: '이케아 KUGGIS 뚜껑 수납함 2종 세트',
+    totalW: 445,
+    totalD: 350,
+    maxH: 150,
     items: [
-      { modelId: 'ikea-skubb-l', dx: 0, dz: 0, rot: 0 },
-      { modelId: 'ikea-skubb-m', dx: 285, dz: 0, rot: 0 },
-      { modelId: 'ikea-skubb-s', dx: 285, dz: 140, rot: 0 },
-      { modelId: 'ikea-skubb-s', dx: 425, dz: 140, rot: 0 }
+      { modelId: 'ikea-kuggis-lid-26x35x15', dx: 0, dz: 0, rot: 0 },
+      { modelId: 'ikea-kuggis-lid-18x26x15', dx: 265, dz: 0, rot: 0 }
     ]
   },
   {

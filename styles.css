@@ -5001,3 +5001,17 @@ body.ui-mode-mobile.mobile-step-build.mobile-setup-open .mobile-shelfh-btn { z-i
 }
 .pfp-help-btn:hover { color: var(--accent); border-color: var(--accent); }
 .pfp-help-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- 냉장고: 칸이 많아서 ＋ 버튼은 팬트리처럼 작게, 선반 높이 버튼은 숨김 (선반 수는 '장 설정'에서) ---------- */
+body.space-fridge #mobile-shelf-buttons .msab-num { display: none !important; }
+body.space-fridge #mobile-shelf-buttons .mobile-shelf-add-btn {
+  min-width: 26px !important;
+  width: 26px !important;
+  height: 26px !important;
+  padding: 0 !important;
+  border-radius: 13px !important;
+  box-shadow: 0 2px 6px rgba(43, 38, 33, 0.16) !important;
+}
+body.space-fridge #mobile-shelf-buttons .msab-plus { font-size: 0.85rem !important; margin-top: 0 !important; line-height: 1; }
+body.ui-wide.space-fridge #mobile-shelf-buttons .mobile-shelf-add-btn { width: 30px !important; min-width: 30px !important; height: 30px !important; border-radius: 15px !important; }
+body.ui-mode-mobile.mobile-step-build.space-fridge .mobile-shelfh-btn { display: none; }

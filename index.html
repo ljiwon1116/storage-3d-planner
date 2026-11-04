@@ -6,7 +6,7 @@
   <title>수납 공간 꾸미기 - 옷장·서랍 3D로 짜보기</title>
   <meta name="theme-color" content="#f7f3ec" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <link rel="stylesheet" href="styles.css?v=1104g" />
+  <link rel="stylesheet" href="styles.css?v=1104p" />
   <script>
     // 실제로 보이는 화면 높이를 --vh 로 넣어요 (주소창·툴바가 생기고 없어질 때마다).
     // 브라우저마다 100vh 가 툴바를 포함해서 위아래가 잘리는 문제를 막아요.
@@ -180,8 +180,12 @@
             <div class="type-card-desc">손잡이로 빼는 서랍<br>보이는 깊이</div>
           </div>
           <div id="card-type-pantry" class="type-card">
-            <div class="type-card-title">팬트리 방</div>
+            <div class="type-card-title">팬트리</div>
             <div class="type-card-desc">ㄱ자로 걸어 들어가는 방<br>기둥, 열마다 선반</div>
+          </div>
+          <div id="card-type-fridge" class="type-card">
+            <div class="type-card-title">냉장고</div>
+            <div class="type-card-desc">양문형·4도어·2도어<br>냉장실·냉동실 선반</div>
           </div>
         </div>
 
@@ -251,14 +255,14 @@
               <div style="display:flex;align-items:center;gap:6px;">
                 <button id="btn-door-angle-toggle" type="button" class="btn btn-sm" style="flex:1;justify-content:space-between;border-color:#c29c74;background:#fffaf0;color:#5c4228;font-weight:700;">
                   <span>문 열리는 각도</span>
-                  <span id="door-angle-badge" style="color:#b86b43;font-weight:800;">75° ▾</span>
+                  <span id="door-angle-badge" style="color:#b86b43;font-weight:800;">100° ▾</span>
                 </button>
               </div>
               <div id="door-angle-panel" style="display:flex;flex-direction:column;gap:6px;background:#f8f1e3;border:1px solid #e2d5c1;border-radius:8px;padding:8px 10px;">
                 <div style="display:flex;align-items:center;gap:8px;">
                   <span style="font-size:0.72rem;font-weight:700;color:#6e5236;white-space:nowrap;">각도 맞추기</span>
-                  <input id="cab-door-angle-slider" type="range" min="0" max="120" value="75" step="1" style="flex:1;accent-color:#b86b43;cursor:pointer;" />
-                  <strong id="cab-door-angle-val" style="font-size:0.75rem;color:#b86b43;min-width:34px;text-align:right;">75°</strong>
+                  <input id="cab-door-angle-slider" type="range" min="0" max="120" value="100" step="1" style="flex:1;accent-color:#b86b43;cursor:pointer;" />
+                  <strong id="cab-door-angle-val" style="font-size:0.75rem;color:#b86b43;min-width:34px;text-align:right;">100°</strong>
                 </div>
                 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;">
                   <button type="button" class="btn btn-sm door-angle-preset" data-angle="0">닫힘 0°</button>
@@ -386,9 +390,9 @@
       <div id="open-ctrl-pop" class="open-ctrl-pop" hidden>
         <div class="ocp-head">
           <span id="ocp-title" class="ocp-title">문 열기</span>
-          <span id="ocp-val" class="ocp-val">75°</span>
+          <span id="ocp-val" class="ocp-val">100°</span>
         </div>
-        <input id="ocp-slider" class="ocp-slider" type="range" min="0" max="110" value="75" aria-labelledby="ocp-title" />
+        <input id="ocp-slider" class="ocp-slider" type="range" min="0" max="110" value="100" aria-labelledby="ocp-title" />
         <div class="ocp-ends"><span>닫힘</span><span id="ocp-max">활짝</span></div>
       </div>
 
@@ -766,11 +770,11 @@
   </div>
 
   <!-- 애플리케이션 스크립트 로드 -->
-  <script src="js/presets.js?v=1104g"></script>
-  <script src="js/items.js?v=1104g"></script>
-  <script src="js/packer.js?v=1104g"></script>
-  <script src="js/scene3d.js?v=1104g"></script>
-  <script src="js/app.js?v=1104g"></script>
+  <script src="js/presets.js?v=1104p"></script>
+  <script src="js/items.js?v=1104p"></script>
+  <script src="js/packer.js?v=1104p"></script>
+  <script src="js/scene3d.js?v=1104p"></script>
+  <script src="js/app.js?v=1104p"></script>
 
   <!-- 보관함 자세히 보기: 뒤는 흐리게, 고른 보관함만 크게 + 물건 넣기 -->
   <div id="box-detail" class="box-detail" aria-hidden="true">
@@ -796,6 +800,6 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="js/boxdetail.js?v=1104g"></script>
+  <script src="js/boxdetail.js?v=1104p"></script>
 </body>
 </html>

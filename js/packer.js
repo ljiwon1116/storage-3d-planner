@@ -3,6 +3,10 @@
 window.PackerEngine = (function () {
   // 0. 가구 전체 크기 (가로 W, 깊이 D, 높이 H)
   function getSpaceDims(spaceConfig) {
+    if (spaceConfig.type === 'fridge') {
+      const f = spaceConfig.fridge;
+      return { W: f.w, D: f.d, H: f.h };
+    }
     if (spaceConfig.type === 'pantry') {
       const p = spaceConfig.pantry;
       return { W: p.roomW, D: p.roomD, H: p.h };
@@ -80,6 +84,56 @@ window.PackerEngine = (function () {
     return { front, side, min: Math.min(front, side), ok: Math.min(front, side) >= 600 };
   }
 
+  // 0-4. 냉장고: 바깥 크기(가로·깊이·높이)에서 안쪽 칸(냉장실·냉동실)을 나눔
+  // - 'side' 양문형: 왼쪽 냉동실 · 오른쪽 냉장실
+  // - 'four' 4도어: 위 냉장실 · 아래 냉동실 왼쪽/오른쪽
+  // - 'two'  2도어: 위 냉동실 · 아래 냉장실
+  // 안쪽 치수는 실제 제품 평균에 맞춘 추정값 (벽·문 포켓 두께를 빼서 계산)
+  const FRIDGE_PARTS = { wall: 40, top: 50, base: 70, back: 60, door: 70, pocket: 150, divider: 50, glass: 6 };
+  function getFridgeLayout(spaceConfig) {
+    const f = spaceConfig.fridge;
+    const P = FRIDGE_PARTS;
+    const IW = Math.max(200, f.w - P.wall * 2);
+    const IH = Math.max(300, f.h - P.top - P.base);
+    const bodyD = Math.max(300, f.d - P.door);
+    const innerD = Math.max(200, bodyD - P.back - P.pocket);
+    const div = P.divider;
+    let zones;
+    if (f.doorType === 'four') {
+      const topH = Math.round((IH - div) * 0.6);
+      const botH = IH - div - topH;
+      const bw = Math.round((IW - div) / 2);
+      zones = [
+        { key: 'rf', kind: 'fridge', label: '냉장실', x0: 0, y0: botH + div, w: IW, h: topH },
+        { key: 'fzL', kind: 'freezer', label: '냉동실 왼쪽', x0: 0, y0: 0, w: bw, h: botH },
+        { key: 'fzR', kind: 'freezer', label: '냉동실 오른쪽', x0: bw + div, y0: 0, w: IW - bw - div, h: botH }
+      ];
+    } else if (f.doorType === 'two') {
+      const fzH = Math.round((IH - div) * 0.3);
+      const rfH = IH - div - fzH;
+      zones = [
+        { key: 'rf', kind: 'fridge', label: '냉장실', x0: 0, y0: 0, w: IW, h: rfH },
+        { key: 'fz', kind: 'freezer', label: '냉동실', x0: 0, y0: rfH + div, w: IW, h: fzH }
+      ];
+    } else {
+      const fw = Math.round((IW - div) * 0.42);
+      zones = [
+        { key: 'rf', kind: 'fridge', label: '냉장실', x0: fw + div, y0: 0, w: IW - fw - div, h: IH },
+        { key: 'fz', kind: 'freezer', label: '냉동실', x0: 0, y0: 0, w: fw, h: IH }
+      ];
+    }
+    zones.forEach((z) => {
+      const n = Math.max(0, Math.round(Number(z.kind === 'fridge' ? f.shelvesFridge : f.shelvesFreezer) || 0));
+      z.shelfCount = n;
+      z.clear = Math.max(20, Math.floor((z.h - n * P.glass) / (n + 1)));
+      z.ox = -f.w / 2 + P.wall + z.x0;          // 칸 왼쪽 끝 (방 좌표)
+      z.oz = -f.d / 2 + P.back;                 // 칸 뒤쪽 끝
+      z.yBase = P.base + z.y0;                  // 칸 바닥 높이
+      z.d = innerD;
+    });
+    return { zones, IW, IH, bodyD, innerD, parts: P };
+  }
+
   // 칸 안의 위치(x: 벽을 따라, z: 벽에서 앞으로)를 방 좌표로
   function localToWorld(comp, lx, lz) {
     const c = Math.cos(comp.rotY || 0), s = Math.sin(comp.rotY || 0);
@@ -93,7 +147,7 @@ window.PackerEngine = (function () {
   // 1. 장 형식의 선반 구획(칸) 또는 슬라이딩 서랍의 유효 공간 목록 반환
   function getCompartments(spaceConfig) {
     const list = getCompartmentsRaw(spaceConfig);
-    if (spaceConfig.type !== 'pantry') {
+    if (spaceConfig.type !== 'pantry' && spaceConfig.type !== 'fridge') {
       const { W, D } = getSpaceDims(spaceConfig);
       list.forEach((c) => { c.ox = -W / 2; c.oz = -D / 2; c.rotY = 0; });
     }
@@ -101,6 +155,24 @@ window.PackerEngine = (function () {
   }
 
   function getCompartmentsRaw(spaceConfig) {
+    if (spaceConfig.type === 'fridge') {
+      const { zones, parts } = getFridgeLayout(spaceConfig);
+      const out = [];
+      zones.forEach((z) => {
+        for (let lvl = 0; lvl <= z.shelfCount; lvl++) {
+          const yStart = z.yBase + lvl * (z.clear + parts.glass);
+          out.push({
+            index: out.length,
+            name: `${z.label} ${lvl + 1}칸`,
+            short: `${z.kind === 'fridge' ? '냉장' : '냉동'}${lvl + 1}`,
+            zoneKey: z.key, zoneKind: z.kind, level: lvl,
+            yStart, yEnd: yStart + z.clear, clearH: z.clear,
+            w: z.w, d: z.d, ox: z.ox, oz: z.oz, rotY: 0
+          });
+        }
+      });
+      return out;
+    }
     if (spaceConfig.type === 'pantry') {
       const p = spaceConfig.pantry;
       const { bays } = getPantryBays(spaceConfig);
@@ -264,7 +336,8 @@ window.PackerEngine = (function () {
       return { ok: false, reason: `너무 높아요 (칸 높이 ${comp.clearH}mm)` };
     }
     const fitsNormal = model.wTop <= comp.w && model.dTop <= comp.d;
-    const fitsRotated = model.dTop <= comp.w && model.wTop <= comp.d;
+    // 서랍형은 서랍 면이 항상 앞을 봐야 해서 돌려 넣지 않음
+    const fitsRotated = model.accessType !== 'front_drawer' && model.dTop <= comp.w && model.wTop <= comp.d;
     if (!fitsNormal && !fitsRotated) {
       return { ok: false, reason: `바닥에 안 들어가요` };
     }
@@ -811,6 +884,7 @@ window.PackerEngine = (function () {
   return {
     getSpaceDims,
     getPantryBays,
+    getFridgeLayout,
     getPantryCorner,
     getPantryWalkway,
     localToWorld,

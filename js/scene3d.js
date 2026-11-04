@@ -335,7 +335,8 @@ window.Scene3DManager = (function () {
   function updateShelfCalloutAnchors() {
     if (!onShelfAnchorsCallback || !currentSpaceConfig || !containerEl || !camera) return;
     const compartments = window.PackerEngine.getCompartments(currentSpaceConfig);
-    const isPantry = currentSpaceConfig.type === 'pantry';
+    // 팬트리·냉장고: ＋버튼을 각 칸 앞쪽 오른편 안에 (칸이 옆으로 나란히 있어서)
+    const isPantry = currentSpaceConfig.type === 'pantry' || currentSpaceConfig.type === 'fridge';
 
     const cw = containerEl.clientWidth;
     const ch = containerEl.clientHeight;
@@ -487,7 +488,7 @@ window.Scene3DManager = (function () {
 
   function buildWarmHomeRoomEnvironment(spaceConfig) {
     const isCab = spaceConfig.type === 'cabinet';
-    const isPantry = spaceConfig.type === 'pantry';
+    const isPantry = spaceConfig.type === 'pantry' || spaceConfig.type === 'fridge'; // 바닥에 바로 놓이는 가구
     const { W, D, H } = window.PackerEngine.getSpaceDims(spaceConfig);
 
     const floorY = isPantry ? -2 : isCab ? -46 : -14 - drawerLowerBodyH(spaceConfig);
@@ -759,6 +760,153 @@ window.Scene3DManager = (function () {
     }
   }
 
+  // 냉장고: 양문형 · 4도어 · 2도어 (몸통 + 칸막이 + 유리 선반 + 문짝과 문 포켓)
+  function buildFridgeScene(spaceConfig) {
+    const f = spaceConfig.fridge;
+    const W = f.w, D = f.d, H = f.h;
+    const L = window.PackerEngine.getFridgeLayout(spaceConfig);
+    const P = L.parts;
+    const backZ = -D / 2;
+    const frontZ = backZ + L.bodyD;           // 몸통 앞면 (문이 닫히는 곳)
+    const bodyCZ = backZ + L.bodyD / 2;
+
+    const shellMat = new THREE.MeshStandardMaterial({
+      color: 0xf3eee6, roughness: 0.45, transparent: true, opacity: xrayMode ? 0.22 : 0.9
+    });
+    const linerMat = new THREE.MeshStandardMaterial({
+      color: 0xfbfaf7, roughness: 0.6, transparent: true, opacity: xrayMode ? 0.18 : 0.75, depthWrite: false
+    });
+    const glassMat = new THREE.MeshStandardMaterial({
+      color: 0xd6e4ec, roughness: 0.15, metalness: 0.05, transparent: true, opacity: 0.45, depthWrite: false
+    });
+    const edgeMat = new THREE.LineBasicMaterial({ color: 0xb9ad9c });
+    const glassEdgeMat = new THREE.LineBasicMaterial({ color: 0x9fb4c2 });
+
+    const addPart = (w, h, d, x, y, z, mat, eMat) => {
+      const g = new THREE.BoxGeometry(w, h, d);
+      const m = new THREE.Mesh(g, mat);
+      m.position.set(x, y, z);
+      m.castShadow = mat !== glassMat;
+      m.receiveShadow = true;
+      cabinetGroup.add(m);
+      const e = new THREE.LineSegments(new THREE.EdgesGeometry(g), eMat || edgeMat);
+      e.position.copy(m.position);
+      cabinetGroup.add(e);
+      return m;
+    };
+
+    // 1) 몸통: 옆판 · 윗판 · 바닥(기계실) · 뒤판
+    addPart(P.wall, H, L.bodyD, -W / 2 + P.wall / 2, H / 2, bodyCZ, shellMat);
+    addPart(P.wall, H, L.bodyD, W / 2 - P.wall / 2, H / 2, bodyCZ, shellMat);
+    addPart(W - P.wall * 2, P.top, L.bodyD, 0, H - P.top / 2, bodyCZ, shellMat);
+    addPart(W - P.wall * 2, P.base, L.bodyD, 0, P.base / 2, bodyCZ, shellMat);
+    addPart(W - P.wall * 2, H - P.top - P.base, P.back, 0, P.base + (H - P.top - P.base) / 2, backZ + P.back / 2, linerMat);
+
+    // 2) 칸막이: 칸과 칸 사이 (안쪽 좌표 기준)
+    const inX = (x) => -W / 2 + P.wall + x;
+    const inY = (y) => P.base + y;
+    const divD = L.bodyD - P.back;
+    const divZ = backZ + P.back + divD / 2;
+    if (f.doorType === 'four') {
+      const top = L.zones.find((z) => z.key === 'rf');
+      const fzL = L.zones.find((z) => z.key === 'fzL');
+      addPart(L.IW, P.divider, divD, 0, inY(top.y0 - P.divider / 2), divZ, shellMat);
+      addPart(P.divider, fzL.h, divD, inX(fzL.w + P.divider / 2), inY(fzL.h / 2), divZ, shellMat);
+    } else if (f.doorType === 'two') {
+      const fz = L.zones.find((z) => z.key === 'fz');
+      addPart(L.IW, P.divider, divD, 0, inY(fz.y0 - P.divider / 2), divZ, shellMat);
+    } else {
+      const fz = L.zones.find((z) => z.key === 'fz');
+      addPart(P.divider, L.IH, divD, inX(fz.w + P.divider / 2), inY(L.IH / 2), divZ, shellMat);
+    }
+
+    // 3) 유리 선반 (칸마다 똑같은 간격)
+    L.zones.forEach((z) => {
+      for (let i = 1; i <= z.shelfCount; i++) {
+        const y = z.yBase + i * z.clear + (i - 1) * P.glass + P.glass / 2;
+        addPart(z.w - 4, P.glass, z.d, z.ox + z.w / 2, y, z.oz + z.d / 2, glassMat, glassEdgeMat);
+      }
+    });
+
+    // 4) 지금 고른 칸 바닥 표시
+    const comps = window.PackerEngine.getCompartments(spaceConfig);
+    const active = comps[activeCompartmentIdx] || comps[0];
+    if (active) {
+      const hl = new THREE.Mesh(
+        new THREE.PlaneGeometry(active.w - 4, active.d - 4),
+        new THREE.MeshBasicMaterial({ color: 0xb86b43, transparent: true, opacity: 0.16, side: THREE.DoubleSide })
+      );
+      hl.rotation.x = -Math.PI / 2;
+      hl.position.set(active.ox + active.w / 2, active.yStart + 1, active.oz + active.d / 2);
+      cabinetGroup.add(hl);
+    }
+
+    // 5) 문짝: 몸통 앞면 가장자리에 경첩, '문 열기' 각도만큼 열림. 안쪽에는 문 포켓
+    const doorMat = new THREE.MeshStandardMaterial({
+      color: 0xeee6da, roughness: 0.4, transparent: true, opacity: xrayMode ? 0.14 : 0.55, depthWrite: false
+    });
+    const doorEdgeMat = new THREE.LineBasicMaterial({ color: 0xa8998a, transparent: true, opacity: 0.9 });
+    const pocketMat = new THREE.MeshStandardMaterial({
+      color: 0xe3edf2, roughness: 0.2, transparent: true, opacity: 0.4, depthWrite: false
+    });
+    const pocketEdgeMat = new THREE.LineBasicMaterial({ color: 0x9fb4c2 });
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0xcfc6b8, roughness: 0.35, metalness: 0.3 });
+    const angleRad = THREE.MathUtils.degToRad(typeof doorOpenAngle === 'number' ? doorOpenAngle : 100);
+    const gap = 3;
+
+    const addDoor = (x0, x1, y0, y1, hingeLeft, pockets) => {
+      const leafW = Math.max(60, x1 - x0 - gap);
+      const leafH = Math.max(60, y1 - y0 - gap);
+      const pivot = new THREE.Group();
+      pivot.position.set(hingeLeft ? x0 : x1, (y0 + y1) / 2, frontZ);
+      const sx = hingeLeft ? 1 : -1;
+      const leafGeom = new THREE.BoxGeometry(leafW, leafH, P.door);
+      const leaf = new THREE.Mesh(leafGeom, doorMat);
+      leaf.position.set(sx * leafW / 2, 0, P.door / 2);
+      pivot.add(leaf);
+      const le = new THREE.LineSegments(new THREE.EdgesGeometry(leafGeom), doorEdgeMat);
+      le.position.copy(leaf.position);
+      pivot.add(le);
+      // 손잡이: 열리는 쪽 가장자리 세로 막대
+      const hh = Math.min(leafH * 0.5, 520);
+      const handle = new THREE.Mesh(new THREE.BoxGeometry(14, hh, 22), handleMat);
+      handle.position.set(sx * (leafW - 30), 0, P.door + 11);
+      pivot.add(handle);
+      // 문 포켓: 문 안쪽에 붙은 투명 칸
+      const pd = P.pocket - 30;
+      for (let i = 0; i < pockets; i++) {
+        const py = -leafH / 2 + leafH * ((i + 0.6) / (pockets + 0.4));
+        const pg = new THREE.BoxGeometry(leafW - 70, 80, pd);
+        const pm = new THREE.Mesh(pg, pocketMat);
+        pm.position.set(sx * leafW / 2, py, -pd / 2);
+        pivot.add(pm);
+        const pe = new THREE.LineSegments(new THREE.EdgesGeometry(pg), pocketEdgeMat);
+        pe.position.copy(pm.position);
+        pivot.add(pe);
+      }
+      pivot.rotation.y = hingeLeft ? -angleRad : angleRad;
+      cabinetGroup.add(pivot);
+    };
+
+    const L0 = -W / 2, R0 = W / 2;
+    if (f.doorType === 'four') {
+      const top = L.zones.find((z) => z.key === 'rf');
+      const splitY = inY(top.y0 - P.divider / 2);
+      addDoor(L0, 0, splitY, H, true, 3);
+      addDoor(0, R0, splitY, H, false, 3);
+      addDoor(L0, 0, 0, splitY, true, 2);
+      addDoor(0, R0, 0, splitY, false, 2);
+    } else if (f.doorType === 'two') {
+      const fz = L.zones.find((z) => z.key === 'fz');
+      const splitY = inY(fz.y0 - P.divider / 2);
+      addDoor(L0, R0, splitY, H, false, 1);
+      addDoor(L0, R0, 0, splitY, false, 4);
+    } else {
+      addDoor(L0, 0, 0, H, true, 4);
+      addDoor(0, R0, 0, H, false, 4);
+    }
+  }
+
   function renderScene(spaceConfig, placedBoxes, modelsMap, stateOpts) {
     lastRenderArgs = [spaceConfig, placedBoxes, modelsMap, stateOpts];
     currentSpaceConfig = spaceConfig;
@@ -791,6 +939,10 @@ window.Scene3DManager = (function () {
       boxesGroup.position.set(0, 0, 0);
     } else if (spaceConfig.type === 'pantry') {
       buildPantryScene(spaceConfig);
+      cabinetGroup.add(boxesGroup);
+      boxesGroup.position.set(0, 0, 0);
+    } else if (spaceConfig.type === 'fridge') {
+      buildFridgeScene(spaceConfig);
       cabinetGroup.add(boxesGroup);
       boxesGroup.position.set(0, 0, 0);
     } else {
@@ -913,7 +1065,7 @@ window.Scene3DManager = (function () {
       const handleMat = new THREE.MeshStandardMaterial({ color: 0x6e4b2a, roughness: 0.4, metalness: 0.15 });
       const hingeMat = new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.3, metalness: 0.7 });
 
-      const angleRad = THREE.MathUtils.degToRad(typeof doorOpenAngle === 'number' ? doorOpenAngle : 75);
+      const angleRad = THREE.MathUtils.degToRad(typeof doorOpenAngle === 'number' ? doorOpenAngle : 100);
 
       const createDoorLeaf = (pivotX, leafW, isLeftHinge) => {
         const pivot = new THREE.Group();
@@ -1678,6 +1830,15 @@ window.Scene3DManager = (function () {
       const mir = currentSpaceConfig.pantry && currentSpaceConfig.pantry.doorSide === 'right' ? -1 : 1;
       controls.target.set(mir * W * 0.12, H * 0.45, -D * 0.1);
       camera.position.set(-mir * W * 0.9, H * 1.1, D * 1.4 + 2400);
+      controls.update();
+      return;
+    }
+
+    if (currentSpaceConfig.type === 'fridge' && viewType !== 'top' && viewType !== 'side') {
+      // 냉장고: 열린 문까지 다 보이게 조금 멀리, 정면에서 살짝 오른쪽 위
+      controls.target.set(0, H * 0.47, 0);
+      if (viewType === 'front') camera.position.set(0, H * 0.5, D / 2 + maxDim * 2.3);
+      else camera.position.set(W * 0.55, H * 0.95, D / 2 + maxDim * 2.2);
       controls.update();
       return;
     }

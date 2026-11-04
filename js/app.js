@@ -4,6 +4,26 @@
   const STORAGE_KEY_CUSTOM_MODELS = 'storagefit_custom_models_v1';
   const STORAGE_KEY_SAVED_COMBOS = 'storagefit_saved_combos_v1';
 
+  // 냉장고 용량별 바깥 크기 (mm). 870L·832L·592L·507L은 LG 실제 제품 치수, 650L은 추정값
+  const FRIDGE_CAPACITIES = {
+    870: { w: 914, d: 918, h: 1787 },   // LG 디오스 오브제컬렉션 4도어 870L
+    832: { w: 913, d: 913, h: 1790 },   // LG 디오스 오브제컬렉션 양문형 832L
+    650: { w: 860, d: 760, h: 1860 },   // 추정값 (같은 크기 2도어 실제 제품을 찾지 못함)
+    592: { w: 860, d: 730, h: 1840 },   // LG 일반냉장고 2도어 592L
+    507: { w: 780, d: 730, h: 1800 }    // LG 일반냉장고 2도어 507L
+  };
+  // 도어 유형별 기본 용량 · 선반 수
+  const FRIDGE_DOOR_DEFAULTS = {
+    side: { capacity: 832, shelvesFridge: 4, shelvesFreezer: 4 },
+    four: { capacity: 870, shelvesFridge: 3, shelvesFreezer: 1 },
+    two: { capacity: 650, shelvesFridge: 3, shelvesFreezer: 1 }
+  };
+  function defaultFridge() {
+    const dd = FRIDGE_DOOR_DEFAULTS.side;
+    return Object.assign({ doorType: 'side', capacity: dd.capacity, shelvesFridge: dd.shelvesFridge, shelvesFreezer: dd.shelvesFreezer }, FRIDGE_CAPACITIES[dd.capacity]);
+  }
+  const SPACE_TYPE_LABELS = { cabinet: '문 달린 장', drawer: '빼는 서랍', pantry: '팬트리', fridge: '냉장고' };
+
   // 한국 아파트 ㄱ자 팬트리 기본값 (방 1500x1800, 선반 높이 2300, 깊이 400)
   function defaultPantry() {
     return {
@@ -50,8 +70,9 @@
         clearanceH: 175,
         tiers: 2
       },
-      // ㄱ자 팬트리 방 (mm). 뒤 벽(A) = 방 가로, 옆 벽(B) = 방 깊이
-      pantry: defaultPantry()
+      // ㄱ자 팬트리 (mm). 뒤 벽(A) = 방 가로, 옆 벽(B) = 방 깊이
+      pantry: defaultPantry(),
+      fridge: defaultFridge()
     },
 
     plans: [
@@ -88,7 +109,7 @@
     autofillStack: true,
 
     drawerOpenRatio: 1.0,
-    doorOpenAngle: 75,
+    doorOpenAngle: 100,           // 여닫이 문 기본 열림 각도
     doorAnglePanelOpen: true,
     showDeadzones: true,
     xrayMode: false,
@@ -351,11 +372,11 @@
 
     const planB = state.plans[1];
     planB.boxes = [
-      { id: 'demo-b1', modelId: 'ikea-kuggis-m', compartmentIndex: 0, x: 65, y: 0, z: 80, rot: 0 },
-      { id: 'demo-b2', modelId: 'ikea-kuggis-m', compartmentIndex: 0, x: 65, y: 145, z: 80, rot: 0 }, // 2단 적층 예시
-      { id: 'demo-b3', modelId: 'ikea-variera-l', compartmentIndex: 0, x: 340, y: 0, z: 190, rot: 0 },
-      { id: 'demo-b4', modelId: 'ikea-skubb-l', compartmentIndex: 2, x: 65, y: 0, z: 150, rot: 0 },
-      { id: 'demo-b5', modelId: 'ikea-skubb-l', compartmentIndex: 2, x: 350, y: 0, z: 150, rot: 0 }
+      { id: 'demo-b1', modelId: 'ikea-kuggis-lid-26x35x15', compartmentIndex: 0, x: 65, y: 0, z: 80, rot: 0 },
+      { id: 'demo-b2', modelId: 'ikea-kuggis-lid-26x35x15', compartmentIndex: 0, x: 65, y: 148, z: 80, rot: 0 }, // 2단 적층 예시
+      { id: 'demo-b3', modelId: 'ikea-kuggis-lid-18x26x15', compartmentIndex: 0, x: 340, y: 0, z: 190, rot: 0 },
+      { id: 'demo-b4', modelId: 'ikea-kuggis-lg-18x26x15', compartmentIndex: 2, x: 65, y: 0, z: 150, rot: 0 },
+      { id: 'demo-b5', modelId: 'ikea-kuggis-lg-18x26x15', compartmentIndex: 2, x: 350, y: 0, z: 150, rot: 0 }
     ];
 
     const planC = state.plans[2];
@@ -374,6 +395,7 @@
     if (!sc) return null;
     if (sc.type === 'drawer') return 'drawer';
     if (sc.type === 'cabinet' && sc.cabinet && sc.cabinet.doorType && sc.cabinet.doorType !== 'none') return 'door';
+    if (sc.type === 'fridge') return 'door';
     return null;   // 팬트리 · 문 없는 장은 버튼 없음
   }
   function updateOpenCtrlButton() {
@@ -456,6 +478,7 @@
   function refreshAll() {
     document.body.classList.toggle('space-drawer', state.spaceConfig.type === 'drawer');
     document.body.classList.toggle('space-pantry', state.spaceConfig.type === 'pantry');
+    document.body.classList.toggle('space-fridge', state.spaceConfig.type === 'fridge');
     const shBtn = document.getElementById('btn-mobile-shelf-height');
     if (shBtn) shBtn.textContent = state.spaceConfig.type === 'pantry' ? '기둥·선반' : '선반 높이';
     const shHead = document.querySelector('#mobile-shelfh-popup .mobile-shelfh-head > span');
@@ -781,12 +804,129 @@
     return boxes;
   }
 
+  // ===== 냉장고 채우기 =====
+  // - 냉장고용 · 주방(팬트리·식품·계란 등) 상자만
+  // - 바구니형: 칸 높이의 절반 이하만 / 쌓아도 칸 높이의 60%까지만
+  // - 서랍형만: 서랍 깊이가 칸 깊이의 60% 이하, 앞쪽에 한 줄
+  // - 섞어서: 서랍형을 안쪽부터, 그 앞에 낮은 바구니형을 한 층만
+  const FRIDGE_FRIENDLY_RE = /냉장고|계란|주방|키친|팬트리|펜트리|식품|밀폐/;
+  const FRIDGE_EXCLUDE_IDS = new Set(['daiso-clean-cutlery-white']); // 수저통은 냉장고에 넣지 않음
+  function isFridgeFriendly(m) {
+    if (!m || m.accessType === 'item' || FRIDGE_EXCLUDE_IDS.has(m.id)) return false;
+    return FRIDGE_FRIENDLY_RE.test(`${m.name || ''} ${m.lineup || ''}`) || m.brand === '루틴랩'; // 루틴랩 = 팬트리 서랍 정리함
+  }
+  const fridgeIsBasket = (m) => ['basket', 'lid'].includes(window.getModelKind(m));
+  const fridgeIsDrawer = (m) => window.getModelKind(m) === 'drawer';
+  const FRIDGE_STACK_RATIO = 0.6;   // 쌓아도 칸 높이의 60%까지
+  const FRIDGE_BASKET_RATIO = 0.5;  // 바구니형은 칸 높이의 절반까지
+  const FRIDGE_DRAWER_DEPTH = 0.6;  // 서랍형만 채울 때 서랍 깊이는 칸 깊이의 60%까지
+
+  // 이 칸에 넣을 수 있는 냉장고 상자 (kind: 'drawer' | 'basket' | 'mix')
+  function fridgeFillPool(comp, kind, brand) {
+    const capH = comp.clearH * FRIDGE_STACK_RATIO;
+    const base = state.catalogModels.filter((m) => isFridgeFriendly(m) && (!brand || m.brand === brand));
+    const drawers = base.filter((m) => fridgeIsDrawer(m) && m.h <= capH &&
+      (kind !== 'drawer' || m.dTop <= comp.d * FRIDGE_DRAWER_DEPTH)); // 서랍형은 돌리지 않으니 깊이 = dTop
+    const baskets = base.filter((m) => fridgeIsBasket(m) && m.h <= comp.clearH * FRIDGE_BASKET_RATIO);
+    if (kind === 'drawer') return drawers;
+    if (kind === 'basket') return baskets;
+    return drawers.concat(baskets);
+  }
+
+  function fridgeFillCompartment(compIdx, kind, brand, rng) {
+    const comp = window.PackerEngine.getCompartments(state.spaceConfig)[compIdx];
+    if (!comp) return [];
+    const capH = comp.clearH * FRIDGE_STACK_RATIO;
+    const k = kind || 'mix';
+    const boxes = [];
+    let id = Date.now();
+    const layersFor = (m, allowStack) => {
+      if (!allowStack || !m.stackable) return 1;
+      const stepH = Math.max(10, m.h - (m.stackingOffset || 0));
+      return Math.max(1, 1 + Math.floor((capH - m.h) / stepH));
+    };
+
+    // 한 줄 채우기: align 'front'면 edge가 앞 끝, 'back'이면 edge가 뒤 끝
+    const placeRow = (models, align, edge, maxD, allowStack) => {
+      let x = 0, rowDepth = 0, safety = 0;
+      while (x < comp.w - 15 && safety++ < 30) {
+        const remW = comp.w - x;
+        const cands = [];
+        models.forEach((m) => {
+          const rots = (!opensFromFront(m) && m.wTop !== m.dTop) ? [0, 90] : [0];
+          rots.forEach((rot) => {
+            const dim = window.PackerEngine.getOrientedDims(m, rot);
+            if (dim.w > remW || dim.d > maxD) return;
+            const rep = Math.max(1, Math.floor((remW + 2) / (dim.w + 2)));
+            const score = (dim.d / Math.max(1, maxD)) * 0.6 + Math.min(1, (rep * dim.w) / Math.max(1, remW)) * 0.4;
+            cands.push({ m, rot, dim, score, rep });
+          });
+        });
+        if (!cands.length) break;
+        cands.sort((a, b) => b.score - a.score);
+        const top = cands.filter((c) => c.score >= cands[0].score * 0.85).slice(0, 5);
+        const pick = top[Math.floor(rng() * top.length)] || cands[0];
+        const count = pick.rep > 1 && rng() < 0.8 ? pick.rep : 1;
+        for (let r = 0; r < count; r++) {
+          if (x + pick.dim.w > comp.w) break;
+          const z = align === 'front' ? edge - pick.dim.d : edge;
+          const stepH = Math.max(10, pick.m.h - (pick.m.stackingOffset || 0));
+          const layers = layersFor(pick.m, allowStack);
+          for (let l = 0; l < layers; l++) {
+            boxes.push({ id: 'box-' + (++id), modelId: pick.m.id, compartmentIndex: compIdx, x: Math.round(x), y: Math.round(l * stepH), z: Math.round(z), rot: pick.rot });
+          }
+          x += pick.dim.w + 2;
+          rowDepth = Math.max(rowDepth, pick.dim.d);
+        }
+      }
+      return rowDepth;
+    };
+
+    // 앞에서 뒤로 여러 줄 (바구니형)
+    const fillRowsFromFront = (models, backLimit, allowStack) => {
+      let front = comp.d;
+      for (let row = 0; row < 10 && front - backLimit > 40; row++) {
+        const dep = placeRow(models, 'front', front, front - backLimit, allowStack);
+        if (!dep) break;
+        front -= dep + 2;
+      }
+    };
+
+    const pool = fridgeFillPool(comp, k, brand);
+    const drawers = pool.filter(fridgeIsDrawer);
+    const baskets = pool.filter(fridgeIsBasket);
+
+    if (k === 'drawer') {
+      placeRow(drawers, 'front', comp.d, comp.d * FRIDGE_DRAWER_DEPTH, true);
+    } else if (k === 'basket') {
+      fillRowsFromFront(baskets, 0, true);
+    } else {
+      // 낮은 바구니형: 바구니 중 낮은 편(가장 낮은 것의 1.6배 이하)만
+      const minH = baskets.reduce((a, m) => Math.min(a, m.h), Infinity);
+      const low = baskets.filter((m) => m.h <= Math.max(minH * 1.6, comp.clearH * 0.25));
+      const minLowD = low.reduce((a, m) => Math.min(a, m.dTop, m.wTop), Infinity);
+      // 서랍형은 안쪽(뒤)부터. 앞에 바구니를 두면 서랍이 절반은 열리도록 서랍 깊이의 절반만큼 비워 둠
+      // → 서랍 깊이 × 1.5 + 바구니 깊이가 칸 깊이 안에 들어가는 서랍만
+      const OPEN_RATIO = 0.5;
+      const drawerMaxD = isFinite(minLowD) ? Math.max(0, (comp.d - minLowD - 2) / (1 + OPEN_RATIO)) : comp.d;
+      const dDepth = placeRow(drawers, 'back', 0, drawerMaxD, true);
+      const gapForOpen = dDepth ? Math.ceil(dDepth * (1 + OPEN_RATIO)) + 2 : 0;
+      fillRowsFromFront(low, gapForOpen, false);  // 한 층만 (쌓지 않음)
+    }
+    return boxes;
+  }
+
   // 첫 설정의 3D 예시: 장은 가운데 칸에 서랍형, 서랍은 바구니형
   function applyPreviewFill() {
     const plan = getActivePlan();
     const rng = seededRng(state.previewSeed);
     const isCab = state.spaceConfig.type === 'cabinet';
-    if (state.spaceConfig.type === 'pantry') {
+    if (state.spaceConfig.type === 'fridge') {
+      // 냉장고 예시: 냉장실 가운데 칸에 바구니
+      const comps = window.PackerEngine.getCompartments(state.spaceConfig).filter((c) => c.zoneKind === 'fridge');
+      const mid = comps[Math.floor(comps.length / 2)];
+      plan.boxes = mid ? fridgeFillCompartment(mid.index, 'mix', null, rng) : [];
+    } else if (state.spaceConfig.type === 'pantry') {
       const comps = window.PackerEngine.getCompartments(state.spaceConfig);
       plan.boxes = [];
       comps.filter((c) => c.level === 1).forEach((c) => {
@@ -809,7 +949,7 @@
     let pool = typeFillPool(kind);
     if (brand) pool = pool.filter((m) => m.brand === brand);
     const isCab = state.spaceConfig.type === 'cabinet';
-    const isPan = state.spaceConfig.type === 'pantry';
+    const isPan = state.spaceConfig.type === 'pantry' || state.spaceConfig.type === 'fridge';
     const isDrawerKind = kind === 'drawer' || (!kind && isCab);
     // 누를 때마다 새 조합 (이전과 똑같으면 한 번 더 뽑음)
     const sig = (list) => list.map((b) => `${b.modelId}@${b.x},${b.z},${b.y}`).join('|');
@@ -842,7 +982,9 @@
     let best = null, bestRate = -1;
     for (let attempt = 0; attempt < 18; attempt++) {
       const rng = seededRng(Math.floor(Math.random() * 1e9));
-      const cand = randomFillCompartment(compIdx, pool, rng, opts);
+      const cand = state.spaceConfig.type === 'fridge'
+        ? fridgeFillCompartment(compIdx, kind, brand, rng)
+        : randomFillCompartment(compIdx, pool, rng, opts);
       if (!cand.length) continue;
       const rate = fillRate(cand);
       const same = sig(cand) === prevSig;
@@ -870,9 +1012,11 @@
     const body = document.getElementById('mobile-shelf-sheet-body');
     const compartments = window.PackerEngine.getCompartments(state.spaceConfig);
     const comp = compartments[compIdx] || compartments[0];
-    const isPan = state.spaceConfig.type === 'pantry';
+    const isPan = state.spaceConfig.type === 'pantry' || state.spaceConfig.type === 'fridge';
     const kind = isPan ? '상자' : state.spaceConfig.type === 'cabinet' ? '서랍형 상자' : '바구니형 상자';
-    const pool = typeFillPool(isPan ? 'mix' : undefined).filter((m) => m.h <= comp.clearH);
+    const pool = state.spaceConfig.type === 'fridge'
+      ? fridgeFillPool(comp, 'mix')
+      : typeFillPool(isPan ? 'mix' : undefined).filter((m) => m.h <= comp.clearH);
     const brands = [...new Set(pool.map((m) => m.brand))];
 
     body.innerHTML = '';
@@ -920,12 +1064,15 @@
   function renderPantryKindChoice(compIdx, brand) {
     const body = document.getElementById('mobile-shelf-sheet-body');
     const comp = window.PackerEngine.getCompartments(state.spaceConfig)[compIdx];
-    const countOf = (k) => typeFillPool(k).filter((m) => m.h <= comp.clearH && (!brand || m.brand === brand)).length;
+    const isFridge = state.spaceConfig.type === 'fridge';
+    const countOf = (k) => (isFridge
+      ? fridgeFillPool(comp, k, brand)
+      : typeFillPool(k).filter((m) => m.h <= comp.clearH && (!brand || m.brand === brand))).length;
 
     body.innerHTML = '';
     const head = document.createElement('div');
     head.className = 'sheet-step-head';
-    head.innerHTML = `<div class="sheet-step-title">어떤 상자로 채울까요?</div><div class="sheet-step-hint">${brand ? `${brand} 상자 중에서 골라요.` : '모든 브랜드 상자 중에서 골라요.'} 지금 놓인 상자는 바뀌어요.</div>`;
+    head.innerHTML = `<div class="sheet-step-title">어떤 상자로 채울까요?</div><div class="sheet-step-hint">${isFridge ? '냉장고·주방용 상자만 골라요. ' : ''}${brand ? `${brand} 상자 중에서 골라요.` : '모든 브랜드 상자 중에서 골라요.'} 지금 놓인 상자는 바뀌어요.</div>`;
     body.appendChild(head);
 
     const go = (k) => {
@@ -937,7 +1084,10 @@
       closeShelfSheet();
       refreshAll();
     };
-    [['drawer', '서랍형', '앞으로 빼는 상자'], ['basket', '바구니형', '위가 열린 바구니·통'], ['mix', '섞어서', '서랍형과 바구니형을 같이']].forEach(([k, label, sub], i) => {
+    const kindRows = isFridge
+      ? [['drawer', '서랍형', '칸 깊이의 60%까지 앞쪽에'], ['basket', '바구니형', '칸 높이의 절반까지'], ['mix', '섞어서', '서랍형은 안쪽, 앞에 낮은 바구니 (서랍 절반 열림)']]
+      : [['drawer', '서랍형', '앞으로 빼는 상자'], ['basket', '바구니형', '위가 열린 바구니·통'], ['mix', '섞어서', '서랍형과 바구니형을 같이']];
+    kindRows.forEach(([k, label, sub], i) => {
       const n = countOf(k);
       const b = sheetBtn(label, n ? `${sub} · ${n}가지` : '이 칸에 맞는 상자가 없어요', i === 2 ? 'primary' : '', () => go(k));
       if (!n) b.disabled = true;
@@ -1011,6 +1161,7 @@
           <button class="btn btn-danger btn-sm" title="빼기">✕</button>`;
         row.querySelector('button').addEventListener('click', () => {
           activePlan.boxes = activePlan.boxes.filter((b) => b.id !== box.id);
+          settleBoxes(activePlan.boxes, [box.compartmentIndex]);
           refreshAll();
           openShelfSheet(compIdx); // 목록 갱신
         });
@@ -1049,6 +1200,10 @@
     if (!body) return;
     if (state.spaceConfig.type === 'pantry') {
       renderPantryPopup(body);
+      return;
+    }
+    if (state.spaceConfig.type === 'fridge') {
+      body.innerHTML = `<div class="hint-text">냉장고 선반 수는 '장 설정'에서 바꿔요.</div>`;
       return;
     }
     if (state.spaceConfig.type !== 'cabinet') {
@@ -1631,6 +1786,7 @@
       b.y = Math.round((b.y || 0) + maxSupportY);
     });
 
+    settleBoxes(activePlan.boxes, [currentCompIdx]);
     state.activeCompartmentIdx = targetCompIdx;
     refreshAll();
   }
@@ -1737,10 +1893,41 @@
     refreshAll();
   }
 
+  // 아래 상자를 빼거나 옮기면, 그 위에 떠 있던 상자를 아래(바닥 또는 남은 상자 위)로 내려놓음
+  // - 낮은 상자부터 차례로 내려놓고, 이미 내려놓은 상자만 받침으로 봄 (위 상자를 받침으로 착각하지 않게)
+  // - 내려가기만 하고 올라가지는 않음
+  function settleBoxes(boxes, compIdxList) {
+    const targets = new Set(compIdxList);
+    targets.forEach((ci) => {
+      const list = boxes.filter((b) => b.compartmentIndex === ci).sort((a, b) => (a.y || 0) - (b.y || 0));
+      const settled = [];
+      list.forEach((b) => {
+        const m = state.modelsMap[b.modelId];
+        if (!m) { settled.push(b); return; }
+        const d = window.PackerEngine.getOrientedDims(m, b.rot || 0);
+        let support = 0;
+        settled.forEach((o) => {
+          const om = state.modelsMap[o.modelId];
+          if (!om) return;
+          const od = window.PackerEngine.getOrientedDims(om, o.rot || 0);
+          const overlap = b.x < o.x + od.w - 4 && b.x + d.w > o.x + 4 && b.z < o.z + od.d - 4 && b.z + d.d > o.z + 4;
+          if (!overlap) return;
+          const offset = (om.id === m.id && om.stackable) ? (om.stackingOffset || 0) : 0;
+          const top = (o.y || 0) + od.h - offset;
+          if (top <= (b.y || 0) + 1 && top > support) support = top;
+        });
+        if (support < (b.y || 0)) b.y = Math.round(support);
+        settled.push(b);
+      });
+    });
+  }
+
   function deleteSelectedBoxes() {
     if (state.selectedBoxIds.length === 0) return;
     const activePlan = getActivePlan();
+    const removed = activePlan.boxes.filter((b) => state.selectedBoxIds.includes(b.id));
     activePlan.boxes = activePlan.boxes.filter((b) => !state.selectedBoxIds.includes(b.id));
+    settleBoxes(activePlan.boxes, removed.map((b) => b.compartmentIndex));
     state.selectedBoxIds = [];
     refreshAll();
   }
@@ -1752,7 +1939,7 @@
     const spaceCard = document.getElementById('floating-space-card');
     spaceCard.classList.toggle('open', state.spaceCardOpen);
     document.getElementById('space-card-chevron').textContent = state.spaceCardOpen ? '∧' : '∨';
-    document.getElementById('space-card-type-badge').textContent = isCab ? '문 달린 장' : '빼는 서랍';
+    document.getElementById('space-card-type-badge').textContent = SPACE_TYPE_LABELS[state.spaceConfig.type] || '문 달린 장';
 
     const shelfCard = document.getElementById('floating-shelf-card');
     shelfCard.style.display = isCab ? 'flex' : 'none';
@@ -1760,11 +1947,12 @@
     document.getElementById('shelf-card-chevron').textContent = state.shelfCardOpen ? '∧' : '∨';
     document.getElementById('shelf-count-badge').textContent = `선반 ${state.spaceConfig.cabinet.shelves.length}개`;
 
-    document.getElementById('card-type-cabinet').classList.toggle('active', isCab);
-    document.getElementById('card-type-drawer').classList.toggle('active', !isCab);
+    ['cabinet', 'drawer', 'pantry', 'fridge'].forEach((t) => {
+      document.getElementById(`card-type-${t}`)?.classList.toggle('active', state.spaceConfig.type === t);
+    });
 
     document.getElementById('cabinet-config-section').style.display = isCab ? 'block' : 'none';
-    document.getElementById('drawer-config-section').style.display = !isCab ? 'block' : 'none';
+    document.getElementById('drawer-config-section').style.display = state.spaceConfig.type === 'drawer' ? 'block' : 'none';
     updateOpenCtrlButton();
 
     if (isCab) {
@@ -2099,6 +2287,7 @@
             item.querySelector('.mini-del-btn').addEventListener('click', (e) => {
               e.stopPropagation();
               activePlan.boxes = activePlan.boxes.filter((b) => b.id !== box.id);
+              settleBoxes(activePlan.boxes, [box.compartmentIndex]);
               state.selectedBoxIds = state.selectedBoxIds.filter((id) => id !== box.id);
               refreshAll();
             });
@@ -3409,7 +3598,12 @@
     panH: { fig: 'h', tips: ['바닥에서 맨 위 선반 판 위까지 재요.', '천장까지가 아니에요. 선반이 끝나는 곳까지예요.'] },
     panDepth: { fig: 'pdep', tips: ['벽에 줄자 끝을 대요.', '선반 판 앞 끝까지 재요.', '앞에 기둥이 있으면 기둥 앞면까지 재요.'] },
     panCols: { fig: 'count', tips: ['세로 기둥 사이 칸을 세요.', '가운데 기둥이 1개면 2열이에요.'] },
-    panLevels: { fig: 'count', tips: ['한 열의 선반 판을 세요.', '판이 5개면 바닥 칸까지 6단이에요.'] }
+    panLevels: { fig: 'count', tips: ['한 열의 선반 판을 세요.', '판이 5개면 바닥 칸까지 6단이에요.'] },
+    frW: { fig: 'w', tips: ['문을 닫은 채로 재요.', '냉장고 왼쪽 옆면에서 오른쪽 옆면까지 재요.', '문 손잡이는 빼고 몸통 폭만 재요.'] },
+    frH: { fig: 'h', tips: ['바닥에 줄자 끝을 대요.', '냉장고 맨 윗면까지 재요.', '위에 올려 둔 물건은 빼고 재요.'] },
+    frD: { fig: 'd', tips: ['냉장고 옆에 서서 재요.', '문 앞면에서 냉장고 뒷면까지 재요.', '뒤가 벽에 붙어 있으면 문 앞면에서 벽까지 재고 5cm를 빼요.'] },
+    frShelfR: { fig: 'count', tips: ['냉장실 문을 열어요.', '유리 선반 판을 세요.', '야채칸 위 덮개 판도 선반 1개로 세요.'] },
+    frShelfF: { fig: 'count', tips: ['냉동실 문을 열어요.', '선반 판을 세요.', '서랍(트레이)은 빼고 판만 세요.'] }
   };
 
   // 재는 곳을 갈색 화살표로 보여주는 작은 그림 (선 그림, 단색)
@@ -3439,6 +3633,42 @@
     else if (fig === 'pdep') body = `<path d="M14,14 L82,14 L82,58" ${ln}/><rect x="14" y="14" width="68" height="12" fill="currentColor" opacity=".12"/>` + arrow(48, 15, 48, 25);
     else body = `<path d="M18,10 L78,10 L78,58 L18,58 Z" ${ln}/><path d="M18,26 L78,26 M18,42 L78,42" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/>`;
     return `<svg class="wiz-measure-fig" viewBox="0 0 96 68" width="96" height="68" aria-hidden="true">${body}</svg>`;
+  }
+
+  // ===== 냉장고: 칸 구성이 바뀌면 상자를 같은 칸(냉장실 n칸)으로 옮기고, 넘치면 칸 안으로 =====
+  let fridgeCompSnapshot = null;
+  function snapFridgeComps() {
+    if (state.spaceConfig.type === 'fridge') fridgeCompSnapshot = window.PackerEngine.getCompartments(state.spaceConfig);
+  }
+  function clampFridgeBoxes() {
+    if (state.spaceConfig.type !== 'fridge') return;
+    const before = fridgeCompSnapshot;
+    fridgeCompSnapshot = null;
+    const after = window.PackerEngine.getCompartments(state.spaceConfig);
+    const findNew = (old) => {
+      if (!old) return null;
+      const sameZone = after.filter((c) => c.zoneKey === old.zoneKey);
+      const sameKind = sameZone.length ? sameZone : after.filter((c) => c.zoneKind === old.zoneKind);
+      if (!sameKind.length) return null;
+      return sameKind.find((c) => c.level === old.level) || sameKind[sameKind.length - 1];
+    };
+    state.plans.forEach((pl) => {
+      pl.boxes = pl.boxes.filter((b) => {
+        const nc = before ? findNew(before[b.compartmentIndex]) : after[b.compartmentIndex];
+        if (!nc) return false;
+        b.compartmentIndex = nc.index;
+        const m = state.modelsMap[b.modelId];
+        if (m) {
+          const dims = window.PackerEngine.getOrientedDims(m, b.rot || 0);
+          b.x = Math.max(0, Math.min(nc.w - dims.w, b.x));
+          b.z = Math.max(0, Math.min(nc.d - dims.d, b.z));
+        }
+        return true;
+      });
+    });
+    const maxIdx = after.length - 1;
+    if (state.activeCompartmentIdx > maxIdx) state.activeCompartmentIdx = 0;
+    state.selectedBoxIds = [];
   }
 
   // ===== 팬트리: 열(기둥)과 단(선반) =====
@@ -3577,16 +3807,78 @@
       options: [
         { value: 'cabinet', label: '문 달린 장', sub: '옷장 · 벽장 · 주방장' },
         { value: 'drawer', label: '빼는 서랍', sub: '앞으로 당겨 여는 서랍장' },
-        { value: 'pantry', label: '팬트리 방', sub: 'ㄱ자로 걸어 들어가는 방' }
+        { value: 'pantry', label: '팬트리', sub: 'ㄱ자로 걸어 들어가는 방' },
+        { value: 'fridge', label: '냉장고', sub: '양문형 · 4도어 · 2도어' }
       ],
       get: () => state.spaceConfig.type,
       set: (v) => {
         if (v === state.spaceConfig.type) return;
         state.previewSeed = Math.floor(Math.random() * 1e9);
-        const cardId = { cabinet: 'card-type-cabinet', drawer: 'card-type-drawer', pantry: 'card-type-pantry' }[v];
+        const cardId = { cabinet: 'card-type-cabinet', drawer: 'card-type-drawer', pantry: 'card-type-pantry', fridge: 'card-type-fridge' }[v];
         document.getElementById(cardId).click();
       }
     };
+
+    if (state.spaceConfig.type === 'fridge') {
+      const f = state.spaceConfig.fridge;
+      const capOptions = Object.keys(FRIDGE_CAPACITIES).map(Number).sort((a, b) => b - a).map((cap) => {
+        const d = FRIDGE_CAPACITIES[cap];
+        return { value: cap, label: `${cap}L`, sub: `${d.w} × ${d.d} × ${d.h} mm${cap === 650 ? ' (추정)' : ''}` };
+      });
+      const sizeStep = (title, key, min, max, hint, measure) => num({
+        title, min, max, step: 10, hint, measure,
+        get: () => f[key],
+        set: (v) => { snapFridgeComps(); f[key] = v; f.capacity = null; clampFridgeBoxes(); }
+      });
+      return [
+        typeStep,
+        {
+          kind: 'choice',
+          title: '어떤 냉장고인가요?',
+          hint: () => '문 모양에 따라 냉장실·냉동실 위치가 달라요.',
+          options: [
+            { value: 'side', label: '양문형', sub: '왼쪽 냉동실 · 오른쪽 냉장실' },
+            { value: 'four', label: '4도어', sub: '위 냉장실 · 아래 냉동실 2칸' },
+            { value: 'two', label: '2도어', sub: '위 냉동실 · 아래 냉장실' }
+          ],
+          get: () => f.doorType,
+          set: (v) => {
+            if (v === f.doorType) return;
+            snapFridgeComps();
+            const dd = FRIDGE_DOOR_DEFAULTS[v];
+            Object.assign(f, { doorType: v, capacity: dd.capacity, shelvesFridge: dd.shelvesFridge, shelvesFreezer: dd.shelvesFreezer }, FRIDGE_CAPACITIES[dd.capacity]);
+            clampFridgeBoxes();
+          }
+        },
+        {
+          kind: 'choice',
+          title: '용량은 얼마인가요?',
+          hint: () => '냉장고 옆면이나 문 안쪽 스티커(에너지 효율 라벨)에 용량이 적혀 있어요. 고르면 바깥 크기가 맞춰져요.',
+          options: capOptions,
+          get: () => f.capacity,
+          set: (v) => { snapFridgeComps(); f.capacity = Number(v); Object.assign(f, FRIDGE_CAPACITIES[v]); clampFridgeBoxes(); }
+        },
+        sizeStep('냉장고 가로는<br>몇 mm인가요?', 'w', 500, 1300, () => '용량을 골랐다면 이미 맞춰져 있어요. 다르면 재서 고쳐요.', WIZ_MEASURE.frW),
+        sizeStep('냉장고 높이는<br>몇 mm인가요?', 'h', 1000, 2200, () => '바닥에서 냉장고 맨 위까지예요.', WIZ_MEASURE.frH),
+        sizeStep('냉장고 깊이는<br>몇 mm인가요?', 'd', 500, 1100, () => '문 앞면에서 뒷면까지예요. 손잡이는 빼요.', WIZ_MEASURE.frD),
+        num({
+          title: '냉장실 선반은<br>몇 개인가요?',
+          measure: WIZ_MEASURE.frShelfR,
+          unit: '개', step: 1, min: 0, max: 6,
+          hint: () => `냉장실이 ${(Number(f.shelvesFridge) || 0) + 1}칸으로 나뉘어요.`,
+          get: () => f.shelvesFridge,
+          set: (v) => { snapFridgeComps(); f.shelvesFridge = v; clampFridgeBoxes(); }
+        }),
+        num({
+          title: '냉동실 선반은<br>몇 개인가요?',
+          measure: WIZ_MEASURE.frShelfF,
+          unit: '개', step: 1, min: 0, max: 6,
+          hint: () => `냉동실이 ${(Number(f.shelvesFreezer) || 0) + 1}칸으로 나뉘어요.${f.doorType === 'four' ? ' 아래 두 칸이 똑같이 나뉘어요.' : ''}`,
+          get: () => f.shelvesFreezer,
+          set: (v) => { snapFridgeComps(); f.shelvesFreezer = v; clampFridgeBoxes(); }
+        })
+      ];
+    }
 
     if (state.spaceConfig.type === 'pantry') {
       const p = state.spaceConfig.pantry;
@@ -3798,7 +4090,9 @@
     const body = document.getElementById('mobile-setup-body');
     if (!body) return;
     const steps = getWizardSteps();
-    const names = state.spaceConfig.type === 'pantry'
+    const names = state.spaceConfig.type === 'fridge'
+      ? ['가구 종류', '도어 유형', '용량', '가로', '높이', '깊이', '냉장실 선반', '냉동실 선반']
+      : state.spaceConfig.type === 'pantry'
       ? ['가구 종류', '입구 쪽', '안쪽 벽', '옆 벽', '전체 높이', '선반 깊이', '안쪽 벽 열', '옆 벽 열', '단 수']
       : state.spaceConfig.type === 'cabinet'
       ? ['가구 종류', '가로', '깊이', '높이', '문 여는 쪽', '문틀 폭', '선반 개수']
@@ -4143,6 +4437,20 @@
     document.getElementById('card-type-cabinet').addEventListener('click', () => {
       switchSpaceType('cabinet');
       state.selectedBoxIds = [];
+      refreshAll();
+      window.Scene3DManager.setCameraView('iso');
+    });
+
+    document.getElementById('card-type-fridge')?.addEventListener('click', () => {
+      if (!state.spaceConfig.fridge) state.spaceConfig.fridge = defaultFridge();
+      switchSpaceType('fridge');
+      state.activeCompartmentIdx = 0;
+      state.expandedCompartmentIdx = null;
+      state.selectedBoxIds = [];
+      const count = window.PackerEngine.getCompartments(state.spaceConfig).length;
+      state.plans.forEach((p) => {
+        p.boxes = p.boxes.filter((b) => b.compartmentIndex < count);
+      });
       refreshAll();
       window.Scene3DManager.setCameraView('iso');
     });
@@ -4587,6 +4895,7 @@
     if (restored) {
       state.spaceConfig = restored.spaceConfig;
       if (!state.spaceConfig.pantry) state.spaceConfig.pantry = defaultPantry();
+      if (!state.spaceConfig.fridge) state.spaceConfig.fridge = defaultFridge();
       if (state.spaceConfig.drawer && !state.spaceConfig.drawer.tiers) state.spaceConfig.drawer.tiers = 2;
       state.plans = restored.plans;
       if (restored.plans.some((p) => p.id === restored.activePlanId)) state.activePlanId = restored.activePlanId;
