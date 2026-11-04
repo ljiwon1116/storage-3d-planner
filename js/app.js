@@ -595,6 +595,16 @@
     const isMobileBuild = state.uiMode === 'mobile' && state.mobileStep === 'build';
     if (isMobileBuild && btnLayer) {
       if (svgEl) svgEl.innerHTML = '';
+      // 아래쪽 버튼 줄(다 비우기 줄 · 상자 선택 줄) 위로는 ＋버튼이 올라가지 않게: 겹치면 그 줄 바로 위로
+      const layerTop = btnLayer.getBoundingClientRect().top;
+      let barTop = Infinity;
+      ['.hud-pill-bar', '#selected-box-hud'].forEach((sel) => {
+        const el = document.querySelector(sel);
+        if (!el || el.offsetParent === null) return;
+        const r = el.getBoundingClientRect();
+        if (r.height > 0) barTop = Math.min(barTop, r.top - layerTop);
+      });
+      const safeY = (y) => Math.min(y, barTop - 24);
       // 버튼은 매 프레임 새로 만들지 않고 위치만 갱신 (클릭 유지)
       const existing = btnLayer.querySelectorAll('.mobile-shelf-add-btn');
       if (existing.length !== anchors.length) {
@@ -607,7 +617,7 @@
           btn.setAttribute('aria-label', `${anc.label || anc.index + 1} 칸에 상자 넣기`);
           btn.dataset.idx = anc.index;
           btn.style.left = `${anc.x.toFixed(1)}px`;
-          btn.style.top = `${anc.y.toFixed(1)}px`;
+          btn.style.top = `${safeY(anc.y).toFixed(1)}px`;
           btn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -622,7 +632,7 @@
           const numEl = btn.querySelector('.msab-num');
           if (numEl) numEl.textContent = anc.label || anc.index + 1;
           btn.style.left = `${anc.x.toFixed(1)}px`;
-          btn.style.top = `${anc.y.toFixed(1)}px`;
+          btn.style.top = `${safeY(anc.y).toFixed(1)}px`;
         });
       }
       return;
@@ -1061,7 +1071,7 @@
     head.className = 'sheet-step-head';
     head.innerHTML = mode === 'brand'
       ? `<div class="sheet-step-title">어떤 브랜드로 채울까요?</div><div class="sheet-step-hint">이 칸에 맞는 ${kind}만 보여요.</div>`
-      : `<div class="sheet-step-title">어떻게 채울까요?</div><div class="sheet-step-hint">${isPan ? '먼저 브랜드를 골라요. 다음에 상자 종류를 골라요.' : `이 칸에 맞는 ${kind}로 알아서 채워요. 다시 하면 다른 조합이 나와요.`}</div>`;
+      : `<div class="sheet-step-title">어떻게 채울까요?</div><div class="sheet-step-hint">${isPan ? '브랜드 → 상자 종류 순서로 골라요.' : `누를 때마다 다른 조합으로 채워요.`}</div>`;
     body.appendChild(head);
 
     const fillAndClose = (brand) => {
@@ -1105,7 +1115,7 @@
     body.innerHTML = '';
     const head = document.createElement('div');
     head.className = 'sheet-step-head';
-    head.innerHTML = `<div class="sheet-step-title">어떤 상자로 채울까요?</div><div class="sheet-step-hint">${isFridge ? '냉장고·주방용 상자만 골라요. ' : ''}${brand ? `${brand} 상자 중에서 골라요.` : '모든 브랜드 상자 중에서 골라요.'} 다시 하면 다른 조합이 나와요.</div>`;
+    head.innerHTML = `<div class="sheet-step-title">어떤 상자로 채울까요?</div><div class="sheet-step-hint">${isFridge ? '냉장고·주방용 상자 중에서 ' : ''}${brand ? `${brand} 상자로 ` : ''}채워요.</div>`;
     body.appendChild(head);
 
     const go = (k) => {
@@ -1173,35 +1183,21 @@
       renderAutofillChoice(compIdx);
     }, '이 칸에 맞는 상자로 알아서 채워 줘요'));
 
-    // 4. 지금 놓은 것 보기/빼기
+    // 4. 지금 놓은 것: 같은 상자는 한 줄로 묶고 개수로 보여 줘요
     if (compBoxes.length > 0) {
-      const listWrap = document.createElement('div');
-      listWrap.style.cssText = 'margin-top:4px;border-top:1px solid var(--border);padding-top:10px;';
-      listWrap.innerHTML = `<div style="font-size:0.78rem;font-weight:700;color:var(--text-sub);margin-bottom:6px;">지금 놓은 것</div>`;
+      const groups = new Map();
       compBoxes.forEach((box) => {
-        const model = state.modelsMap[box.modelId];
-        if (!model) return;
-        const row = document.createElement('div');
-        row.className = 'placed-mini-item';
-        row.innerHTML = `
-          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-            <strong>[${model.brand}]</strong> ${model.name}
-          </div>
-          <button class="btn btn-danger btn-sm" title="치우기" aria-label="치우기">✕</button>`;
-        row.querySelector('button').addEventListener('click', () => {
-          activePlan.boxes = activePlan.boxes.filter((b) => b.id !== box.id);
-          settleBoxes(activePlan.boxes, [box.compartmentIndex]);
-          refreshAll();
-          openShelfSheet(compIdx); // 목록 갱신
-        });
-        listWrap.appendChild(row);
+        if (!state.modelsMap[box.modelId]) return;
+        if (!groups.has(box.modelId)) groups.set(box.modelId, []);
+        groups.get(box.modelId).push(box);
       });
-      body.appendChild(listWrap);
-    }
 
-    // 5. 이 칸 비우기
-    if (compBoxes.length > 0) {
-      body.appendChild(makeBtn('', '이 칸 비우기', 'danger', async () => {
+      const listWrap = document.createElement('div');
+      listWrap.className = 'placed-list';
+      const head = document.createElement('div');
+      head.className = 'placed-list-head';
+      head.innerHTML = `<span>지금 놓은 것 <b>${compBoxes.length}개</b></span><button type="button" class="placed-clear-btn">이 칸 비우기</button>`;
+      head.querySelector('.placed-clear-btn').addEventListener('click', async () => {
         const ok = await confirmDialog({
           title: '이 칸을 비울까요?',
           message: `이 칸의 상자 ${compBoxes.length}개가 빠져요.`,
@@ -1212,7 +1208,38 @@
         state.selectedBoxIds = [];
         closeShelfSheet();
         refreshAll();
-      }));
+      });
+      listWrap.appendChild(head);
+
+      const ul = document.createElement('div');
+      ul.className = 'placed-rows';
+      groups.forEach((boxes, modelId) => {
+        const model = state.modelsMap[modelId];
+        const row = document.createElement('div');
+        row.className = 'placed-row';
+        const thumb = model.image
+          ? `<img class="placed-thumb" src="${model.image}" alt="" loading="lazy" />`
+          : `<span class="placed-thumb" style="background:${model.color || '#eee'}"></span>`;
+        row.innerHTML = `
+          ${thumb}
+          <span class="placed-text">
+            <span class="placed-brand">${model.brand}</span>
+            <span class="placed-name">${model.name}</span>
+          </span>
+          <span class="placed-count">×${boxes.length}</span>
+          <button type="button" class="placed-minus" aria-label="${model.name} 1개 치우기" title="1개 치우기">−</button>`;
+        row.querySelector('.placed-minus').addEventListener('click', () => {
+          // 맨 위에 쌓인 것부터 1개 치우기
+          const top = boxes.slice().sort((x, y) => (y.y || 0) - (x.y || 0))[0];
+          activePlan.boxes = activePlan.boxes.filter((b) => b.id !== top.id);
+          settleBoxes(activePlan.boxes, [top.compartmentIndex]);
+          refreshAll();
+          openShelfSheet(compIdx); // 목록 갱신
+        });
+        ul.appendChild(row);
+      });
+      listWrap.appendChild(ul);
+      body.appendChild(listWrap);
     }
 
     document.body.classList.add('mobile-shelf-sheet-open');
@@ -1242,8 +1269,8 @@
     const c = state.spaceConfig.cabinet;
     body.innerHTML = `
       <div class="sub-block-title" style="margin-bottom:8px;">
-        <span>선반 높이 (바닥에서 cm)</span>
-        <button id="shelfh-add" class="btn btn-primary btn-sm">+ 선반 넣기</button>
+        <span>바닥에서 높이 (cm)</span>
+        <button id="shelfh-add" class="btn btn-primary btn-sm">+ 선반</button>
       </div>
       <div id="shelfh-list" class="shelf-list"></div>
     `;
@@ -1312,16 +1339,16 @@
         <div class="pp-chips" id="pp-door"></div>
       </div>
       <div class="pp-sec">
-        <div class="pp-h">열 고르기</div>
+        <div class="pp-h">칸 고르기</div>
         <div class="pp-chips" id="pp-bays"></div>
       </div>
       <div class="pp-sec">
         <div class="pp-h-row">
-          <span class="pp-h">${bay ? bayLabel(bay) : ''} 선반 높이 <span class="pp-cap">바닥에서 cm</span></span>
-          <button id="pp-add-shelf" class="pp-text-btn" type="button">+ 선반 넣기</button>
+          <span class="pp-h">${bay ? bayLabel(bay) : ''} 선반 높이 (cm)</span>
+          <button id="pp-add-shelf" class="pp-text-btn" type="button">+ 선반</button>
         </div>
         <div id="pp-shelves" class="shelf-list"></div>
-        <button id="pp-apply-all" class="pp-outline-btn" type="button">모든 열을 이 열처럼</button>
+        <button id="pp-apply-all" class="pp-outline-btn" type="button">모든 칸을 이 칸처럼</button>
       </div>
       <div class="pp-sec">
         <div class="pp-h">세로 기둥 위치 <span class="pp-cap">벽 끝에서 cm</span></div>
@@ -1378,7 +1405,7 @@
       const row = document.createElement('div');
       row.className = 'shelf-item';
       row.innerHTML = `
-        <span>${idx + 1}단 위</span>
+        <span class="shelf-no">${idx + 1}번</span>
         <input type="number" data-unit="mm" class="input-box pp-y" value="${sh.bottomY}" step="10" aria-label="${idx + 1}번째 선반 높이" />
         <span style="display:flex;align-items:center;gap:4px;">두께 <input type="number" data-unit="mm" class="input-box pp-t" value="${sh.thickness || 18}" step="2" style="width:48px;" aria-label="두께" /></span>
         <button class="btn btn-danger btn-sm pp-del" type="button" aria-label="이 선반 지우기">✕</button>`;
@@ -2608,14 +2635,14 @@
             </div>
             <div class="pfp-size-rows">
               <div class="pfp-size-row">
-                <span class="pfp-size-name">가로(폭)</span>
+                <span class="pfp-size-name">가로</span>
                 <input type="number" data-unit="mm" class="pfp-size-input" data-size="wMin" placeholder="최소" value="${pf.wMin}" step="10" min="0" />
                 <span class="pfp-tilde">~</span>
                 <input type="number" data-unit="mm" class="pfp-size-input" data-size="wMax" placeholder="최대 (${Math.round(activeComp.w)})" value="${pf.wMax}" step="10" min="0" />
                 <span class="pfp-unit">cm</span>
               </div>
               <div class="pfp-size-row">
-                <span class="pfp-size-name">세로(깊이)</span>
+                <span class="pfp-size-name">깊이</span>
                 <input type="number" data-unit="mm" class="pfp-size-input" data-size="dMin" placeholder="최소" value="${pf.dMin}" step="10" min="0" />
                 <span class="pfp-tilde">~</span>
                 <input type="number" data-unit="mm" class="pfp-size-input" data-size="dMax" placeholder="최대 (${Math.round(activeComp.d)})" value="${pf.dMax}" step="10" min="0" />
@@ -4168,7 +4195,7 @@
     if (previewCount > 0) {
       const clear = await confirmDialog({
         title: '예시 상자를 비울까요?',
-        message: `설정하면서 보여 드린 예시 상자 ${previewCount}개가 들어 있어요. 비우면 빈 칸에서 시작해요.`,
+        message: `설정 중에 넣은 예시 상자 ${previewCount}개가 있어요.`,
         ok: '비우고 시작',
         cancel: '그대로 두기'
       });

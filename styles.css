@@ -5050,3 +5050,115 @@ body.space-fridge #mobile-shelf-buttons .mobile-shelf-add-btn::after { content: 
 .emp-cell { display: flex; flex-direction: column; align-items: center; padding: 3px 0; border-radius: 6px; background: #faf7f2; white-space: nowrap; }
 .emp-cell span { font-size: 0.68rem; color: #6f665c; }
 .emp-cell b { font-size: 0.82rem; color: #1a1714; }
+
+/* ===== 칸 메뉴 시트 (＋ 눌렀을 때): 글자 잘림 없이, 촘촘하게 ===== */
+#mobile-shelf-sheet-body { overflow-y: auto; }
+#mobile-shelf-sheet-body > * { flex-shrink: 0; }   /* 공간이 모자라도 버튼이 눌려 겹치지 않게 */
+.sheet-menu-btn {
+  min-height: 0 !important;
+  padding: 10px 14px !important;
+  gap: 1px;
+}
+.sheet-menu-btn .smb-label { font-size: 0.95rem; line-height: 1.3; }
+.sheet-menu-btn .smb-sub { font-size: 0.76rem; line-height: 1.35; }
+
+/* 지금 놓은 것: 한 덩어리 목록 + 구분선 */
+.placed-list { margin-top: 6px; }
+.placed-list-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 2px 2px 6px; font-size: 0.8rem; color: var(--text-sub); font-weight: 600;
+}
+.placed-list-head b { color: var(--text-title, #2b2621); }
+.placed-clear-btn {
+  border: 0; background: transparent; color: var(--danger, #b4483a);
+  font-size: 0.8rem; font-weight: 600; padding: 6px 4px; min-height: 32px; cursor: pointer; white-space: nowrap;
+}
+.placed-rows {
+  background: #fff; border: 1px solid var(--line, #ece4d8); border-radius: 12px; overflow: hidden;
+}
+.placed-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 8px 7px 10px; min-height: 52px;
+}
+.placed-row + .placed-row { border-top: 1px solid var(--line, #ece4d8); }
+.placed-thumb {
+  width: 36px; height: 36px; flex-shrink: 0; border-radius: 8px; object-fit: cover;
+  background: #f6f2ec; border: 1px solid #efe8dd; display: block;
+}
+.placed-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
+.placed-brand { font-size: 0.7rem; color: var(--text-meta, #6f665c); font-weight: 600; }
+.placed-name { font-size: 0.84rem; color: var(--text-title, #2b2621); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.placed-count { flex-shrink: 0; font-size: 0.84rem; font-weight: 700; color: var(--text-title, #2b2621); min-width: 26px; text-align: right; }
+.placed-minus {
+  flex-shrink: 0; width: 36px; height: 36px; border-radius: 10px;
+  border: 1px solid #ead9d4; background: #fbf3f1; color: var(--danger, #b4483a);
+  font-size: 1.1rem; font-weight: 700; line-height: 1; cursor: pointer;
+}
+.placed-minus:active { background: #f4e2de; }
+
+/* ===== 1104w 글자 크기·굵기 통일 (같은 역할 = 같은 크기) ===== */
+/* 1) 창·시트 제목: 17px / 600 */
+#mobile-shelf-sheet-title, .sheet-step-title, .mobile-shelfh-head > span, .picker-head-title,
+#modal-export .modal-header > span, .app-confirm-t, #drag-guide-title {
+  font-size: 1.0625rem !important; font-weight: 600 !important; line-height: 1.35 !important;
+}
+/* 2) 버튼·선택지 이름: 15px / 600 */
+.sheet-menu-btn .smb-label, .sheet-btn-text > span:first-child, .app-confirm-btns button, .wiz-option-label,
+#btn-export-share, #btn-export-photo, #btn-export-cost-view, #btn-picker-cart-add {
+  font-size: 0.9375rem !important; font-weight: 600 !important;
+}
+/* 3) 설명 글: 13px / 400 */
+.sheet-menu-btn .smb-sub, .sheet-action-sub, .wiz-option-sub, .sheet-step-hint, .export-section-desc,
+.app-confirm-m, .sp-hint {
+  font-size: 0.8125rem !important; font-weight: 400 !important; line-height: 1.4 !important;
+}
+/* 4) 작은 소제목: 13px / 600 */
+.placed-list-head, .pfp-group-label, .sub-block-title > span, .sp-label, .pfp-top-title,
+.export-margin-main-toggle > span {
+  font-size: 0.8125rem !important; font-weight: 600 !important;
+}
+.placed-list-head b { font-weight: 600 !important; }
+/* 5) 제품 이름 13.5px / 500, 브랜드 11.5px / 600 */
+.pick-row-name, .placed-name { font-size: 0.8438rem !important; font-weight: 500 !important; }
+.pick-row-brand, .placed-brand { font-size: 0.7188rem !important; font-weight: 600 !important; }
+.export-item-name { font-size: 0.75rem !important; }
+/* 6) 작은 알약 버튼·칩: 12.5px / 600 */
+.hud-pill-bar button, #btn-mobile-edit-setup, #btn-mobile-shelf-height, #btn-export,
+.pfp-check-chip span, .pfp-action-btn, .pfp-mini-btn, .pfp-help-btn,
+label.checkbox-row > span, .export-dir-chip span, .placed-clear-btn, #shelfh-add, .picker-filter-btn {
+  font-size: 0.7812rem !important; font-weight: 600 !important;
+}
+/* 7) 굵기만 과했던 곳 */
+#picker-cart-count, .picker-filter-btn span, .emp-name { font-weight: 600 !important; }
+.pick-row-qtynum { font-weight: 700 !important; }
+.pick-minus, .pick-plus, .placed-minus { font-weight: 600 !important; }
+/* 8) 닫기 ✕ 는 모두 같은 크기 */
+#mobile-shelf-sheet-close, #btn-close-export, #btn-mobile-setup-close, #btn-mobile-shelfh-close, #btn-close-picker-modal {
+  font-size: 1rem !important; font-weight: 500 !important;
+}
+.brand-nav-arrow { font-size: 0.75rem !important; }
+/* 1104w 보정: 더 구체적인 규칙에 밀리던 곳 */
+body #modal-box-picker .modal-header #btn-close-picker-modal { font-size: 1rem !important; font-weight: 500 !important; }
+body .hud-pill-bar > #btn-touch-multiselect, body .hud-pill-bar > #btn-open-ctrl, body .hud-pill-bar > #btn-clear-plan { font-size: 0.7812rem !important; }
+body #modal-box-picker .brand-nav .brand-nav-arrow { font-size: 0.75rem !important; font-weight: 600 !important; }
+.shelf-item > span { font-size: 0.7812rem !important; }
+.wiz-measure-h { font-size: 0.8125rem !important; }
+
+/* 넓은 화면(태블릿 가로)의 떠 있는 아래 탭: '3D 화면'이 두 줄로 꺾이지 않게 */
+.mobile-nav-tab .m-nav-label, .mobile-nav-tab span { white-space: nowrap; }
+
+/* 선반 높이 · 기둥·선반 창: 좁은 휴대폰에서도 한 줄씩 */
+body.ui-mode-mobile .mobile-shelfh-popup { width: min(340px, calc(100% - 24px)); max-height: calc(var(--vh, 1vh) * 62); }
+.shelf-item { display: flex !important; align-items: center; gap: 6px; flex-wrap: nowrap !important; }
+.shelf-item > span, .shelf-item > span > * { white-space: nowrap; }
+.shelf-item .pp-y, .shelf-item .shelfh-y, .shelf-item .shelf-y-input { flex: 1 1 auto; min-width: 54px; width: auto !important; }
+.shelf-item .pp-t, .shelf-item .shelfh-t, .shelf-item .shelf-t-input { width: 46px !important; flex: 0 0 46px; }
+.shelf-item .btn-danger { flex: 0 0 auto; }
+.pp-h-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pp-h-row .pp-h { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pp-text-btn, #shelfh-add, .pp-outline-btn { white-space: nowrap; }
+.pp-toggle > span { min-width: 0; }
+/* 상자 고른 줄: 이름은 줄여도 크기는 늘 보이게 */
+#sel-box-title { display: flex !important; align-items: baseline; gap: 6px; min-width: 0; white-space: nowrap; overflow: hidden; }
+#sel-box-title > strong { flex: 1 1 auto; min-width: 80px; overflow: hidden; text-overflow: ellipsis; }
+#sel-box-title > .sel-box-meta { flex: 0 0 auto; margin-left: 0; }
