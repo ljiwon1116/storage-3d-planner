@@ -1685,6 +1685,8 @@
           return { x: b.x, z: b.z, stackedY, score: stackedY + sameModelBonus + fitsHeightBonus };
         });
         candidates.sort((a, b) => a.score - b.score);
+        // 바닥도 꽉 차고 위에 쌓아도 천장을 넘으면 넣지 않음 (칸 밖으로 튀어나오지 않게)
+        if (candidates[0].stackedY + dims.h > comp.clearH + 1) return false;
         bestX = Math.max(0, Math.min(comp.w - dims.w, candidates[0].x));
         bestZ = Math.max(0, Math.min(comp.d - dims.d, candidates[0].z));
       }
@@ -1712,6 +1714,7 @@
     activePlan.boxes.push(newBox);
     state.selectedBoxIds = [newBox.id];
     refreshAll();
+    return true;
   }
 
   // 선택된 수납함 바로 위에 똑같은 수납함 1단 더 쌓기
@@ -2863,15 +2866,17 @@
   function applyPickerCart() {
     const entries = Object.entries(state.pickerCart);
     if (entries.length === 0) return;
+    let skipped = 0;
     entries.forEach(([modelId, qty]) => {
       for (let i = 0; i < qty; i++) {
-        addBoxToActiveSpace(modelId, 0);
+        if (addBoxToActiveSpace(modelId, 0) === false) skipped += 1;
       }
     });
     state.pickerCart = {};
     updatePickerCartBar();
     document.getElementById('modal-box-picker').classList.remove('open');
     refreshAll();
+    if (skipped > 0) showToast(`자리가 모자라서 ${skipped}개는 넣지 못했어요`);
   }
 
   function renderSelectedBoxInspector() {
@@ -4898,7 +4903,14 @@
 
     // 지난번에 쓰던 설정이 있으면 그대로 불러와요 (공유 링크로 열었을 때는 링크 내용이 먼저)
     const urlParams = new URLSearchParams(window.location.search);
-    const restored = (urlParams.get('state') || urlParams.get('plan')) ? null : loadLocal();
+    const isSharedLink = !!(urlParams.get('state') || urlParams.get('plan'));
+    const restored = isSharedLink ? null : loadLocal();
+    if (isSharedLink) {
+      // 공유 링크로 연 사람은 질문 없이 바로 받은 배치를 3D로 봐요
+      state.setupDone = true;
+      state.mobileStep = 'build';
+      state.wizPreview = false;
+    }
     if (restored) {
       state.spaceConfig = restored.spaceConfig;
       if (!state.spaceConfig.pantry) state.spaceConfig.pantry = defaultPantry();

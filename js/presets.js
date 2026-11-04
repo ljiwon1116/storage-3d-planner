@@ -4,24 +4,36 @@
 const ROUTINELAB_URL = 'https://smartstore.naver.com/nuber/products/13818484744';
 
 // 아이리스 BC 시리즈 구매 링크 (전 사이즈 공통)
+// 아이리스 제품별 구매 링크 (쿠팡). 없으면 네이버 브랜드스토어 링크
+const IRIS_URLS = {
+  'iris-bc-370': 'https://link.coupang.com/a/io8vOhOBUa',
+  'iris-bc-200': 'https://link.coupang.com/a/io8ww8p4X6',
+  'iris-bc-200d': 'https://link.coupang.com/a/io8w5vApyu',
+  'iris-bc-450s': 'https://link.coupang.com/a/io8AbWvhUi',
+  'iris-bc-450': 'https://link.coupang.com/a/io8zaaz4BE',
+  'iris-bc-450d': 'https://link.coupang.com/a/io8APnKIIS',
+  'iris-bc-500s': 'https://link.coupang.com/a/io8Hg4NdYq',
+  'iris-bc-500': 'https://link.coupang.com/a/io8GqukOke',
+  'iris-bc-500d': 'https://link.coupang.com/a/io8HOG8Pee'
+};
 const IRIS_BC_URL = 'https://brand.naver.com/iriskorea/products/315482921';
 
 // 코멧 쿠팡 구매 링크 (제품마다). 쿠팡 인플루언서 링크를 받으면 '' 안에 넣어요
 const COMET_URLS = {
-  'comet-basket-l': '',
-  'comet-basket-m': '',
-  'comet-fridge-tray': '',
-  'comet-clear-drawer-wide-l': '',
-  'comet-livingbox-pantry-m': '',
-  'comet-livingbox-pantry-l': '',
-  'comet-pantry-drawer-l': '',
-  'comet-pantry-drawer-m': '',
-  'comet-pantry-drawer-s': '',
-  'comet-simple-pantry-bin': '',
-  'comet-window-pantry-l': '',
-  'comet-clear-organizer-s': '',
-  'comet-clear-organizer-l': '',
-  'comet-clear-organizer-open': ''
+  'comet-basket-l': 'https://link.coupang.com/a/io4402Rrrw',
+  'comet-basket-m': 'https://link.coupang.com/a/io45KfCHMy',
+  'comet-fridge-tray': 'https://link.coupang.com/a/io46yJdIdM',
+  'comet-clear-drawer-wide-l': 'https://link.coupang.com/a/io5aBA5J3Q',
+  'comet-livingbox-pantry-m': 'https://link.coupang.com/a/io5bg7tGj6',
+  'comet-livingbox-pantry-l': 'https://link.coupang.com/a/io5cYVtL3c',
+  'comet-pantry-drawer-l': 'https://link.coupang.com/a/io5g4pPNF6',
+  'comet-pantry-drawer-m': 'https://link.coupang.com/a/io5g4pPNF6',
+  'comet-pantry-drawer-s': 'https://link.coupang.com/a/io5g4pPNF6',
+  'comet-simple-pantry-bin': 'https://link.coupang.com/a/io5psh1Mtg',
+  'comet-window-pantry-l': 'https://link.coupang.com/a/io5kdNxAUC',
+  'comet-clear-organizer-s': 'https://link.coupang.com/a/io5ry48mom',
+  'comet-clear-organizer-l': 'https://link.coupang.com/a/io5yGfTCP6',
+  'comet-clear-organizer-open': 'https://link.coupang.com/a/io5r4SuwKq'
 };
 
 window.DEFAULT_STORAGE_MODELS = [
@@ -40,7 +52,7 @@ window.DEFAULT_STORAGE_MODELS = [
     hasFrontHandle: true,
     color: '#ebe5d9',
     price: 19900,
-    url: 'https://mujikorea.co.kr/products/view/96065',
+    url: 'https://ozip.me/QgzEkvd?af',
     image: 'img/muji/muji-pp-drawer-wide-deep.png'
   },
   {
@@ -57,7 +69,7 @@ window.DEFAULT_STORAGE_MODELS = [
     hasFrontHandle: true,
     color: '#f3efe6',
     price: 17900,
-    url: 'https://mujikorea.co.kr/products/view/96066',
+    url: 'https://ozip.me/QgzEkvd?af',
     image: 'img/muji/muji-pp-drawer-wide-shallow.png'
   },
   {
@@ -74,7 +86,7 @@ window.DEFAULT_STORAGE_MODELS = [
     hasFrontHandle: true,
     color: '#f5f2eb',
     price: 19900,
-    url: 'https://mujikorea.co.kr/products/view/96067',
+    url: 'https://ozip.me/QgzEkvd?af',
     image: 'img/muji/muji-pp-drawer-wide-thin.png'
   },
   {
@@ -91,7 +103,7 @@ window.DEFAULT_STORAGE_MODELS = [
     hasFrontHandle: true,
     color: '#f0ece1',
     price: 19900,
-    url: 'https://mujikorea.co.kr/products/view/96068',
+    url: 'https://ozip.me/QgzEkvd?af',
     image: 'img/muji/muji-pp-drawer-wide-thin-2p.png'
   },
   {
@@ -108,7 +120,7 @@ window.DEFAULT_STORAGE_MODELS = [
     hasFrontHandle: true,
     color: '#ebe5d9',
     price: 17900,
-    url: 'https://mujikorea.co.kr/products/view/95911',
+    url: 'https://ozip.me/l7CoQ1i?af',
     image: 'img/muji/muji-pp-drawer-deep.png'
   },
   {
@@ -125,7 +137,7 @@ window.DEFAULT_STORAGE_MODELS = [
     hasFrontHandle: true,
     color: '#eae4d7',
     price: 24900,
-    url: 'https://mujikorea.co.kr/products/view/96062',
+    url: 'https://ozip.me/l7CoQ1i?af',
     image: 'img/muji/muji-pp-drawer-deep-2p.png'
   },
   {
@@ -142,7 +154,7 @@ window.DEFAULT_STORAGE_MODELS = [
     hasFrontHandle: true,
     color: '#f3efe6',
     price: 14900,
-    url: 'https://mujikorea.co.kr/products/view/95910',
+    url: 'https://ozip.me/zfCbdxW?af',
     image: 'img/muji/muji-pp-drawer-shallow.png'
   },
   {
@@ -159,7 +171,7 @@ window.DEFAULT_STORAGE_MODELS = [
     hasFrontHandle: true,
     color: '#f0ece1',
     price: 19900,
-    url: 'https://mujikorea.co.kr/products/view/96064',
+    url: 'https://ozip.me/zfCbdxW?af',
     image: 'img/muji/muji-pp-drawer-shallow-2p.png'
   },
   {
@@ -176,7 +188,7 @@ window.DEFAULT_STORAGE_MODELS = [
     hasFrontHandle: true,
     color: '#f5f2eb',
     price: 13900,
-    url: 'https://mujikorea.co.kr/products/view/96063',
+    url: 'https://ozip.me/zfCbdxW?af',
     image: 'img/muji/muji-pp-drawer-thin-v.png'
   },
   // 1-2. 무인양품 (MUJI) - PP 수납 시리즈 (12종: 수납케이스 / 가로와이드 / 의류 케이스 / 클로젯 케이스)
@@ -194,7 +206,7 @@ window.DEFAULT_STORAGE_MODELS = [
     hasFrontHandle: true,
     color: '#eef1f3',
     price: 24900,
-    url: 'https://mujikorea.co.kr/products/view/95889',
+    url: 'https://ozip.me/xnYYfat?af',
     image: 'img/muji/muji-pp-storage-s.png'
   },
   {
@@ -211,7 +223,7 @@ window.DEFAULT_STORAGE_MODELS = [
     hasFrontHandle: true,
     color: '#eaeef1',
     price: 29900,
-    url: 'https://mujikorea.co.kr/products/view/95888',
+    url: 'https://ozip.me/xnYYfat?af',
     image: 'img/muji/muji-pp-storage-l.png'
   },
   {
@@ -228,7 +240,7 @@ window.DEFAULT_STORAGE_MODELS = [
     hasFrontHandle: true,
     color: '#e5eaee',
     price: 34900,
-    url: 'https://mujikorea.co.kr/products/view/95887',
+    url: 'https://ozip.me/xnYYfat?af',
     image: 'img/muji/muji-pp-storage-deep.png'
   },
   {
@@ -245,7 +257,7 @@ window.DEFAULT_STORAGE_MODELS = [
     hasFrontHandle: true,
     color: '#eef1f3',
     price: 34900,
-    url: 'https://mujikorea.co.kr/products/view/95896',
+    url: 'https://ozip.me/oMUZ2x5?af',
     image: 'img/muji/muji-pp-storage-wide-s.png'
   },
   {
@@ -262,7 +274,7 @@ window.DEFAULT_STORAGE_MODELS = [
     hasFrontHandle: true,
     color: '#eaeef1',
     price: 39900,
-    url: 'https://mujikorea.co.kr/products/view/95895',
+    url: 'https://ozip.me/oMUZ2x5?af',
     image: 'img/muji/muji-pp-storage-wide-l.png'
   },
   {
@@ -279,7 +291,7 @@ window.DEFAULT_STORAGE_MODELS = [
     hasFrontHandle: true,
     color: '#e5eaee',
     price: 44900,
-    url: 'https://mujikorea.co.kr/products/view/95894',
+    url: 'https://ozip.me/oMUZ2x5?af',
     image: 'img/muji/muji-pp-storage-wide-deep.png'
   },
   {
@@ -296,7 +308,7 @@ window.DEFAULT_STORAGE_MODELS = [
     hasFrontHandle: true,
     color: '#eef1f3',
     price: 21900,
-    url: 'https://mujikorea.co.kr/products/view/100197',
+    url: 'https://ozip.me/UvC39mY?af',
     image: 'img/muji/muji-pp-clothes-s.png'
   },
   {
@@ -313,7 +325,7 @@ window.DEFAULT_STORAGE_MODELS = [
     hasFrontHandle: true,
     color: '#eaeef1',
     price: 24900,
-    url: 'https://mujikorea.co.kr/products/view/100198',
+    url: 'https://ozip.me/UvC39mY?af',
     image: 'img/muji/muji-pp-clothes-l.png'
   },
   {
@@ -330,7 +342,7 @@ window.DEFAULT_STORAGE_MODELS = [
     hasFrontHandle: true,
     color: '#e5eaee',
     price: 29900,
-    url: 'https://mujikorea.co.kr/products/view/100199',
+    url: 'https://ozip.me/UvC39mY?af',
     image: 'img/muji/muji-pp-clothes-deep.png'
   },
   {
@@ -347,7 +359,7 @@ window.DEFAULT_STORAGE_MODELS = [
     hasFrontHandle: true,
     color: '#eef1f3',
     price: 19900,
-    url: 'https://mujikorea.co.kr/products/view/100191',
+    url: 'https://ozip.me/eELSPer?af',
     image: 'img/muji/muji-pp-closet-s.png'
   },
   {
@@ -364,7 +376,7 @@ window.DEFAULT_STORAGE_MODELS = [
     hasFrontHandle: true,
     color: '#eaeef1',
     price: 24900,
-    url: 'https://mujikorea.co.kr/products/view/100192',
+    url: 'https://ozip.me/eELSPer?af',
     image: 'img/muji/muji-pp-closet-l.png'
   },
   {
@@ -381,7 +393,7 @@ window.DEFAULT_STORAGE_MODELS = [
     hasFrontHandle: true,
     color: '#e5eaee',
     price: 29900,
-    url: 'https://mujikorea.co.kr/products/view/100193',
+    url: 'https://ozip.me/eELSPer?af',
     image: 'img/muji/muji-pp-closet-deep.png'
   },
 
@@ -638,7 +650,7 @@ window.DEFAULT_STORAGE_MODELS = [
     color: '#eef0f2',
     ...(price ? { price } : {}),
     ...(packQty > 1 ? { packQty } : {}),
-    url: IRIS_BC_URL,
+    url: IRIS_URLS['iris-' + key] || IRIS_BC_URL,
     image: `img/iris/${key}.png`
   }))
 ];
