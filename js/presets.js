@@ -607,6 +607,7 @@ window.DEFAULT_STORAGE_MODELS = [
     color,
     price,
     ...(packQty > 1 ? { packQty } : {}),
+    image: `img/comet/${id}.png`,
     ...(COMET_URLS[id] ? { url: COMET_URLS[id] } : {})
   })),
 

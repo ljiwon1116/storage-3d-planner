@@ -54,7 +54,8 @@
         leftFrameW: 35,
         rightFrameW: 35,
         topFrameH: 30,
-        bottomFrameH: 20,
+        bottomFrameH: 0,
+        noBottomFrameV1: true,
         doorType: 'double',
         hingeClearanceW: 22,
         shelves: [
@@ -3533,6 +3534,12 @@
       if (!raw) return null;
       const d = JSON.parse(raw);
       if (!d || d.v !== 1 || !d.spaceConfig || !Array.isArray(d.plans) || !d.plans.length) return null;
+      // 여닫이 장 바닥 문틀(턱) 기본값 20 → 0 으로 바뀐 뒤 한 번만 정리
+      const cab = d.spaceConfig.cabinet;
+      if (cab && !cab.noBottomFrameV1) {
+        if (cab.bottomFrameH === 20) cab.bottomFrameH = 0;
+        cab.noBottomFrameV1 = true;
+      }
       return d;
     } catch (e) {
       return null;
@@ -4507,7 +4514,7 @@
         c.leftFrameW = 35;
         c.rightFrameW = 35;
         c.topFrameH = 30;
-        c.bottomFrameH = 20;
+        c.bottomFrameH = 0;
         if (c.hingeClearanceW === 0) c.hingeClearanceW = 22;
       } else {
         // 문틀만 0으로 설정 (문 너비 = 내부 너비와 동일, 문짝 자체는 사라지지 않고 그대로 유지!)
