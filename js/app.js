@@ -4654,7 +4654,10 @@
         const comp = compartments[anc.index];
         if (!comp) return;
         const compBoxes = activePlan.boxes.filter((b) => b.compartmentIndex === anc.index);
-        const compCost = compBoxes.reduce((sum, b) => sum + (Number(state.modelsMap[b.modelId]?.price) || 0), 0);
+        const compCost = Math.round(compBoxes.reduce((sum, b) => {
+          const m = state.modelsMap[b.modelId];
+          return sum + (Number(m?.price) || 0) / Math.max(1, Number(m?.packQty) || 1); // 묶음 상품은 1개 몫
+        }, 0));
         const hasPrice = compBoxes.some((b) => Number(state.modelsMap[b.modelId]?.price) > 0);
 
         let costText = '0원';
@@ -4734,7 +4737,14 @@
         if (boxes.length === 0) {
           costTotalEl.textContent = '0원';
         } else {
-          const totalCost = boxes.reduce((sum, b) => sum + (Number(state.modelsMap[b.modelId]?.price) || 0), 0);
+          // 묶음 판매 상품(packQty)은 필요한 묶음 수만큼: 예) 3개 묶음 상품을 4개 놓으면 2묶음
+          const countByModel = {};
+          boxes.forEach((b) => { countByModel[b.modelId] = (countByModel[b.modelId] || 0) + 1; });
+          const totalCost = Object.keys(countByModel).reduce((sum, id) => {
+            const m = state.modelsMap[id];
+            const pack = Math.max(1, Number(m?.packQty) || 1);
+            return sum + (Number(m?.price) || 0) * Math.ceil(countByModel[id] / pack);
+          }, 0);
           const hasAnyPrice = boxes.some((b) => Number(state.modelsMap[b.modelId]?.price) > 0);
           costTotalEl.textContent = hasAnyPrice
             ? `${totalCost.toLocaleString('ko-KR')}원`

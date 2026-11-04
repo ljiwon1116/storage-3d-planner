@@ -1,5 +1,11 @@
 // 브랜드별/사이즈별 기본 수납함 카탈로그 데이터 (단위: mm), 기본 저장 조합 및 제품 예시 일러스트 생성기
 
+// 루틴랩 구매 링크 (3L·6L·9L 공통) — 공동구매 링크가 정해지면 여기 한 곳만 바꾸면 됨
+const ROUTINELAB_URL = 'https://smartstore.naver.com/nuber/products/13818484744';
+
+// 아이리스 BC 시리즈 구매 링크 (전 사이즈 공통)
+const IRIS_BC_URL = 'https://brand.naver.com/iriskorea/products/315482921';
+
 window.DEFAULT_STORAGE_MODELS = [
   // 1. 무인양품 (MUJI) - 폴리프로필렌 케이스·서랍식 (9종)
   {
@@ -553,6 +559,8 @@ window.DEFAULT_STORAGE_MODELS = [
     stackingOffset: 2,
     hasFrontHandle: true,
     color: '#eef6fb',
+    price: 12500,
+    url: ROUTINELAB_URL,
     image: 'img/routinelab/routinelab-drawer-3l.png'
   },
   {
@@ -568,6 +576,8 @@ window.DEFAULT_STORAGE_MODELS = [
     stackingOffset: 2,
     hasFrontHandle: true,
     color: '#e5f1f8',
+    price: 19900,
+    url: ROUTINELAB_URL,
     image: 'img/routinelab/routinelab-drawer-6l.png'
   },
   {
@@ -583,6 +593,8 @@ window.DEFAULT_STORAGE_MODELS = [
     stackingOffset: 2,
     hasFrontHandle: true,
     color: '#dcecf6',
+    price: 21900,
+    url: ROUTINELAB_URL,
     image: 'img/routinelab/routinelab-drawer-9l.png'
   },
 
@@ -675,17 +687,17 @@ window.DEFAULT_STORAGE_MODELS = [
 
   // 6. 아이리스 (네이버) — BC 시리즈 라인업 (폭×깊이×높이 mm, 사진: img/iris/)
   ...[
-    ['bc-330', 'BC-330', 220, 338, 140],
-    ['bc-370', 'BC-370', 264, 370, 160],
-    ['bc-200', 'BC-200', 200, 500, 235],
-    ['bc-200d', 'BC-200D', 200, 500, 300],
-    ['bc-450s', 'BC-450S', 350, 450, 180],
-    ['bc-450', 'BC-450', 350, 450, 235],
-    ['bc-450d', 'BC-450D', 350, 450, 300],
-    ['bc-500s', 'BC-500S', 400, 500, 180],
-    ['bc-500', 'BC-500', 400, 500, 235],
-    ['bc-500d', 'BC-500D', 400, 500, 300]
-  ].map(([key, code, w, d, h]) => ({
+    // [key, code, 폭, 깊이, 높이, 가격(원), 판매 묶음 개수]  — BC-200·200D는 3개 묶음 가격
+    ['bc-370', 'BC-370', 264, 370, 160, 10900, 1],
+    ['bc-200', 'BC-200', 200, 500, 235, 32900, 3],
+    ['bc-200d', 'BC-200D', 200, 500, 300, 35900, 3],
+    ['bc-450s', 'BC-450S', 350, 450, 180, 14900, 1],
+    ['bc-450', 'BC-450', 350, 450, 235, 15900, 1],
+    ['bc-450d', 'BC-450D', 350, 450, 300, 16900, 1],
+    ['bc-500s', 'BC-500S', 400, 500, 180, 16900, 1],
+    ['bc-500', 'BC-500', 400, 500, 235, 17900, 1],
+    ['bc-500d', 'BC-500D', 400, 500, 300, 18900, 1]
+  ].map(([key, code, w, d, h, price, packQty]) => ({
     id: 'iris-' + key,
     brand: '아이리스',
     lineup: '서랍형 시스템 수납박스 BC',
@@ -698,6 +710,9 @@ window.DEFAULT_STORAGE_MODELS = [
     stackingOffset: 2,
     hasFrontHandle: true,
     color: '#eef0f2',
+    ...(price ? { price } : {}),
+    ...(packQty > 1 ? { packQty } : {}),
+    url: IRIS_BC_URL,
     image: `img/iris/${key}.png`
   }))
 ];
