@@ -1551,7 +1551,7 @@
     if (selBoxes.length === 0) return;
 
     const defaultName = `내 묶음 (${selBoxes.length}개)`;
-    const name = await inputDialog({ title: '이 묶음 이름을 정해 주세요', value: defaultName, ok: '저장' });
+    const name = await inputDialog({ title: '이 묶음 이름을 정해주세요', value: defaultName, ok: '저장' });
     if (!name) return;
 
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, minY = Infinity, maxTopY = 0;
@@ -2033,7 +2033,7 @@
       const isNoFrame = c.leftFrameW === 0 && c.rightFrameW === 0 && c.topFrameH === 0 && c.bottomFrameH === 0;
       const clearFrameBtn = document.getElementById('btn-clear-doorframe');
       if (clearFrameBtn) {
-        clearFrameBtn.textContent = isNoFrame ? '문틀 되돌리기' : '문틀 없어요';
+        clearFrameBtn.textContent = isNoFrame ? '문틀 되돌리기' : '문틀 없음(0)';
       }
 
       const hasDoors = c.doorType && c.doorType !== 'none';
@@ -2603,12 +2603,12 @@
         panel.className = 'picker-filter-panel';
         panel.innerHTML = `
           <div class="pfp-top-actions">
-            <span class="pfp-top-title">골라 보기 (여러 개 체크돼요)
+            <span class="pfp-top-title">상세 조건 필터 (중복 체크 가능)
               <button type="button" class="pfp-help-btn" data-act="help" aria-label="필터 사용법 보기">사용법</button>
             </span>
             <div class="pfp-top-btns">
-              <button type="button" class="pfp-action-btn" data-act="check-all">전부 보기</button>
-              <button type="button" class="pfp-action-btn" data-act="uncheck-all">전부 끄기</button>
+              <button type="button" class="pfp-action-btn" data-act="check-all">모두 체크</button>
+              <button type="button" class="pfp-action-btn" data-act="uncheck-all">모두 해제</button>
             </div>
           </div>
 
@@ -2663,11 +2663,11 @@
           </div>
 
           <div class="pfp-group">
-            <div class="pfp-group-label">안이 보이나요?</div>
+            <div class="pfp-group-label">투명 · 반투명 여부</div>
             <div class="pfp-checks">
               <label class="pfp-check-chip"><input type="checkbox" data-group="transparency" value="clear" ${pf.transparency.includes('clear') ? 'checked' : ''} /><span>투명</span></label>
               <label class="pfp-check-chip"><input type="checkbox" data-group="transparency" value="translucent" ${pf.transparency.includes('translucent') ? 'checked' : ''} /><span>반투명</span></label>
-              <label class="pfp-check-chip"><input type="checkbox" data-group="transparency" value="opaque" ${pf.transparency.includes('opaque') ? 'checked' : ''} /><span>안 보여요</span></label>
+              <label class="pfp-check-chip"><input type="checkbox" data-group="transparency" value="opaque" ${pf.transparency.includes('opaque') ? 'checked' : ''} /><span>불투명(일반)</span></label>
             </div>
           </div>
         `;
@@ -2819,7 +2819,7 @@
 
       const filtered = getFilteredCatalogModels();
       if (filtered.length === 0) {
-        gridEl.innerHTML = `<div style="padding:28px 16px;text-align:center;color:var(--text-sub);font-size:0.86rem;">조건에 맞는 상자가 없어요.<br><span style="font-size:0.76rem;color:var(--text-muted);">필터를 바꾸거나 '전부 보기'를 눌러 보세요.</span></div>`;
+        gridEl.innerHTML = `<div style="padding:28px 16px;text-align:center;color:var(--text-sub);font-size:0.86rem;">조건에 맞는 상자가 없어요.<br><span style="font-size:0.76rem;color:var(--text-muted);">필터를 바꾸거나 '모두 체크'를 눌러 보세요.</span></div>`;
         updatePickerCartBar();
         return;
       }
@@ -4113,7 +4113,7 @@
       return [
         typeStep,
         num({
-          title: '장 안쪽 가로 길이를<br>알려 주세요.',
+          title: '장 안쪽 가로 길이를<br>알려주세요.',
           measure: WIZ_MEASURE.cabW,
           hint: () => '왼쪽 벽에서 오른쪽 벽까지, 안쪽을 재요.',
           min: 200, max: 3000, get: () => c.w, set: (v) => { c.w = v; }
@@ -4171,7 +4171,7 @@
     return [
       typeStep,
       num({
-        title: '서랍 안쪽 가로 길이를<br>알려 주세요.',
+        title: '서랍 안쪽 가로 길이를<br>알려주세요.',
           measure: WIZ_MEASURE.drwW,
         hint: () => '왼쪽 벽에서 오른쪽 벽까지, 안쪽을 재요.',
         min: 150, max: 1500, get: () => d.w, set: (v) => { d.w = v; }
@@ -4322,7 +4322,7 @@
     const restart = document.createElement('button');
     restart.type = 'button';
     restart.className = 'sp-restart';
-    restart.innerHTML = '질문 처음부터 다시 보기<span class="sp-restart-sub">놓은 상자는 그대로예요</span>';
+    restart.textContent = '처음부터 다시 설정';
     restart.addEventListener('click', () => {
       document.body.classList.remove('mobile-setup-open');
       state.wizStep = 0;
@@ -4578,7 +4578,7 @@
     const touchBtn = document.getElementById('btn-touch-multiselect');
     touchBtn.addEventListener('click', () => {
       state.touchMultiSelectMode = !state.touchMultiSelectMode;
-      touchBtn.textContent = state.touchMultiSelectMode ? '여러 개 고르기 끝내기' : '여러 개 고르기';
+      touchBtn.textContent = state.touchMultiSelectMode ? '여러 개 고르기: 켜짐' : '여러 개 고르기: 꺼짐';
       touchBtn.classList.toggle('is-on', !!state.touchMultiSelectMode);
       touchBtn.classList.toggle('btn-warning', state.touchMultiSelectMode);
       refreshAll();
@@ -4795,7 +4795,7 @@
 
     // 5. 시안(Plan) 추가 / 비우기 / 비교표 모달
     document.getElementById('btn-add-plan').addEventListener('click', async () => {
-      const name = await inputDialog({ title: '새 계획 이름을 정해 주세요', value: `계획 ${String.fromCharCode(65 + state.plans.length)}`, ok: '만들기' });
+      const name = await inputDialog({ title: '새 계획 이름을 정해주세요', value: `계획 ${String.fromCharCode(65 + state.plans.length)}`, ok: '만들기' });
       if (!name) return;
       const newPlan = {
         id: 'plan-' + Date.now(),
