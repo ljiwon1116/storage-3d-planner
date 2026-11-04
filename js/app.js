@@ -606,7 +606,15 @@
         const r = el.getBoundingClientRect();
         if (r.height > 0) barTop = Math.min(barTop, r.top - layerTop);
       });
-      const safeY = (y) => Math.min(y, barTop - 24);
+      // 위쪽 버튼(크기·설정, 선반 높이, 저장·구매) 아래로만
+      let topBarBottom = -Infinity;
+      ['#btn-mobile-edit-setup', '#btn-mobile-shelf-height', '#btn-export'].forEach((sel) => {
+        const el = document.querySelector(sel);
+        if (!el || el.offsetParent === null) return;
+        const r = el.getBoundingClientRect();
+        if (r.height > 0 && r.bottom - layerTop < 140) topBarBottom = Math.max(topBarBottom, r.bottom - layerTop);
+      });
+      const safeY = (y) => Math.max(topBarBottom + 26, Math.min(y, barTop - 24));
       // 화면 양옆 밖으로 반쯤 나가지 않게 (버튼 폭 44px 기준 가장자리 여백)
       const layerW = btnLayer.clientWidth || window.innerWidth;
       const safeX = (x) => Math.max(28, Math.min(x, layerW - 28));
@@ -692,6 +700,17 @@
       return state.catalogModels.filter((m) => ['drawer', 'basket'].includes(window.getModelKind(m)));
     }
     return state.catalogModels.filter((m) => window.getModelKind(m) === want);
+  }
+
+  // 자동 채우기 크기 고르기: 'big' 큰 상자 위주 / 'small' 작은 상자 여러 개 / 'mix'(또는 없음) 섞어서
+  // 이 칸에 들어가는 상자들을 바닥 넓이 순으로 줄 세워 큰 쪽 절반 / 작은 쪽 절반만 씀
+  function sizeFilterPool(models, size) {
+    if (!size || size === 'mix' || models.length < 3) return models;
+    const area = (m) => m.wTop * m.dTop;
+    const sorted = [...models].sort((a, b) => area(a) - area(b));
+    const mid = area(sorted[Math.floor(sorted.length / 2)]);
+    const picked = size === 'big' ? models.filter((m) => area(m) >= mid) : models.filter((m) => area(m) < mid);
+    return picked.length ? picked : models;
   }
 
   // 앞으로 꺼내는 상자(서랍형 · 앞 손잡이 바구니)는 돌리지 않음 → 여는 쪽이 항상 문을 봄
@@ -859,7 +878,7 @@
     return drawers.concat(baskets);
   }
 
-  function fridgeFillCompartment(compIdx, kind, brand, rng) {
+  function fridgeFillCompartment(compIdx, kind, brand, rng, size) {
     const comp = window.PackerEngine.getCompartments(state.spaceConfig)[compIdx];
     if (!comp) return [];
     const capH = comp.clearH * FRIDGE_STACK_RATIO;
@@ -919,8 +938,8 @@
     };
 
     const pool = fridgeFillPool(comp, k, brand);
-    const drawers = pool.filter(fridgeIsDrawer);
-    const baskets = pool.filter(fridgeIsBasket);
+    const drawers = sizeFilterPool(pool.filter(fridgeIsDrawer), size);
+    const baskets = sizeFilterPool(pool.filter(fridgeIsBasket), size);
 
     if (k === 'drawer') {
       // 서랍형만: 안쪽(뒷벽)에 붙여서 한 줄 (깊이는 칸 깊이의 60%까지)
@@ -969,12 +988,13 @@
   }
 
   // 3D 화면의 '한 번에 채우기': 가구 종류에 맞는 상자로 한 칸 채우기
-  function runTypeFill(compIdx, brand, kind) {
+  function runTypeFill(compIdx, brand, kind, size) {
     const plan = getActivePlan();
     const fillComp = window.PackerEngine.getCompartments(state.spaceConfig)[compIdx];
     if (fillComp && fillComp.reserved) return 0;   // 팬트리 '맨 아래 비워두기' 칸은 채우지 않음
     let pool = typeFillPool(kind);
     if (brand) pool = pool.filter((m) => m.brand === brand);
+    if (fillComp) pool = sizeFilterPool(pool.filter((m) => m.h <= fillComp.clearH), size);
     const isCab = state.spaceConfig.type === 'cabinet';
     const isPan = state.spaceConfig.type === 'pantry' || state.spaceConfig.type === 'fridge';
     const isDrawerKind = kind === 'drawer' || (!kind && isCab);
@@ -1010,7 +1030,7 @@
     for (let attempt = 0; attempt < 18; attempt++) {
       const rng = seededRng(Math.floor(Math.random() * 1e9));
       const cand = state.spaceConfig.type === 'fridge'
-        ? fridgeFillCompartment(compIdx, kind, brand, rng)
+        ? fridgeFillCompartment(compIdx, kind, brand, rng, size)
         : randomFillCompartment(compIdx, pool, rng, opts);
       if (!cand.length) continue;
       const rate = fillRate(cand);
@@ -1027,7 +1047,7 @@
   }
 
   // 한 번에 채우기 실행: 이미 상자가 있으면 묻고, 채운 뒤 [되돌리기] [다른 조합] 알림
-  async function runAutofillWithUndo(compIdx, brand, kind, onEmpty) {
+  async function runAutofillWithUndo(compIdx, brand, kind, onEmpty, size) {
     const plan = getActivePlan();
     const existing = plan.boxes.filter((b) => b.compartmentIndex === compIdx).length;
     if (existing > 0) {
@@ -1039,14 +1059,14 @@
       if (!ok) return;
     }
     const before = JSON.parse(JSON.stringify(plan.boxes));
-    const n = runTypeFill(compIdx, brand, kind);
+    const n = runTypeFill(compIdx, brand, kind, size);
     if (n === 0) { if (onEmpty) onEmpty(); return; }
     closeShelfSheet();
     refreshAll();
     const announce = (count) => showToast(`상자 ${count}개를 넣었어요`, {
       actions: [
         { label: '되돌리기', onClick: () => { getActivePlan().boxes = before; state.selectedBoxIds = []; refreshAll(); showToast('채우기 전으로 돌렸어요'); } },
-        { label: '다른 조합', onClick: () => { const m = runTypeFill(compIdx, brand, kind); refreshAll(); announce(m || count); } }
+        { label: '다른 조합', onClick: () => { const m = runTypeFill(compIdx, brand, kind, size); refreshAll(); announce(m || count); } }
       ]
     });
     announce(n);
@@ -1086,9 +1106,7 @@
         return;
       }
       if (isPan) { renderPantryKindChoice(compIdx, brand); return; }
-      runAutofillWithUndo(compIdx, brand, undefined, () => {
-        head.querySelector('.sheet-step-hint').textContent = '이 칸에 들어가는 상자가 없어요.';
-      });
+      renderSizeChoice(compIdx, brand, undefined, () => renderAutofillChoice(compIdx, brand ? 'brand' : undefined));
     };
 
     if (pool.length === 0) {
@@ -1109,6 +1127,40 @@
     }));
   }
 
+  // 한 번에 채우기 마지막 단계: 큰 상자 위주 · 작은 상자 여러 개 · 섞어서
+  function renderSizeChoice(compIdx, brand, kind, onBack) {
+    const body = document.getElementById('mobile-shelf-sheet-body');
+    const comp = window.PackerEngine.getCompartments(state.spaceConfig)[compIdx];
+    const isFridge = state.spaceConfig.type === 'fridge';
+    const basePool = isFridge
+      ? fridgeFillPool(comp, kind || 'mix', brand)
+      : typeFillPool(kind).filter((m) => m.h <= comp.clearH && (!brand || m.brand === brand));
+
+    body.innerHTML = '';
+    const head = document.createElement('div');
+    head.className = 'sheet-step-head';
+    head.innerHTML = '<div class="sheet-step-title">상자 크기는 어떻게 할까요?</div><div class="sheet-step-hint">이 칸 크기에 맞는 상자 중에서 골라요.</div>';
+    body.appendChild(head);
+
+    const go = (size) => {
+      runAutofillWithUndo(compIdx, brand, kind, () => {
+        head.querySelector('.sheet-step-hint').textContent = '이 칸에 들어가는 상자가 없어요.';
+      }, size);
+    };
+    const rows = [
+      ['big', '큰 상자 위주', '큰 상자 몇 개로 넓게 채워요'],
+      ['small', '작은 상자 여러 개', '작은 상자로 나눠 담아요'],
+      ['mix', '크기 섞어서', '크고 작은 상자를 같이 써요']
+    ];
+    rows.forEach(([k, label, sub]) => {
+      const n = sizeFilterPool(basePool, k).length;
+      const b = sheetBtn(label, n ? `${sub} · ${n}가지` : '이 칸에 맞는 상자가 없어요', k === 'mix' ? 'primary' : '', () => go(k));
+      if (!n) b.disabled = true;
+      body.appendChild(b);
+    });
+    body.appendChild(sheetBtn('뒤로', '', 'ghost', onBack));
+  }
+
   // 팬트리 한 번에 채우기 2단계: 서랍형 · 바구니형 · 섞어서
   function renderPantryKindChoice(compIdx, brand) {
     const body = document.getElementById('mobile-shelf-sheet-body');
@@ -1124,11 +1176,7 @@
     head.innerHTML = `<div class="sheet-step-title">어떤 상자로 채울까요?</div><div class="sheet-step-hint">${isFridge ? '냉장고·주방용 상자 중에서 ' : ''}${brand ? `${brand} 상자로 ` : ''}채워요.</div>`;
     body.appendChild(head);
 
-    const go = (k) => {
-      runAutofillWithUndo(compIdx, brand, k, () => {
-        head.querySelector('.sheet-step-hint').textContent = '이 칸에 들어가는 상자가 없어요.';
-      });
-    };
+    const go = (k) => renderSizeChoice(compIdx, brand, k, () => renderPantryKindChoice(compIdx, brand));
     const kindRows = isFridge
       ? [['drawer', '서랍형', '칸 깊이의 60%까지 안쪽에'], ['basket', '바구니형', '칸 높이의 절반까지'], ['mix', '섞어서', '서랍형은 안쪽, 앞에 낮은 바구니 (서랍 절반 열림)']]
       : [['drawer', '서랍형', '앞으로 빼는 상자'], ['basket', '바구니형', '위가 열린 바구니·통'], ['mix', '섞어서', '서랍형과 바구니형을 같이']];
@@ -1173,6 +1221,7 @@
       state.pickerBrand = 'ALL';
       state.pickerCart = {};
       state.pickerLiveIds = {};
+      applyPickerFitComp(true);
       renderPickerModalContent();
       document.getElementById('modal-box-picker').classList.add('open');
     }, '원하는 상자를 직접 골라 넣어요'));
@@ -2454,6 +2503,21 @@
     });
   }
 
+  // 필터 '이 칸에 맞게': 켜면 최대 크기를 지금 칸 크기로 (상자 고르기를 열 때 기본으로 켜짐)
+  function applyPickerFitComp(on) {
+    const comps = window.PackerEngine.getCompartments(state.spaceConfig);
+    const comp = comps[Math.min(comps.length - 1, Math.max(0, state.activeCompartmentIdx || 0))];
+    const pf = state.pickerFilters;
+    state.pickerFitComp = !!on && !!comp;
+    if (state.pickerFitComp) {
+      pf.wMax = String(Math.round(comp.w));
+      pf.dMax = String(Math.round(comp.d));
+      pf.hMax = String(Math.round(comp.clearH));
+    } else {
+      pf.wMax = ''; pf.dMax = ''; pf.hMax = '';
+    }
+  }
+
   // 팝업 모달 내부 렌더링
   function renderPickerModalContent() {
     const compartments = window.PackerEngine.getCompartments(state.spaceConfig);
@@ -2641,7 +2705,7 @@
             <div class="pfp-group-head">
               <span class="pfp-group-label">찾는 크기 (cm)</span>
               <div class="pfp-size-quick">
-                <button type="button" class="pfp-mini-btn" data-act="fit-comp">이 칸에 맞게</button>
+                <button type="button" class="pfp-mini-btn${state.pickerFitComp ? ' is-on' : ''}" data-act="fit-comp" aria-pressed="${state.pickerFitComp ? 'true' : 'false'}">이 칸에 맞게</button>
                 <button type="button" class="pfp-mini-btn" data-act="clear-size">크기 지우기</button>
               </div>
             </div>
@@ -2701,6 +2765,11 @@
           inp.addEventListener('input', () => {
             const k = inp.dataset.size;
             state.pickerFilters[k] = inp.value.trim();
+            if (/Max$/.test(k) && state.pickerFitComp) {
+              state.pickerFitComp = false;
+              const fb = panel.querySelector('[data-act="fit-comp"]');
+              if (fb) { fb.classList.remove('is-on'); fb.setAttribute('aria-pressed', 'false'); }
+            }
             updateFilterBtnLabel();
             renderCardsOnly();
           });
@@ -2724,10 +2793,14 @@
           renderCardsOnly();
         });
         panel.querySelector('[data-act="help"]').addEventListener('click', () => showFilterGuide());
-        panel.querySelector('[data-act="fit-comp"]').addEventListener('click', () => {
-          state.pickerFilters.wMax = String(Math.round(activeComp.w));
-          state.pickerFilters.dMax = String(Math.round(activeComp.d));
-          state.pickerFilters.hMax = String(Math.round(activeComp.clearH));
+        const fitBtn = panel.querySelector('[data-act="fit-comp"]');
+        const syncFitBtn = () => {
+          fitBtn.classList.toggle('is-on', !!state.pickerFitComp);
+          fitBtn.setAttribute('aria-pressed', state.pickerFitComp ? 'true' : 'false');
+        };
+        fitBtn.addEventListener('click', () => {
+          applyPickerFitComp(!state.pickerFitComp);
+          syncFitBtn();
           panel.querySelector('[data-size="wMax"]').value = state.pickerFilters.wMax;
           panel.querySelector('[data-size="dMax"]').value = state.pickerFilters.dMax;
           panel.querySelector('[data-size="hMax"]').value = state.pickerFilters.hMax;
@@ -2739,6 +2812,8 @@
           state.pickerFilters.dMin = ''; state.pickerFilters.dMax = '';
           state.pickerFilters.hMin = ''; state.pickerFilters.hMax = '';
           panel.querySelectorAll('.pfp-size-input').forEach((inp) => { inp.value = ''; });
+          state.pickerFitComp = false;
+          syncFitBtn();
           updateFilterBtnLabel();
           renderCardsOnly();
         });
@@ -2964,6 +3039,7 @@
     let wasOpen = false;
     const apply = () => {
       const open = modal.classList.contains('open');
+      document.body.classList.toggle('picker-open', open);
       const S = window.Scene3DManager;
       if (!S || !S.focusCompartmentAbove) return;
       if (open && state.uiMode === 'mobile') {

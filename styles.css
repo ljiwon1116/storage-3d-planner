@@ -5193,3 +5193,13 @@ body.ui-mode-mobile .mobile-shelfh-popup { width: min(340px, calc(100% - 24px));
 /* 1105b: 상자 고르기 — ＋/− 가 바로 3D에 반영되니 뒤 화면이 잘 보이게 */
 body.ui-mode-mobile #modal-box-picker.modal-backdrop { background: rgba(45, 34, 26, 0.06); }
 body.ui-wide #modal-box-picker.modal-backdrop { background: transparent; }
+
+/* 1105c: 필터 선택칸 — 왼쪽 정렬 대신 너비를 n등분 */
+.pfp-checks { display: flex !important; flex-wrap: wrap; gap: 6px; }
+/* 같은 몫으로 나누되, 긴 글자는 잘리지 않게 필요한 만큼만 더 넓게 */
+.pfp-check-chip { flex: 1 1 0; min-width: max-content; justify-content: center; white-space: nowrap; padding-left: 8px; padding-right: 8px; }
+/* '이 칸에 맞게' 켜짐 표시 (체크된 선택칸과 같은 색) */
+.pfp-mini-btn.is-on { background: var(--accent-soft, #f3e8d8); border-color: var(--accent, #7d6244); color: var(--accent, #6e5236); }
+
+/* 상자 고르기 창이 열린 동안엔 칸 ＋버튼 숨김 (3D가 칸 쪽으로 다가가서 위 버튼과 겹치지 않게) */
+body.picker-open #mobile-shelf-buttons { visibility: hidden; }
