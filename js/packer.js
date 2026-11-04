@@ -426,9 +426,9 @@ window.PackerEngine = (function () {
       if (relYMax > comp.clearH + 0.5) {
         setSeverity('error');
         if (spaceConfig.type === 'drawer') {
-          issues.push(`[서랍 안 닫힘] '${model.name}'이 너무 높아서(${window.Units.len(relYMax)}) 서랍이 안 닫혀요. (들어가는 높이 ${window.Units.len(comp.clearH)})`);
+          issues.push(`[서랍 안 닫힘] '${model.name}' 상자가 너무 높아서(${window.Units.len(relYMax)}) 서랍이 안 닫혀요. (들어가는 높이 ${window.Units.len(comp.clearH)})`);
         } else {
-          issues.push(`[너무 높음] '${model.name}'이 ${comp.name}보다 높아요. 상자 ${window.Units.len(relYMax)}, 칸 ${window.Units.len(comp.clearH)}`);
+          issues.push(`[너무 높음] '${model.name}' 상자가 ${comp.name}보다 높아요. (상자 ${window.Units.len(relYMax)}, 칸 ${window.Units.len(comp.clearH)})`);
         }
       }
 
@@ -436,7 +436,7 @@ window.PackerEngine = (function () {
       if (spaceConfig.type === 'cabinet' && cabConst) {
         if (!canPassThroughDoor(model, cabConst.doorClearW, cabConst.doorClearH)) {
           setSeverity('error');
-          issues.push(`[문으로 못 들어감] '${model.name}'이 문(${window.Units.cm(cabConst.doorClearW)}×${window.Units.len(cabConst.doorClearH)})보다 커서 장 안에 못 넣어요.`);
+          issues.push(`[문으로 못 들어감] '${model.name}' 상자가 문(${window.Units.cm(cabConst.doorClearW)}×${window.Units.len(cabConst.doorClearH)})보다 커서 장 안에 못 넣어요.`);
         }
 
         const inLeftDead = cabConst.leftDeadW > 0 && xMin < cabConst.leftDeadW - 0.5;
@@ -447,10 +447,10 @@ window.PackerEngine = (function () {
           const zoneName = inLeftDead ? '왼쪽 문틀' : inRightDead ? '오른쪽 문틀' : '아래 문틀';
           if (model.accessType === 'front_drawer') {
             setSeverity('error');
-            issues.push(`[서랍 못 뺌] 서랍형 '${model.name}'이 ${zoneName}에 걸려서 앞으로 못 빼요.`);
+            issues.push(`[서랍 못 뺌] 서랍형 '${model.name}' 상자가 ${zoneName}에 걸려서 앞으로 못 빼요.`);
           } else {
             setSeverity('warn');
-            issues.push(`[빼기 불편] '${model.name}'이 ${zoneName} 뒤에 걸쳐 있어서 똑바로 빼기 힘들어요.`);
+            issues.push(`[빼기 불편] '${model.name}' 상자가 ${zoneName} 뒤에 걸쳐 있어서 똑바로 빼기 힘들어요.`);
           }
         }
       }
@@ -461,10 +461,10 @@ window.PackerEngine = (function () {
           const hiddenDepth = Math.min(dims.d, drwConst.unexposedD - zMin);
           if (model.accessType === 'top_open' || model.accessType === 'top_lid') {
             setSeverity('warn');
-            issues.push(`[꺼내기 힘든 곳 주의] '${model.name}'의 안쪽 ${window.Units.len(hiddenDepth)}가 서랍을 다 열어도 가려져서 위로 꺼내기 불편해요.`);
+            issues.push(`[꺼내기 힘든 곳 주의] '${model.name}' 상자의 안쪽 ${window.Units.len(hiddenDepth)}가 서랍을 다 열어도 가려져서 위로 꺼내기 불편해요.`);
           } else {
             setSeverity('warn');
-            issues.push(`[꺼내기 힘든 곳] '${model.name}'의 일부(${window.Units.len(hiddenDepth)})가 서랍 안쪽 꺼내기 힘든 곳에 있어요.`);
+            issues.push(`[꺼내기 힘든 곳] '${model.name}' 상자의 일부(${window.Units.len(hiddenDepth)})가 서랍 안쪽 꺼내기 힘든 곳에 있어요.`);
           }
         }
       }
@@ -476,7 +476,7 @@ window.PackerEngine = (function () {
           const a0 = (comp.s0 || 0) + xMin, a1 = (comp.s0 || 0) + xMax;
           if (a1 > corner.s0 + 0.5 && a0 < corner.s1 - 0.5) {
             setSeverity('warn');
-            issues.push(`[구석] '${model.name}'이 구석에 있어요. 옆 선반에 막혀 꺼내기 힘들어요.`);
+            issues.push(`[구석] '${model.name}' 상자가 구석에 있어요. 옆 선반에 막혀 꺼내기 힘들어요.`);
           }
         }
       }

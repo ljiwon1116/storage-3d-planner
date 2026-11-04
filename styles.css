@@ -5162,3 +5162,30 @@ body.ui-mode-mobile .mobile-shelfh-popup { width: min(340px, calc(100% - 24px));
 #sel-box-title { display: flex !important; align-items: baseline; gap: 6px; min-width: 0; white-space: nowrap; overflow: hidden; }
 #sel-box-title > strong { flex: 1 1 auto; min-width: 80px; overflow: hidden; text-overflow: ellipsis; }
 #sel-box-title > .sel-box-meta { flex: 0 0 auto; margin-left: 0; }
+
+/* ===== 1104z 사용성 손질 ===== */
+/* 37 작은 버튼: 누르기 쉬운 최소 높이 */
+.pfp-action-btn, .pfp-mini-btn, .pfp-help-btn { min-height: 34px !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+#btn-box-shelf-up, #btn-box-shelf-down { min-height: 36px !important; }
+.selected-box-pill .btn, .selected-box-pill button { min-height: 38px !important; }
+.header-maker { min-height: 32px; display: inline-flex; align-items: center; }
+/* 38 너무 작던 상자 선택 버튼 글자 */
+.selected-box-pill .btn, .selected-box-pill button { font-size: 0.78rem !important; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+/* 39 흐린 안내 글을 조금 진하게 */
+.sp-hint, .export-section-desc, .hint-text, .wiz-value-caption { color: var(--text-meta, #6f665c) !important; }
+/* 10 문제 탭 위 색 설명 */
+.issue-legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.75rem; color: var(--text-sub); padding: 2px 2px 8px; }
+.issue-legend span { white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+/* 33 여러 개 고르기 켜졌을 때 표시 */
+#btn-touch-multiselect.is-on { background: var(--accent) !important; color: #fff !important; }
+/* 15 이름 입력 창 */
+.app-input { width: 100%; box-sizing: border-box; margin: 10px 0 4px; padding: 10px 12px; min-height: 44px; border: 1px solid var(--border, #e2d8ca); border-radius: 10px; font-size: 1rem; background: #fff; }
+
+/* 11 상자 고르기: 브랜드 · 가격 한 줄 */
+.pick-row-top { min-width: 0; }
+.pick-row-brand { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.picker-fit-badge { flex-shrink: 0; }
+
+/* 1104z: 질문 다시 보기 — 안내는 아래 작은 줄로 (글자 키워도 단어 중간에서 줄바뀜 없음) */
+.sp-restart { display: flex; flex-direction: column; align-items: center; gap: 2px; padding-top: var(--sp-2); padding-bottom: var(--sp-2); white-space: nowrap; }
+.sp-restart-sub { font-size: 0.74rem; font-weight: 400; text-decoration: none; color: var(--text-meta); }

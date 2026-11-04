@@ -521,11 +521,19 @@
     document.getElementById('box-detail-backdrop')?.addEventListener('click', close);
     document.getElementById('box-detail-clear')?.addEventListener('click', () => {
       if (!cur) return;
-      cur.box.contents = {};
-      cur.box.picks = [];
-      renderList();
-      drawItems();
-      if (cur.onChange) cur.onChange();
+      const n = Object.values(cur.box.contents || {}).reduce((a, v) => a + (Number(v) || 0), 0) || (cur.box.picks || []).length;
+      const doClear = () => {
+        cur.box.contents = {};
+        cur.box.picks = [];
+        renderList();
+        drawItems();
+        if (cur.onChange) cur.onChange();
+      };
+      if (n > 0 && window.appConfirm) {
+        window.appConfirm({ title: '상자 안 물건을 모두 뺄까요?', message: `물건 ${n}개가 빠져요.`, ok: '모두 빼기' }).then((ok) => { if (ok && cur) doClear(); });
+      } else {
+        doClear();
+      }
     });
     window.addEventListener('resize', () => { if (cur) resize(); });
   }

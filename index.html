@@ -6,7 +6,7 @@
   <title>수납 공간 꾸미기 - 옷장·서랍 3D로 짜보기</title>
   <meta name="theme-color" content="#f7f3ec" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <link rel="stylesheet" href="styles.css?v=1104y" />
+  <link rel="stylesheet" href="styles.css?v=1104z" />
   <script>
     // 실제로 보이는 화면 높이를 --vh 로 넣어요 (주소창·툴바가 생기고 없어질 때마다).
     // 브라우저마다 100vh 가 툴바를 포함해서 위아래가 잘리는 문제를 막아요.
@@ -102,10 +102,10 @@
     <div id="mobile-popup-backdrop" class="mobile-popup-backdrop" aria-hidden="true"></div>
 
     <!-- [모바일 전용] 3D 화면 위 '장 설정' 돌아가기 버튼 -->
-    <button id="btn-mobile-edit-setup" class="mobile-edit-setup-btn" type="button">장 설정</button>
+    <button id="btn-mobile-edit-setup" class="mobile-edit-setup-btn" type="button">크기·설정</button>
     <div id="mobile-setup-popup" class="mobile-setup-popup">
       <div class="mobile-shelfh-head">
-        <span>장 설정</span>
+        <span>크기·설정</span>
         <button id="btn-mobile-setup-close" class="btn btn-sm" aria-label="닫기">✕</button>
       </div>
       <div id="mobile-setup-body"></div>
@@ -214,7 +214,7 @@
           <div class="sub-block">
             <div class="sub-block-title">
               <span>문틀과 문 걸림</span>
-              <button id="btn-clear-doorframe" class="btn btn-sm" title="0으로 하면 문 너비 = 장 너비로 봐요">문틀 없음(0)</button>
+              <button id="btn-clear-doorframe" class="btn btn-sm" title="문틀을 0으로 해요">문틀 없어요</button>
             </div>
             <div class="form-grid-2">
               <div class="form-group">
@@ -296,7 +296,7 @@
                 <input id="drw-w" data-unit="mm" type="number" class="input-box" value="720" step="10" />
               </div>
               <div class="form-group">
-                <label>진짜 깊이</label>
+                <label>서랍 안쪽 깊이</label>
                 <input id="drw-d" data-unit="mm" type="number" class="input-box" value="480" step="10" />
               </div>
             </div>
@@ -306,11 +306,11 @@
             </div>
             <div class="form-grid-2">
               <div class="form-group">
-                <label>서랍 옆벽 높이</label>
+                <label>서랍 벽 높이</label>
                 <input id="drw-h" data-unit="mm" type="number" class="input-box" value="140" step="5" />
               </div>
               <div class="form-group">
-                <label>넣을 수 있는 높이</label>
+                <label>위 서랍에 안 닿는 높이</label>
                 <input id="drw-clearance-h" data-unit="mm" type="number" class="input-box" value="175" step="5" />
               </div>
             </div>
@@ -366,7 +366,7 @@
           <button id="btn-box-save-combo" class="btn btn-warning btn-sm" style="display:none;">묶음 저장</button>
           <button id="btn-box-rot-ccw" class="btn btn-primary btn-sm" aria-label="왼쪽으로 돌리기">↺ 왼쪽</button>
           <button id="btn-box-rot" class="btn btn-primary btn-sm" title="단축키: R" aria-label="오른쪽으로 돌리기">↻ 오른쪽</button>
-          <button id="btn-box-fine" class="btn btn-sm sel-fine-btn" type="button" aria-expanded="false" aria-controls="box-fine-pad">상세 조정</button>
+          <button id="btn-box-fine" class="btn btn-sm sel-fine-btn" type="button" aria-expanded="false" aria-controls="box-fine-pad">조금 옮기기</button>
           <button id="btn-box-del" class="btn btn-danger btn-sm">치우기</button>
         </div>
         <!-- 상세 조정: ㅗ 모양 방향키 (밖을 누르면 닫힘) -->
@@ -399,7 +399,7 @@
       <!-- 시점 전환 & 모바일 묶음선택 토글 캡슐 바 -->
       <div class="hud-pill-bar">
         <button id="btn-touch-multiselect" class="btn btn-sm" title="폰·태블릿에서 상자 여러 개를 손가락으로 한 번에 고르기">
-          여러 개 고르기: 꺼짐
+          여러 개 고르기
         </button>
         <button id="btn-open-ctrl" class="btn btn-sm" type="button" style="display:none;" aria-expanded="false" aria-controls="open-ctrl-pop">문 열기</button>
         <label class="checkbox-row" style="margin:0;">
@@ -416,6 +416,7 @@
         <span id="error-code-tab-title">문제 알림</span>
       </button>
       <div class="error-code-body">
+        <div class="issue-legend"><span><i class="legend-dot" style="background:#dc2626;"></i>빨강: 문에 걸림·문제</span><span><i class="legend-dot" style="background:#f59e0b;"></i>주황: 꺼내기 힘든 곳</span></div>
         <div id="warnings-list" style="display:flex;flex-direction:column;gap:5px;"></div>
       </div>
     </div>
@@ -466,7 +467,7 @@
     <div class="modal-box modal-box-wide">
       <div class="modal-header picker-head">
         <div class="picker-head-text">
-          <span class="picker-head-title">상자 고르기 (저장한 묶음도)</span>
+          <span class="picker-head-title">상자 고르기</span>
           <span id="picker-target-space-badge" class="badge picker-target-line"></span>
         </div>
         <button id="btn-close-picker-modal" class="btn btn-sm picker-close-btn" aria-label="닫기">✕</button>
@@ -476,7 +477,7 @@
         <div class="picker-top-row">
           <div id="picker-brand-nav-slot" class="picker-brand-nav-slot"></div>
           <form id="picker-search-form" class="picker-search" role="search" onsubmit="return false;">
-            <input id="picker-search-input" type="search" class="picker-search-input" placeholder="상자·묶음 이름 찾기" aria-label="상자나 묶음 이름 찾기" />
+            <input id="picker-search-input" type="search" class="picker-search-input" placeholder="이름으로 찾기" aria-label="상자나 묶음 이름 찾기" />
             <button id="btn-picker-search" class="picker-search-btn" type="submit" aria-label="찾기">
               <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
             </button>
@@ -501,9 +502,9 @@
       <ul class="drag-guide-list">
         <li><b>상자 모양</b>서랍형·바구니형·뚜껑형 중 보고 싶은 것만 체크해요. 여러 개를 같이 고를 수 있어요.</li>
         <li><b>위에 쌓기</b>위로 쌓을 상자를 찾을 때는 '쌓을 수 있어요'만 체크해요.</li>
-        <li><b>찾는 사이즈</b>가로·세로·높이를 최소~최대 cm로 적어요. '현재 칸 이하로'를 누르면 지금 칸에 들어가는 상자만 보여요.</li>
-        <li><b>투명 · 반투명 여부</b>안이 보이는 상자만 보고 싶을 때 써요.</li>
-        <li><b>필터 옆 숫자</b>조건에 맞는 상자 개수예요. '모두 체크'를 누르면 처음처럼 전부 보여요.</li>
+        <li><b>찾는 크기</b>가로·깊이·높이를 최소~최대 cm로 적어요. '이 칸에 맞게'를 누르면 지금 칸에 들어가는 상자만 보여요.</li>
+        <li><b>안이 보이나요?</b>안이 보이는 상자만 보고 싶을 때 써요.</li>
+        <li><b>필터 옆 숫자</b>조건에 맞는 상자 개수예요. '전부 보기'를 누르면 처음처럼 전부 보여요.</li>
       </ul>
       <button id="filter-guide-ok" class="drag-guide-ok" type="button">알겠어요</button>
     </div>
@@ -531,7 +532,7 @@
           </label>
           <input id="ab-photo-input" type="file" accept="image/*" hidden />
           <div class="ab-photo-help">
-            <div class="ab-label">썸네일 <span class="ab-opt">선택</span></div>
+            <div class="ab-label">상품 사진 <span class="ab-opt">없어도 돼요</span></div>
             <div class="ab-hint">상품 사진을 고르거나 찍어요. 없으면 크기로 그린 그림이 나와요.</div>
             <button id="ab-photo-clear" class="pp-text-btn" type="button" hidden>사진 빼기</button>
           </div>
@@ -543,7 +544,7 @@
           <span id="ab-name-err" class="ab-err" hidden>제품 이름을 적어 주세요.</span>
         </label>
         <label class="ab-field">
-          <span class="ab-label">브랜드 <span class="ab-opt">선택</span></span>
+          <span class="ab-label">브랜드 <span class="ab-opt">없어도 돼요</span></span>
           <input id="ab-brand" class="ab-input" type="text" maxlength="20" placeholder="예: 다이소 (비우면 '내 상자')" />
         </label>
 
@@ -775,12 +776,12 @@
   </div>
 
   <!-- 애플리케이션 스크립트 로드 -->
-  <script src="js/units.js?v=1104y"></script>
-  <script src="js/presets.js?v=1104y"></script>
-  <script src="js/items.js?v=1104y"></script>
-  <script src="js/packer.js?v=1104y"></script>
-  <script src="js/scene3d.js?v=1104y"></script>
-  <script src="js/app.js?v=1104y"></script>
+  <script src="js/units.js?v=1104z"></script>
+  <script src="js/presets.js?v=1104z"></script>
+  <script src="js/items.js?v=1104z"></script>
+  <script src="js/packer.js?v=1104z"></script>
+  <script src="js/scene3d.js?v=1104z"></script>
+  <script src="js/app.js?v=1104z"></script>
 
   <!-- 보관함 자세히 보기: 뒤는 흐리게, 고른 보관함만 크게 + 물건 넣기 -->
   <div id="box-detail" class="box-detail" aria-hidden="true">
@@ -806,6 +807,6 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="js/boxdetail.js?v=1104y"></script>
+  <script src="js/boxdetail.js?v=1104z"></script>
 </body>
 </html>

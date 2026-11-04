@@ -266,7 +266,7 @@
     // 2) Vercel + Neon DB (/api/bootstrap) 동기화
     if (window.location.protocol === 'file:') {
       if (badgeEl) {
-        badgeEl.textContent = '⚪ 내 기기에 저장';
+        badgeEl.textContent = '내 기기에 저장';
         badgeEl.title = '인터넷에 올리면 저절로 같이 저장돼요.';
       }
       return;
@@ -290,7 +290,7 @@
         }
 
         if (badgeEl) {
-          badgeEl.textContent = '🟢 인터넷에 저장됨';
+          badgeEl.textContent = '인터넷에 저장됨';
           badgeEl.style.background = '#e6f4ea';
           badgeEl.style.color = '#137333';
           badgeEl.style.borderColor = '#a8dab5';
@@ -298,13 +298,13 @@
         refreshAll();
       } else {
         if (badgeEl) {
-          badgeEl.textContent = '🟡 내 기기에 저장';
+          badgeEl.textContent = '내 기기에 저장';
           badgeEl.title = data.message || '인터넷에 연결하면 어디서나 볼 수 있어요.';
         }
       }
     } catch (e) {
       if (badgeEl) {
-        badgeEl.textContent = '⚪ 내 기기에 저장';
+        badgeEl.textContent = '내 기기에 저장';
       }
     }
   }
@@ -362,7 +362,7 @@
       await navigator.clipboard.writeText(shareUrl);
       showToast('링크를 복사했어요. 카톡이나 문자에 붙여 넣어 보내세요');
     } catch (e) {
-      prompt('이 링크를 복사해서 보내세요:', shareUrl);
+      inputDialog({ title: '길게 눌러 복사해 주세요', value: shareUrl, ok: '닫기', readOnly: true });
     }
   }
 
@@ -605,6 +605,9 @@
         if (r.height > 0) barTop = Math.min(barTop, r.top - layerTop);
       });
       const safeY = (y) => Math.min(y, barTop - 24);
+      // 화면 양옆 밖으로 반쯤 나가지 않게 (버튼 폭 44px 기준 가장자리 여백)
+      const layerW = btnLayer.clientWidth || window.innerWidth;
+      const safeX = (x) => Math.max(28, Math.min(x, layerW - 28));
       // 버튼은 매 프레임 새로 만들지 않고 위치만 갱신 (클릭 유지)
       const existing = btnLayer.querySelectorAll('.mobile-shelf-add-btn');
       if (existing.length !== anchors.length) {
@@ -616,7 +619,7 @@
           btn.innerHTML = `<span class="msab-num">${anc.label || anc.index + 1}</span><span class="msab-plus">+</span>`;
           btn.setAttribute('aria-label', `${anc.label || anc.index + 1} 칸에 상자 넣기`);
           btn.dataset.idx = anc.index;
-          btn.style.left = `${anc.x.toFixed(1)}px`;
+          btn.style.left = `${safeX(anc.x).toFixed(1)}px`;
           btn.style.top = `${safeY(anc.y).toFixed(1)}px`;
           btn.addEventListener('click', (e) => {
             e.preventDefault();
@@ -631,7 +634,7 @@
           btn.dataset.idx = anc.index;
           const numEl = btn.querySelector('.msab-num');
           if (numEl) numEl.textContent = anc.label || anc.index + 1;
-          btn.style.left = `${anc.x.toFixed(1)}px`;
+          btn.style.left = `${safeX(anc.x).toFixed(1)}px`;
           btn.style.top = `${safeY(anc.y).toFixed(1)}px`;
         });
       }
@@ -1260,7 +1263,7 @@
       return;
     }
     if (state.spaceConfig.type === 'fridge') {
-      body.innerHTML = `<div class="hint-text">냉장고 선반 수는 '장 설정'에서 바꿔요.</div>`;
+      body.innerHTML = `<div class="hint-text">냉장고 선반 수는 '크기·설정'에서 바꿔요.</div>`;
       return;
     }
     if (state.spaceConfig.type !== 'cabinet') {
@@ -1542,13 +1545,13 @@
     document.getElementById('btn-bundle-down').style.display = isCab ? 'inline-flex' : 'none';
   }
 
-  function saveCurrentSelectionAsCombo() {
+  async function saveCurrentSelectionAsCombo() {
     const activePlan = getActivePlan();
     const selBoxes = activePlan.boxes.filter((b) => state.selectedBoxIds.includes(b.id));
     if (selBoxes.length === 0) return;
 
     const defaultName = `내 묶음 (${selBoxes.length}개)`;
-    const name = prompt('이 묶음 이름을 정해주세요:', defaultName);
+    const name = await inputDialog({ title: '이 묶음 이름을 정해 주세요', value: defaultName, ok: '저장' });
     if (!name) return;
 
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, minY = Infinity, maxTopY = 0;
@@ -1817,7 +1820,7 @@
     const currentCompIdx = selBoxes[0].compartmentIndex;
     const targetCompIdx = currentCompIdx + deltaIdx;
     if (targetCompIdx < 0 || targetCompIdx >= compartments.length) {
-      alert(deltaIdx > 0 ? '위에 칸이 더 없어요.' : '이미 맨 아래 칸이에요.');
+      showToast(deltaIdx > 0 ? '위에 칸이 더 없어요' : '이미 맨 아래 칸이에요');
       return;
     }
 
@@ -2030,7 +2033,7 @@
       const isNoFrame = c.leftFrameW === 0 && c.rightFrameW === 0 && c.topFrameH === 0 && c.bottomFrameH === 0;
       const clearFrameBtn = document.getElementById('btn-clear-doorframe');
       if (clearFrameBtn) {
-        clearFrameBtn.textContent = isNoFrame ? '🔄 문틀 되돌리기' : '문틀 없음(0)';
+        clearFrameBtn.textContent = isNoFrame ? '문틀 되돌리기' : '문틀 없어요';
       }
 
       const hasDoors = c.doorType && c.doorType !== 'none';
@@ -2177,7 +2180,7 @@
       card.innerHTML = `
         <div class="shelf-callout-top">
           <div class="shelf-callout-title">
-            <span>📁 ${comp.name}</span>
+            <span>${comp.name}</span>
           </div>
           <span class="badge">${compBoxes.length}개 놓음</span>
         </div>
@@ -2213,17 +2216,17 @@
 
         panel.innerHTML = `
           <button class="btn btn-primary btn-lg-cta exp-open-picker-btn">
-            ➕ 이 칸에 상자 넣기
+            + 이 칸에 상자 넣기
           </button>
 
           <div class="right-subtabs">
-            <button class="subtab-btn exp-tab-placed ${isPlacedTab ? 'active' : ''}">📋 지금 놓은 것</button>
+            <button class="subtab-btn exp-tab-placed ${isPlacedTab ? 'active' : ''}">지금 놓은 것</button>
             <button class="subtab-btn exp-tab-combos ${!isPlacedTab ? 'active' : ''}">저장한 묶음 (${state.savedCombos.length})</button>
           </div>
 
           <div class="exp-placed-section" style="display:${isPlacedTab ? 'block' : 'none'};">
             <div style="font-size:0.7rem;color:var(--text-sub);margin-bottom:4px;">
-              💡 <strong>Shift + 클릭</strong>으로 여러 개 고르기.
+              <strong>Shift + 클릭</strong>으로 여러 개 고르기.
             </div>
             <div class="placed-mini-list exp-placed-list"></div>
           </div>
@@ -2234,7 +2237,7 @@
 
           <div style="border-top:1px solid var(--border);padding-top:8px;">
             <button type="button" class="btn exp-toggle-autofill-btn" style="width:100%;justify-content:space-between;background:${state.autofillPanelOpen ? '#f3e5d3' : '#faf5eb'};border-color:#d5c3aa;color:#5c4228;font-weight:700;">
-              <span>⚡ 한 번에 채우기</span>
+              <span>한 번에 채우기</span>
               <span style="color:#b86b43;font-weight:800;">${state.autofillPanelOpen ? '접기 ∧' : '열기 ∨'}</span>
             </button>
 
@@ -2283,7 +2286,7 @@
               </label>
 
               <button class="btn exp-run-autofill-btn" style="width:100%;margin-top:4px;border-color:var(--accent);background:#fff;color:var(--accent);font-weight:800;">
-                ⚡ 이 칸 채우기
+                이 칸 채우기
               </button>
             </div>
           </div>
@@ -2600,12 +2603,12 @@
         panel.className = 'picker-filter-panel';
         panel.innerHTML = `
           <div class="pfp-top-actions">
-            <span class="pfp-top-title">상세 조건 필터 (중복 체크 가능)
+            <span class="pfp-top-title">골라 보기 (여러 개 체크돼요)
               <button type="button" class="pfp-help-btn" data-act="help" aria-label="필터 사용법 보기">사용법</button>
             </span>
             <div class="pfp-top-btns">
-              <button type="button" class="pfp-action-btn" data-act="check-all">모두 체크</button>
-              <button type="button" class="pfp-action-btn" data-act="uncheck-all">모두 해제</button>
+              <button type="button" class="pfp-action-btn" data-act="check-all">전부 보기</button>
+              <button type="button" class="pfp-action-btn" data-act="uncheck-all">전부 끄기</button>
             </div>
           </div>
 
@@ -2630,8 +2633,8 @@
             <div class="pfp-group-head">
               <span class="pfp-group-label">찾는 크기 (cm)</span>
               <div class="pfp-size-quick">
-                <button type="button" class="pfp-mini-btn" data-act="fit-comp">현재 칸 이하로</button>
-                <button type="button" class="pfp-mini-btn" data-act="clear-size">치수 지우기</button>
+                <button type="button" class="pfp-mini-btn" data-act="fit-comp">이 칸에 맞게</button>
+                <button type="button" class="pfp-mini-btn" data-act="clear-size">크기 지우기</button>
               </div>
             </div>
             <div class="pfp-size-rows">
@@ -2639,32 +2642,32 @@
                 <span class="pfp-size-name">가로</span>
                 <input type="number" data-unit="mm" class="pfp-size-input" data-size="wMin" placeholder="최소" value="${pf.wMin}" step="10" min="0" />
                 <span class="pfp-tilde">~</span>
-                <input type="number" data-unit="mm" class="pfp-size-input" data-size="wMax" placeholder="최대 (${Math.round(activeComp.w)})" value="${pf.wMax}" step="10" min="0" />
+                <input type="number" data-unit="mm" class="pfp-size-input" data-size="wMax" placeholder="${Math.round(activeComp.w)}까지" value="${pf.wMax}" step="10" min="0" />
                 <span class="pfp-unit">cm</span>
               </div>
               <div class="pfp-size-row">
                 <span class="pfp-size-name">깊이</span>
                 <input type="number" data-unit="mm" class="pfp-size-input" data-size="dMin" placeholder="최소" value="${pf.dMin}" step="10" min="0" />
                 <span class="pfp-tilde">~</span>
-                <input type="number" data-unit="mm" class="pfp-size-input" data-size="dMax" placeholder="최대 (${Math.round(activeComp.d)})" value="${pf.dMax}" step="10" min="0" />
+                <input type="number" data-unit="mm" class="pfp-size-input" data-size="dMax" placeholder="${Math.round(activeComp.d)}까지" value="${pf.dMax}" step="10" min="0" />
                 <span class="pfp-unit">cm</span>
               </div>
               <div class="pfp-size-row">
                 <span class="pfp-size-name">높이</span>
                 <input type="number" data-unit="mm" class="pfp-size-input" data-size="hMin" placeholder="최소" value="${pf.hMin}" step="10" min="0" />
                 <span class="pfp-tilde">~</span>
-                <input type="number" data-unit="mm" class="pfp-size-input" data-size="hMax" placeholder="최대 (${Math.round(activeComp.clearH)})" value="${pf.hMax}" step="10" min="0" />
+                <input type="number" data-unit="mm" class="pfp-size-input" data-size="hMax" placeholder="${Math.round(activeComp.clearH)}까지" value="${pf.hMax}" step="10" min="0" />
                 <span class="pfp-unit">cm</span>
               </div>
             </div>
           </div>
 
           <div class="pfp-group">
-            <div class="pfp-group-label">투명 · 반투명 여부</div>
+            <div class="pfp-group-label">안이 보이나요?</div>
             <div class="pfp-checks">
               <label class="pfp-check-chip"><input type="checkbox" data-group="transparency" value="clear" ${pf.transparency.includes('clear') ? 'checked' : ''} /><span>투명</span></label>
               <label class="pfp-check-chip"><input type="checkbox" data-group="transparency" value="translucent" ${pf.transparency.includes('translucent') ? 'checked' : ''} /><span>반투명</span></label>
-              <label class="pfp-check-chip"><input type="checkbox" data-group="transparency" value="opaque" ${pf.transparency.includes('opaque') ? 'checked' : ''} /><span>불투명(일반)</span></label>
+              <label class="pfp-check-chip"><input type="checkbox" data-group="transparency" value="opaque" ${pf.transparency.includes('opaque') ? 'checked' : ''} /><span>안 보여요</span></label>
             </div>
           </div>
         `;
@@ -2816,7 +2819,7 @@
 
       const filtered = getFilteredCatalogModels();
       if (filtered.length === 0) {
-        gridEl.innerHTML = `<div style="padding:28px 16px;text-align:center;color:var(--text-sub);font-size:0.86rem;">조건에 맞는 상자가 없어요.<br><span style="font-size:0.76rem;color:var(--text-muted);">필터 조건을 조정하거나 '모두 체크'를 눌러 보세요.</span></div>`;
+        gridEl.innerHTML = `<div style="padding:28px 16px;text-align:center;color:var(--text-sub);font-size:0.86rem;">조건에 맞는 상자가 없어요.<br><span style="font-size:0.76rem;color:var(--text-muted);">필터를 바꾸거나 '전부 보기'를 눌러 보세요.</span></div>`;
         updatePickerCartBar();
         return;
       }
@@ -2837,7 +2840,7 @@
           </div>
           <div class="pick-row-main">
             <div class="pick-row-top">
-              <span class="pick-row-brand">${model.brand}</span>
+              <span class="pick-row-brand">${model.brand}${model.price ? ` · ${Number(model.price).toLocaleString('ko-KR')}원${model.packQty > 1 ? ` (${model.packQty}개 묶음)` : ''}` : ''}</span>
               <span class="picker-fit-badge ${fitInfo.ok ? 'fit-ok' : 'fit-warn'}">${fitInfo.reason}</span>
             </div>
             <div class="pick-row-name">${model.name}</div>
@@ -2987,7 +2990,7 @@
 
     if (val.messages.length === 0) {
       tabTitle.textContent = `문제 알림 (괜찮아요)`;
-      if (mobileErrLabel) mobileErrLabel.textContent = `문제(0)`;
+      if (mobileErrLabel) mobileErrLabel.textContent = '문제 없음';
       const okDiv = document.createElement('div');
       okDiv.className = 'alert-item alert-ok';
       okDiv.textContent = `걸리는 곳 없이 잘 놓였어요.`;
@@ -2996,11 +2999,18 @@
     }
 
     tabTitle.textContent = `문제 알림 (${val.messages.length})`;
-    if (mobileErrLabel) mobileErrLabel.textContent = `문제(${val.messages.length})`;
+    if (mobileErrLabel) mobileErrLabel.textContent = `문제 ${val.messages.length}`;
     val.messages.forEach((m) => {
       const div = document.createElement('div');
       div.className = 'alert-item ' + (m.severity === 'error' ? 'alert-error' : 'alert-warn');
-      div.textContent = (m.severity === 'error' ? '[문제] ' : '[주의] ') + m.text;
+      // '[구석] 내용' → 굵은 '구석' + 내용 (문제/주의는 색으로 구분)
+      const mt = /^\[([^\]]+)\]\s*(.*)$/.exec(m.text);
+      const tagEl = document.createElement('b');
+      tagEl.textContent = (mt ? mt[1] : (m.severity === 'error' ? '문제' : '주의')) + ' · ';
+      const line = document.createElement('span');
+      line.appendChild(tagEl);
+      line.appendChild(document.createTextNode(mt ? mt[2] : m.text));
+      div.appendChild(line);
       div.style.cursor = 'pointer';
       div.addEventListener('click', () => {
         if (m.boxId) {
@@ -3271,6 +3281,35 @@
       document.addEventListener('keydown', onKey);
       document.body.appendChild(wrap);
       wrap.querySelector('.app-confirm-no').focus();
+    });
+  }
+
+  window.appConfirm = (opts) => confirmDialog(opts); // 다른 파일(boxdetail.js)에서도 같은 확인창을 써요
+  // 이름 입력 창 (브라우저 기본 prompt 대신). 결과: 입력한 글자 / 취소면 null
+  function inputDialog({ title, value, ok, readOnly }) {
+    return new Promise((resolve) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'app-confirm';
+      wrap.innerHTML = `
+        <div class="app-confirm-card" role="dialog" aria-modal="true" aria-labelledby="app-input-t">
+          <div id="app-input-t" class="app-confirm-t">${title}</div>
+          <input class="app-input" type="text" ${readOnly ? 'readonly' : ''} />
+          <div class="app-confirm-btns">
+            ${readOnly ? '' : '<button type="button" class="app-confirm-no">취소</button>'}
+            <button type="button" class="app-confirm-yes">${ok || '확인'}</button>
+          </div>
+        </div>`;
+      const input = wrap.querySelector('.app-input');
+      input.value = value || '';
+      const done = (v) => { wrap.remove(); document.removeEventListener('keydown', onKey); resolve(v); };
+      const onKey = (e) => { if (e.key === 'Escape') done(null); if (e.key === 'Enter') done(readOnly ? null : input.value.trim() || null); };
+      wrap.addEventListener('click', (e) => { if (e.target === wrap) done(null); });
+      wrap.querySelector('.app-confirm-no')?.addEventListener('click', () => done(null));
+      wrap.querySelector('.app-confirm-yes').addEventListener('click', () => done(readOnly ? null : input.value.trim() || null));
+      document.addEventListener('keydown', onKey);
+      document.body.appendChild(wrap);
+      input.focus();
+      input.select();
     });
   }
 
@@ -4074,7 +4113,7 @@
       return [
         typeStep,
         num({
-          title: '장 안쪽 가로 길이를<br>알려주세요.',
+          title: '장 안쪽 가로 길이를<br>알려 주세요.',
           measure: WIZ_MEASURE.cabW,
           hint: () => '왼쪽 벽에서 오른쪽 벽까지, 안쪽을 재요.',
           min: 200, max: 3000, get: () => c.w, set: (v) => { c.w = v; }
@@ -4132,7 +4171,7 @@
     return [
       typeStep,
       num({
-        title: '서랍 안쪽 가로 길이를<br>알려주세요.',
+        title: '서랍 안쪽 가로 길이를<br>알려 주세요.',
           measure: WIZ_MEASURE.drwW,
         hint: () => '왼쪽 벽에서 오른쪽 벽까지, 안쪽을 재요.',
         min: 150, max: 1500, get: () => d.w, set: (v) => { d.w = v; }
@@ -4157,7 +4196,7 @@
         set: (v) => { d.exposedD = Math.min(v, d.d); }
       }),
       num({
-        title: '위로 넣을 수 있는<br>높이는요?',
+        title: '상자를 얼마나 높게<br>넣을 수 있나요?',
           measure: WIZ_MEASURE.drwClear,
         hint: () => '서랍 바닥에서 위 판까지의 높이예요.',
         min: 40, max: 600, step: 5,
@@ -4283,7 +4322,7 @@
     const restart = document.createElement('button');
     restart.type = 'button';
     restart.className = 'sp-restart';
-    restart.textContent = '처음부터 다시 설정';
+    restart.innerHTML = '질문 처음부터 다시 보기<span class="sp-restart-sub">놓은 상자는 그대로예요</span>';
     restart.addEventListener('click', () => {
       document.body.classList.remove('mobile-setup-open');
       state.wizStep = 0;
@@ -4539,7 +4578,8 @@
     const touchBtn = document.getElementById('btn-touch-multiselect');
     touchBtn.addEventListener('click', () => {
       state.touchMultiSelectMode = !state.touchMultiSelectMode;
-      touchBtn.textContent = state.touchMultiSelectMode ? '여러 개 고르기: 켜짐' : '여러 개 고르기: 꺼짐';
+      touchBtn.textContent = state.touchMultiSelectMode ? '여러 개 고르기 끝내기' : '여러 개 고르기';
+      touchBtn.classList.toggle('is-on', !!state.touchMultiSelectMode);
       touchBtn.classList.toggle('btn-warning', state.touchMultiSelectMode);
       refreshAll();
     });
@@ -4754,8 +4794,8 @@
     });
 
     // 5. 시안(Plan) 추가 / 비우기 / 비교표 모달
-    document.getElementById('btn-add-plan').addEventListener('click', () => {
-      const name = prompt('새 계획 이름을 정해주세요:', `계획 ${String.fromCharCode(65 + state.plans.length)}`);
+    document.getElementById('btn-add-plan').addEventListener('click', async () => {
+      const name = await inputDialog({ title: '새 계획 이름을 정해 주세요', value: `계획 ${String.fromCharCode(65 + state.plans.length)}`, ok: '만들기' });
       if (!name) return;
       const newPlan = {
         id: 'plan-' + Date.now(),
@@ -4773,7 +4813,7 @@
       if (!activePlan.boxes.length) { showToast('비울 상자가 없어요'); return; }
       const ok = await confirmDialog({
         title: '상자를 다 비울까요?',
-        message: `지금 계획의 상자 ${activePlan.boxes.length}개가 모두 빠져요.`,
+        message: `지금 놓은 상자 ${activePlan.boxes.length}개가 모두 빠져요.`,
         ok: '다 비우기'
       });
       if (!ok) return;
@@ -5036,6 +5076,10 @@
         state.wizPreview = false;
       }
     }
+    // ✕ 만 있는 버튼에 화면 낭독기용 이름 붙이기
+    document.querySelectorAll('button').forEach((b) => {
+      if (!b.getAttribute('aria-label') && b.textContent.trim() === '✕') b.setAttribute('aria-label', '닫기');
+    });
     window.addEventListener('pagehide', saveLocalNow);
     document.addEventListener('visibilitychange', () => { if (document.hidden) saveLocalNow(); });
     document.getElementById('drag-guide-ok')?.addEventListener('click', closeDragGuide);
@@ -5192,6 +5236,17 @@
             ? `${totalCost.toLocaleString('ko-KR')}원`
             : '가격 정보 준비 중';
         }
+        // 묶음 상품이 있으면: 총액은 묶음 단위, 칸별 금액은 1개 몫이라 합이 다를 수 있다고 알려 줘요
+        let note = document.getElementById('export-cost-note');
+        if (!note) {
+          note = document.createElement('p');
+          note.id = 'export-cost-note';
+          note.className = 'export-section-desc';
+          costTotalEl.insertAdjacentElement('afterend', note);
+        }
+        const hasPack = boxes.some((b) => Number(state.modelsMap[b.modelId]?.packQty) > 1);
+        note.textContent = hasPack ? '묶음 상품은 묶음째 사는 값으로 더했어요.' : '';
+        note.style.display = hasPack ? '' : 'none';
       }
 
       // 2) 브랜드별 구매 링크 모음 (중복 모델 제거, 3열 썸네일)
