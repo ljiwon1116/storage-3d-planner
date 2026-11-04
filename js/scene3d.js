@@ -329,7 +329,40 @@ window.Scene3DManager = (function () {
     const cw = containerEl.clientWidth;
     const ch = containerEl.clientHeight;
 
+    const isDrawer = currentSpaceConfig.type === 'drawer';
+    const exposedD = isDrawer ? window.PackerEngine.getDrawerConstraints(currentSpaceConfig).exposedD : 0;
+
     const anchors = compartments.map((comp) => {
+      if (isDrawer) {
+        const t = comp.tierIndex || comp.index || 0;
+        const isTop = t === 0;
+        const tierCenterY = isTop
+          ? Math.min(45, comp.clearH * 0.25)
+          : -14 - 8 - (t - 1) * (comp.clearH + 8) - (comp.clearH - 2) * 0.5;
+        const edgeX = comp.ox + comp.w + (isTop ? 18 : 26);
+        const edgeZ = isTop
+          ? comp.oz + comp.d + drawerOpenRatio * exposedD * 0.45
+          : -8 + (comp.d + 30) / 2 + 12;
+        const v = new THREE.Vector3(edgeX, tierCenterY, edgeZ);
+        v.project(camera);
+
+        const cv = new THREE.Vector3(
+          0,
+          isTop ? comp.clearH * 0.35 : tierCenterY,
+          isTop ? drawerOpenRatio * exposedD * 0.45 : -8 + (comp.d + 30) / 2 + 20
+        );
+        cv.project(camera);
+        return {
+          index: comp.index,
+          name: comp.name,
+          label: comp.short || String(comp.index + 1),
+          x: (v.x * 0.5 + 0.5) * cw,
+          y: (-(v.y * 0.5) + 0.5) * ch,
+          cx: (cv.x * 0.5 + 0.5) * cw,
+          cy: (-(cv.y * 0.5) + 0.5) * ch
+        };
+      }
+
       // 장·서랍: 오른쪽 바깥 / 팬트리: 각 칸 앞쪽 오른편 안
       const p = window.PackerEngine.localToWorld(comp, isPantry ? comp.w - 36 : comp.w + 18, comp.d);
       const worldX = p.x;
@@ -337,11 +370,18 @@ window.Scene3DManager = (function () {
       const worldZ = p.z;
       const v = new THREE.Vector3(worldX, worldY, worldZ);
       v.project(camera);
+
+      const cp = window.PackerEngine.localToWorld(comp, comp.w * 0.5, comp.d * 0.65);
+      const cv = new THREE.Vector3(cp.x, comp.yStart + comp.clearH * 0.4, cp.z);
+      cv.project(camera);
       return {
         index: comp.index,
+        name: comp.name,
         label: comp.short || String(comp.index + 1),
         x: (v.x * 0.5 + 0.5) * cw,
-        y: (-(v.y * 0.5) + 0.5) * ch
+        y: (-(v.y * 0.5) + 0.5) * ch,
+        cx: (cv.x * 0.5 + 0.5) * cw,
+        cy: (-(cv.y * 0.5) + 0.5) * ch
       };
     });
 
@@ -408,10 +448,13 @@ window.Scene3DManager = (function () {
   }
 
   // 첨부 샘플 이미지와 같은 깔끔한 웜톤 가정집 실내 배경 (벽면 + 따뜻한 마루 바닥)
-  // 2단 서랍장: 아래 단(닫힌 빈 서랍) + 받침 높이. 위 단과 같은 높이로 맞춰요
+  // 1~6단 서랍장: 아래 닫힌 서랍 칸들(tiers - 1개) + 받침 높이
   function drawerLowerBodyH(spaceConfig) {
+    const d = (spaceConfig && spaceConfig.drawer) || {};
+    const tiers = Math.min(6, Math.max(1, Math.round(Number(d.tiers) || 2)));
     const clearH = window.PackerEngine.getDrawerConstraints(spaceConfig).clearanceH;
-    return Math.max(120, clearH + 64);
+    const closedTiers = Math.max(0, tiers - 1);
+    return closedTiers * (clearH + 8) + 56;
   }
 
   function buildWarmHomeRoomEnvironment(spaceConfig) {
@@ -924,6 +967,7 @@ window.Scene3DManager = (function () {
 
   function buildDrawerScene(spaceConfig) {
     const d = spaceConfig.drawer;
+    const tiers = Math.min(6, Math.max(1, Math.round(Number(d.tiers) || 2)));
     const W = d.w, D = d.d;
     const drwConst = window.PackerEngine.getDrawerConstraints(spaceConfig);
     const clearH = drwConst.clearanceH;
@@ -931,6 +975,7 @@ window.Scene3DManager = (function () {
     const unexposedD = drwConst.unexposedD;
     // 서랍 벽 높이는 '넣을 수 있는 높이'를 따라가요 (높이를 올리면 벽·앞판도 같이 올라감)
     const wallH = Math.max(40, clearH - 8);
+    const tierH = clearH; // 한 단 높이
 
     const chestWoodMat = new THREE.MeshStandardMaterial({
       color: 0xc8a47e,
@@ -955,13 +1000,16 @@ window.Scene3DManager = (function () {
     lowerLine.position.copy(lowerMesh.position);
     drawerStaticGroup.add(lowerLine);
 
-    // 아래 단: 닫혀 있는 빈 서랍 (앞판 + 손잡이). 위 단만 채워요
-    {
-      const lowFrontH = clearH - 2;
-      const lowFrontY = -14 - 8 - lowFrontH / 2;
-      const lowFrontZ = -8 + (D + 30) / 2 + 9;
+    // 아래 단들: 닫혀 있는 서랍 칸 (tiers - 1개, 앞판 + 손잡이). 맨 위 칸(1단)만 열려요
+    const closedTiers = Math.max(0, tiers - 1);
+    const lowFrontH = Math.max(40, clearH - 2);
+    const lowFrontZ = -8 + (D + 30) / 2 + 9;
+    const lowFrontMat = new THREE.MeshStandardMaterial({ color: 0xd2b08c, roughness: 0.5 });
+    const lowHandleMat = new THREE.MeshStandardMaterial({ color: 0x6e5034, metalness: 0.2, roughness: 0.4 });
+    const lowHandleGeom = new THREE.BoxGeometry(Math.min(140, W * 0.32), 14, 22);
+    for (let i = 0; i < closedTiers; i++) {
+      const lowFrontY = -14 - 8 - i * (clearH + 8) - lowFrontH / 2;
       const lowFrontGeom = new THREE.BoxGeometry(W + 44, lowFrontH, 18);
-      const lowFrontMat = new THREE.MeshStandardMaterial({ color: 0xd2b08c, roughness: 0.5 });
       const lowFront = new THREE.Mesh(lowFrontGeom, lowFrontMat);
       lowFront.position.set(0, lowFrontY, lowFrontZ);
       lowFront.castShadow = true;
@@ -970,8 +1018,7 @@ window.Scene3DManager = (function () {
       lowFrontLine.position.copy(lowFront.position);
       drawerStaticGroup.add(lowFrontLine);
 
-      const lowHandleGeom = new THREE.BoxGeometry(Math.min(140, W * 0.32), 14, 22);
-      const lowHandle = new THREE.Mesh(lowHandleGeom, new THREE.MeshStandardMaterial({ color: 0x6e5034, metalness: 0.2, roughness: 0.4 }));
+      const lowHandle = new THREE.Mesh(lowHandleGeom, lowHandleMat);
       lowHandle.position.set(0, lowFrontY + lowFrontH * 0.08, lowFrontZ + 17);
       drawerStaticGroup.add(lowHandle);
     }
@@ -1114,8 +1161,12 @@ window.Scene3DManager = (function () {
   function buildPlacedBoxes(spaceConfig, placedBoxes, modelsMap) {
     const compartments = window.PackerEngine.getCompartments(spaceConfig);
     const isMultiBundle = selectedBoxIds.length >= 2;
+    const activeDrawerTier = Math.min(compartments.length - 1, Math.max(0, activeCompartmentIdx || 0));
+    const visibleBoxes = spaceConfig.type === 'drawer'
+      ? placedBoxes.filter((b) => (b.compartmentIndex || 0) === activeDrawerTier)
+      : placedBoxes;
 
-    placedBoxes.forEach((box) => {
+    visibleBoxes.forEach((box) => {
       const model = modelsMap[box.modelId];
       if (!model) return;
 
@@ -1517,7 +1568,8 @@ window.Scene3DManager = (function () {
   function setCameraView(viewType) {
     if (!currentSpaceConfig || !camera || !controls) return;
     const { W, D, H } = window.PackerEngine.getSpaceDims(currentSpaceConfig);
-    const maxDim = Math.max(W, D, H, 600);
+    const lowerH = currentSpaceConfig.type === 'drawer' ? drawerLowerBodyH(currentSpaceConfig) : 0;
+    const maxDim = Math.max(W, D, H + lowerH * 0.85, 600);
 
     if (currentSpaceConfig.type === 'pantry') {
       // 팬트리: 입구(왼쪽 앞)에서 안쪽 구석을 비스듬히 내려다봄
@@ -1528,14 +1580,15 @@ window.Scene3DManager = (function () {
       return;
     }
 
-    controls.target.set(80, H * 0.46, 0);
+    const targetY = currentSpaceConfig.type === 'drawer' ? H * 0.46 - Math.max(0, lowerH - 240) * 0.28 : H * 0.46;
+    controls.target.set(80, targetY, 0);
 
     if (viewType === 'front') {
-      camera.position.set(80, H * 0.48, maxDim * 2.0);
+      camera.position.set(80, targetY, maxDim * 2.0);
     } else if (viewType === 'top') {
       camera.position.set(0, maxDim * 2.1, 40);
     } else if (viewType === 'side') {
-      camera.position.set(maxDim * 1.9, H * 0.48, 150);
+      camera.position.set(maxDim * 1.9, targetY, 150);
     } else {
       camera.position.set(maxDim * 0.72, maxDim * 0.85, maxDim * 1.85);
     }

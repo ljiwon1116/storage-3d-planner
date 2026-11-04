@@ -131,18 +131,22 @@ window.PackerEngine = (function () {
     if (spaceConfig.type === 'drawer') {
       const d = spaceConfig.drawer;
       const clearH = d.clearanceH && d.clearanceH > 0 ? d.clearanceH : d.h;
-      return [
-        {
-          index: 0,
-          name: '서랍 안 공간',
+      const tiers = Math.min(6, Math.max(1, Math.round(Number(d.tiers) || 2)));
+      const out = [];
+      for (let t = 0; t < tiers; t++) {
+        out.push({
+          index: t,
+          name: tiers === 1 ? '서랍 안 공간' : `서랍 ${t + 1}단`,
+          tierIndex: t,
           yStart: 0,
           yEnd: clearH,
           clearH: clearH,
           wallH: d.h,
           w: d.w,
           d: d.d
-        }
-      ];
+        });
+      }
+      return out;
     }
 
     const c = spaceConfig.cabinet;
@@ -435,6 +439,19 @@ window.PackerEngine = (function () {
           boxStatuses[a.id].issues.push(msg);
           boxStatuses[b.id].issues.push(msg);
           messages.push({ boxId: a.id, severity: 'error', text: msg });
+        } else if (overlapX && overlapY) {
+          // 서랍형(front_drawer) 앞에 다른 상자가 놓여 서랍을 열 수 없는 경우 검사
+          if (modA.accessType === 'front_drawer' && b.z >= a.z + dimA.d - 4) {
+            boxStatuses[a.id].severity = 'error';
+            const msg = `[서랍 못 엶] '${modA.name}' 바로 앞에 '${modB.name}'이 있어서 서랍을 열 수 없어요.`;
+            boxStatuses[a.id].issues.push(msg);
+            messages.push({ boxId: a.id, severity: 'error', text: msg });
+          } else if (modB.accessType === 'front_drawer' && a.z >= b.z + dimB.d - 4) {
+            boxStatuses[b.id].severity = 'error';
+            const msg = `[서랍 못 엶] '${modB.name}' 바로 앞에 '${modA.name}'이 있어서 서랍을 열 수 없어요.`;
+            boxStatuses[b.id].issues.push(msg);
+            messages.push({ boxId: b.id, severity: 'error', text: msg });
+          }
         }
       }
     }
@@ -569,7 +586,25 @@ window.PackerEngine = (function () {
       return m.h <= usableH;
     });
 
-    pool.sort((a, b) => (b.wTop * b.dTop) - (a.wTop * a.dTop));
+    // 선반 바닥(깊이 usableD · 폭 usableW)을 최대한 채우는 크기부터 우선 정렬
+    const floorFitScore = (m) => {
+      const frontAccess = m.accessType === 'front_drawer' || m.accessType === 'front_open';
+      const rots = options.allowRotation && !frontAccess && m.wTop !== m.dTop ? [0, 90] : [0];
+      let best = 0;
+      for (const r of rots) {
+        const d = getOrientedDims(m, r);
+        if (d.w <= usableW && d.d <= usableD) {
+          const depthFit = d.d / Math.max(1, usableD);
+          const area = d.w * d.d;
+          // 서랍형은 선반 깊이를 꽉 채울수록 가중치 부여 (앞뒤 이중 적치 방지)
+          const bonus = m.accessType === 'front_drawer' ? (depthFit * depthFit * 1.6) : depthFit;
+          const sc = area * (0.6 + bonus);
+          if (sc > best) best = sc;
+        }
+      }
+      return best;
+    };
+    pool.sort((a, b) => floorFitScore(b) - floorFitScore(a));
     if (pool.length === 0) return [];
 
     const step = 5;
@@ -601,7 +636,11 @@ window.PackerEngine = (function () {
 
         for (let mIdx = 0; mIdx < pool.length; mIdx++) {
           const model = pool[mIdx];
-          const frontAccess = model.accessType === 'front_drawer' || model.accessType === 'front_open';
+          const isFrontDrawer = model.accessType === 'front_drawer';
+          // 서랍형은 반드시 맨 앞줄(gz === 0)에만 배치하여 앞에 다른 상자가 막지 않게 함
+          if (isFrontDrawer && gz > 0) continue;
+
+          const frontAccess = isFrontDrawer || model.accessType === 'front_open';
           const rots = options.allowRotation && !frontAccess && model.wTop !== model.dTop ? [0, 90] : [0];
           let placed = false;
 
@@ -611,7 +650,8 @@ window.PackerEngine = (function () {
             const gd = Math.ceil(dims.d / step);
 
             if (canFitGrid(gx, gz, gw, gd)) {
-              markGrid(gx, gz, gw, gd);
+              // 서랍형(front_drawer)이 들어간 폭 구간은 뒤쪽까지 전후 열 전체를 점유 처리해 서랍 앞뒤 이중 쌓임을 방지
+              markGrid(gx, gz, gw, isFrontDrawer ? (gridD - gz) : gd);
               const realX = xStart + gx * step;
               const realZ = zEnd - gz * step - dims.d;
               if (realZ >= zStart - 1) {
@@ -641,6 +681,67 @@ window.PackerEngine = (function () {
     }
 
     return results;
+  }
+
+  // 9-2. 각 칸(선반/서랍)의 상·좌·우·전·후 남는 공간(mm) 계산
+  function getCompartmentMargins(spaceConfig, placedBoxes, modelsMap) {
+    const compartments = getCompartments(spaceConfig);
+    return compartments.map((comp) => {
+      const compBoxes = (placedBoxes || []).filter((b) => b.compartmentIndex === comp.index);
+      if (compBoxes.length === 0) {
+        return {
+          compartmentIndex: comp.index,
+          name: comp.name,
+          short: comp.short || comp.name,
+          boxCount: 0,
+          compW: Math.round(comp.w),
+          compD: Math.round(comp.d),
+          compH: Math.round(comp.clearH),
+          top: Math.round(comp.clearH),
+          left: Math.round(comp.w),
+          right: Math.round(comp.w),
+          front: Math.round(comp.d),
+          back: Math.round(comp.d),
+          freeW: Math.round(comp.w),
+          freeD: Math.round(comp.d)
+        };
+      }
+      let minX = Infinity, maxX = -Infinity;
+      let minZ = Infinity, maxZ = -Infinity;
+      let maxTopY = 0;
+      compBoxes.forEach((b) => {
+        const m = modelsMap[b.modelId];
+        if (!m) return;
+        const dims = getOrientedDims(m, b.rot || 0);
+        if (b.x < minX) minX = b.x;
+        if (b.x + dims.w > maxX) maxX = b.x + dims.w;
+        if (b.z < minZ) minZ = b.z;
+        if (b.z + dims.d > maxZ) maxZ = b.z + dims.d;
+        const topY = (b.y || 0) + dims.h;
+        if (topY > maxTopY) maxTopY = topY;
+      });
+      const left = Math.max(0, Math.round(minX));
+      const right = Math.max(0, Math.round(comp.w - maxX));
+      const back = Math.max(0, Math.round(minZ));
+      const front = Math.max(0, Math.round(comp.d - maxZ));
+      const top = Math.max(0, Math.round(comp.clearH - maxTopY));
+      return {
+        compartmentIndex: comp.index,
+        name: comp.name,
+        short: comp.short || comp.name,
+        boxCount: compBoxes.length,
+        compW: Math.round(comp.w),
+        compD: Math.round(comp.d),
+        compH: Math.round(comp.clearH),
+        top,
+        left,
+        right,
+        front,
+        back,
+        freeW: left + right,
+        freeD: front + back
+      };
+    });
   }
 
   // 10. 시안별 요약 지표 계산
@@ -722,6 +823,7 @@ window.PackerEngine = (function () {
     validatePlan,
     computeStackingY,
     autoFill,
+    getCompartmentMargins,
     calculatePlanMetrics
   };
 })();

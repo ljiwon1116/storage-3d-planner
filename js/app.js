@@ -47,7 +47,8 @@
         d: 480,
         exposedD: 350,
         h: 140,
-        clearanceH: 175
+        clearanceH: 175,
+        tiers: 2
       },
       // ㄱ자 팬트리 방 (mm). 뒤 벽(A) = 방 가로, 옆 벽(B) = 방 깊이
       pantry: defaultPantry()
@@ -68,7 +69,7 @@
     errorDockCollapsed: false,    // 우측 하단 에러코드 접힘 여부
 
     selectedBoxIds: [],
-    selectedCatalogModelId: 'muji-pp-drawer-wide-s',
+    selectedCatalogModelId: 'muji-pp-drawer-wide-shallow',
     uiMode: 'mobile',             // 'mobile' | 'pc' (기본값: 'mobile'!)
     activeMobileTab: 'none',      // 'none'(순수 3D) | 'errors'(문제)
     mobileStep: 'setup',          // 'setup'(장 설정) | 'build'(3D 상자 배치)
@@ -103,7 +104,16 @@
     pickerBrand: 'ALL',
     pickerSearch: '',
     pickerBrandListOpen: false, // 브랜드 글자 눌렀을 때 목록 펼침
-    pickerKind: 'ALL',          // 상자 종류 필터: ALL | drawer | basket | lid
+    pickerKind: 'ALL',          // 상자 종류 필터 호환용
+    pickerFilterOpen: false,    // 필터 패널 펼침 여부
+    pickerFilters: {
+      kinds: ['drawer', 'basket', 'lid'],
+      stackable: ['yes', 'no'],
+      transparency: ['clear', 'translucent', 'opaque'],
+      wMin: '', wMax: '',
+      dMin: '', dMax: '',
+      hMin: '', hMax: ''
+    },
     pickerCart: {},      // { modelId: 수량 } 담기 바구니
     pickerTargetComp: 0  // 담을 선반 칸
   };
@@ -326,11 +336,11 @@
   function seedInitialDemoPlans() {
     const planA = state.plans[0];
     planA.boxes = [
-      { id: 'demo-a1', modelId: 'muji-pp-drawer-wide-l', compartmentIndex: 0, x: 40, y: 0, z: 170, rot: 0, bundleGroupId: 'grp-muji-1' },
-      { id: 'demo-a2', modelId: 'muji-pp-filebox-wide', compartmentIndex: 0, x: 425, y: 0, z: 110, rot: 0, bundleGroupId: 'grp-muji-1' },
-      { id: 'demo-a3', modelId: 'muji-pp-filebox-wide', compartmentIndex: 0, x: 580, y: 0, z: 110, rot: 0, bundleGroupId: 'grp-muji-1' },
-      { id: 'demo-a4', modelId: 'muji-softbox-rect-m', compartmentIndex: 2, x: 40, y: 0, z: 170, rot: 0 },
-      { id: 'demo-a5', modelId: 'muji-softbox-rect-m', compartmentIndex: 2, x: 415, y: 0, z: 170, rot: 0 }
+      { id: 'demo-a1', modelId: 'muji-pp-drawer-wide-deep', compartmentIndex: 0, x: 40, y: 0, z: 170, rot: 0, bundleGroupId: 'grp-muji-1' },
+      { id: 'demo-a2', modelId: 'muji-pp-drawer-deep', compartmentIndex: 0, x: 425, y: 0, z: 60, rot: 0, bundleGroupId: 'grp-muji-1' },
+      { id: 'demo-a3', modelId: 'muji-pp-drawer-shallow', compartmentIndex: 0, x: 425, y: 172, z: 60, rot: 0, bundleGroupId: 'grp-muji-1' },
+      { id: 'demo-a4', modelId: 'muji-pp-drawer-wide-shallow', compartmentIndex: 2, x: 40, y: 0, z: 170, rot: 0 },
+      { id: 'demo-a5', modelId: 'muji-pp-drawer-wide-shallow', compartmentIndex: 2, x: 415, y: 0, z: 170, rot: 0 }
     ];
 
     const planB = state.plans[1];
@@ -344,11 +354,11 @@
 
     const planC = state.plans[2];
     planC.boxes = [
-      { id: 'demo-c1', modelId: 'daiso-drawer-wide', compartmentIndex: 0, x: 65, y: 0, z: 80, rot: 0 },
-      { id: 'demo-c2', modelId: 'daiso-drawer-wide', compartmentIndex: 0, x: 330, y: 0, z: 80, rot: 0 },
-      { id: 'demo-c3', modelId: 'daiso-pantry-slim', compartmentIndex: 0, x: 595, y: 0, z: 150, rot: 0 },
-      { id: 'demo-c4', modelId: 'daiso-basket-m', compartmentIndex: 2, x: 65, y: 0, z: 220, rot: 0 },
-      { id: 'demo-c5', modelId: 'daiso-basket-m', compartmentIndex: 2, x: 365, y: 0, z: 220, rot: 0 }
+      { id: 'demo-c1', modelId: 'daiso-drawer-1tier', compartmentIndex: 0, x: 65, y: 0, z: 80, rot: 0 },
+      { id: 'demo-c2', modelId: 'daiso-drawer-1tier', compartmentIndex: 0, x: 330, y: 0, z: 80, rot: 0 },
+      { id: 'demo-c3', modelId: 'daiso-pantry-handle-15', compartmentIndex: 0, x: 595, y: 0, z: 150, rot: 0 },
+      { id: 'demo-c4', modelId: 'daiso-wood-handle-basket-m', compartmentIndex: 2, x: 65, y: 0, z: 40, rot: 0 },
+      { id: 'demo-c5', modelId: 'daiso-wood-handle-basket-m', compartmentIndex: 2, x: 365, y: 0, z: 40, rot: 0 }
     ];
   }
 
@@ -532,7 +542,12 @@
   }
 
   // 3D 가구 선반의 2D 화면 좌표와 우측 선반 콜아웃 카드를 잇는 리더라인(연결선) 그리기
+  let lastShelfAnchors = [];
   function handleShelfAnchors(anchors) {
+    lastShelfAnchors = anchors || [];
+    if (state.costOverlayOpen) {
+      renderCostOverlayLabels(lastShelfAnchors);
+    }
     const svgEl = document.getElementById('shelf-leader-svg');
     const btnLayer = document.getElementById('mobile-shelf-buttons');
 
@@ -629,8 +644,7 @@
     return m.accessType === 'front_drawer' || m.accessType === 'front_open';
   }
 
-  // 한 칸을 고른 상자들로 무작위로 채움 (문틀·꺼내기 힘든 곳은 피함)
-  // opts.levelRows: 줄마다 높이가 비슷한 것끼리, 앞줄은 낮게 · 뒷줄일수록 높게
+  // 한 칸을 고른 상자들로 채움 (선반 바닥 사이즈를 최대한 채우는 크기를 우선 배치, 서랍형 앞뒤 이중 적치 방지)
   function randomFillCompartment(compIdx, pool, rng, opts) {
     const compartments = window.PackerEngine.getCompartments(state.spaceConfig);
     const comp = compartments[compIdx] || compartments[0];
@@ -644,35 +658,80 @@
       zStart = window.PackerEngine.getDrawerConstraints(state.spaceConfig).unexposedD;
     }
 
+    const usableW = Math.max(0, xEnd - xStart);
+    const usableD = Math.max(0, zEnd - zStart);
     const fits = pool.filter((m) => m.h <= comp.clearH);
     const boxes = [];
-    if (fits.length === 0) return boxes;
+    if (fits.length === 0 || usableW <= 10 || usableD <= 10) return boxes;
 
-    // 높이가 15mm 안쪽으로 비슷한 것끼리 묶음 (낮은 묶음부터)
+    // 서랍형(front_drawer)이 주력인 경우, 높이가 제각각인 그룹으로 쪼개서 얕은 소형 서랍이 뽑히지 않도록 바닥 채움 우선
+    const hasDrawer = fits.some((m) => m.accessType === 'front_drawer');
     const groups = [];
-    [...fits].sort((a, b) => a.h - b.h).forEach((m) => {
-      const g = groups[groups.length - 1];
-      if (g && m.h - g[0].h <= 15) g.push(m);
-      else groups.push([m]);
-    });
+    if (opts.levelRows && !hasDrawer) {
+      [...fits].sort((a, b) => a.h - b.h).forEach((m) => {
+        const g = groups[groups.length - 1];
+        if (g && m.h - g[0].h <= 15) g.push(m);
+        else groups.push([m]);
+      });
+    } else {
+      groups.push(fits);
+    }
 
     let id = Date.now();
     let rowFront = zEnd;
-    let groupIdx = Math.floor(rng() * Math.ceil(groups.length / 2)); // 앞줄은 낮은 쪽에서 시작
+    let groupIdx = Math.floor(rng() * Math.ceil(groups.length / 2));
+    let anyFrontDrawerPlaced = false;
 
-    // 한 줄 채우기: 넣은 줄 깊이를 돌려줌 (못 넣으면 0)
-    const fillRow = (rowPool) => {
+    // 후보 상자+회전이 남은 폭(remW)과 깊이(availD) 바닥을 얼마나 알차게 채우는지 점수화
+    const getFittingCandidates = (rowPool, remW, availD, rowIdx) => {
+      const cands = [];
+      rowPool.forEach((m) => {
+        // 뒷줄(rowIdx > 0)에는 앞으로 여는 서랍형(front_drawer) 절대 배치 금지
+        if (rowIdx > 0 && m.accessType === 'front_drawer') return;
+        const rots = (!opensFromFront(m) && m.wTop !== m.dTop) ? [0, 90] : [0];
+        rots.forEach((rot) => {
+          const dim = window.PackerEngine.getOrientedDims(m, rot);
+          if (dim.w <= remW && dim.d <= availD) {
+            const depthRatio = dim.d / Math.max(1, availD);
+            const maxRepeat = Math.max(1, Math.floor((remW + 2) / (dim.w + 2)));
+            const tiledWidthRatio = Math.min(1, (maxRepeat * dim.w) / Math.max(1, remW));
+            const singleWidthRatio = dim.w / Math.max(1, usableW);
+            // 선반 바닥 깊이(depthRatio)를 꽉 채우는 제품을 최우선으로 선택 (앞뒤 이중 쌓임 원천 방지)
+            const depthWeight = m.accessType === 'front_drawer' ? 0.72 : 0.58;
+            const score = (depthRatio * depthWeight) + (tiledWidthRatio * 0.24) + (singleWidthRatio * (1 - depthWeight - 0.24));
+            cands.push({ m, rot, dim, score, maxRepeat });
+          }
+        });
+      });
+      cands.sort((a, b) => b.score - a.score);
+      return cands;
+    };
+
+    // 한 줄 채우기: 선반 바닥을 최대한 채우는 모델부터 우선 배치
+    const fillRow = (rowPool, rowIdx) => {
       let x = xStart;
       let rowDepth = 0;
-      let misses = 0;
-      while (misses < 14) {
-        const m = rowPool[Math.floor(rng() * rowPool.length)];
-        let rots = [0];
-        if (!opensFromFront(m) && m.wTop !== m.dTop) rots = rng() < 0.5 ? [0, 90] : [90, 0];
-        let placed = false;
-        for (const rot of rots) {
-          const dim = window.PackerEngine.getOrientedDims(m, rot);
-          if (x + dim.w > xEnd || rowFront - dim.d < zStart) continue;
+      const availD = rowFront - zStart;
+      let safety = 0;
+
+      while (x < xEnd - 15 && safety++ < 30) {
+        const remW = xEnd - x;
+        const cands = getFittingCandidates(rowPool, remW, availD, rowIdx);
+        if (cands.length === 0) break;
+
+        // 바닥을 가장 잘 채우는 상위 후보군(최고점의 82% 이상, 최대 5개) 중에서 골라 매번 신선하면서도 바닥을 꽉 채움
+        const topScore = cands[0].score;
+        const topTier = cands.filter((c) => c.score >= topScore * 0.82).slice(0, 5);
+        const picked = topTier[Math.floor(rng() * topTier.length)] || cands[0];
+        const { m, rot, dim, maxRepeat } = picked;
+
+        // 같은 모델로 나란히 채울 개수 (선반이 깔끔하게 정돈되도록 대부분 연속 배치)
+        const repeatCount = (maxRepeat > 1 && rng() < 0.8)
+          ? Math.max(1, maxRepeat - (rng() < 0.25 ? 1 : 0))
+          : 1;
+
+        for (let r = 0; r < repeatCount; r++) {
+          if (x + dim.w > xEnd) break;
           const stepH = Math.max(10, m.h - (m.stackingOffset || 0));
           const layers = (opts.stack && m.stackable)
             ? Math.max(1, 1 + Math.floor((comp.clearH - m.h) / stepH))
@@ -688,30 +747,29 @@
               rot
             });
           }
+          if (m.accessType === 'front_drawer') {
+            anyFrontDrawerPlaced = true;
+          }
           x += dim.w + 2;
           rowDepth = Math.max(rowDepth, dim.d);
-          placed = true;
-          break;
         }
-        if (!placed) misses++;
       }
       return rowDepth;
     };
 
     for (let row = 0; row < 20 && rowFront - zStart > 40; row++) {
       let rowDepth = 0;
-      if (opts.levelRows) {
-        // 이 줄 높이 묶음부터 위로 올라가며 들어가는 묶음을 찾음
+      if (opts.levelRows && !hasDrawer && groups.length > 1) {
         for (let g = groupIdx; g < groups.length && rowDepth === 0; g++) {
-          rowDepth = fillRow(groups[g]);
+          rowDepth = fillRow(groups[g], row);
           if (rowDepth > 0) groupIdx = g;
         }
-        // 다음 줄은 같거나 한 단계 높은 묶음
         if (groupIdx < groups.length - 1 && rng() < 0.6) groupIdx += 1;
       } else {
-        rowDepth = fillRow(fits);
+        rowDepth = fillRow(fits, row);
       }
-      if (rowDepth === 0 || !opts.multiRow) break;
+      // 서랍형(front_drawer)이 하나라도 들어갔거나 multiRow가 꺼져 있으면 앞뒤 이중 적치를 막기 위해 즉시 종료!
+      if (rowDepth === 0 || !opts.multiRow || anyFrontDrawerPlaced) break;
       rowFront -= rowDepth + 2;
     }
     return boxes;
@@ -726,7 +784,7 @@
       const comps = window.PackerEngine.getCompartments(state.spaceConfig);
       plan.boxes = [];
       comps.filter((c) => c.level === 1).forEach((c) => {
-        plan.boxes = plan.boxes.concat(randomFillCompartment(c.index, typeFillPool(), rng, { stack: false, multiRow: true, levelRows: true }));
+        plan.boxes = plan.boxes.concat(randomFillCompartment(c.index, typeFillPool('basket'), rng, { stack: false, multiRow: false, levelRows: false }));
       });
     } else if (isCab) {
       const count = window.PackerEngine.getCompartments(state.spaceConfig).length;
@@ -745,12 +803,18 @@
     let pool = typeFillPool(kind);
     if (brand) pool = pool.filter((m) => m.brand === brand);
     const isCab = state.spaceConfig.type === 'cabinet';
+    const isPan = state.spaceConfig.type === 'pantry';
+    const isDrawerKind = kind === 'drawer' || (!kind && isCab);
     // 누를 때마다 새 조합 (이전과 똑같으면 한 번 더 뽑음)
     const sig = (list) => list.map((b) => `${b.modelId}@${b.x},${b.z},${b.y}`).join('|');
     const prevSig = sig(plan.boxes.filter((b) => b.compartmentIndex === compIdx));
     let boxes = [];
-    const isPan = state.spaceConfig.type === 'pantry';
-    const opts = { stack: isCab || isPan, multiRow: !isCab, levelRows: !isCab };
+    // 서랍형(drawer)이거나 장/팬트리 선반에서 서랍형을 채울 때는 앞뒤 이중 쌓임(multiRow) 금지
+    const opts = {
+      stack: isCab || isPan,
+      multiRow: !isCab && !isDrawerKind,
+      levelRows: !isCab && !isPan && !isDrawerKind
+    };
     // 채운 정도: 바닥을 덮은 비율 (쌓는 가구는 높이까지 본 부피 비율)
     const comp = window.PackerEngine.getCompartments(state.spaceConfig)[compIdx];
     const fillRate = (list) => {
@@ -878,7 +942,11 @@
 
   // 선반 ＋버튼 → 바텀시트 메뉴 열기
   function openShelfSheet(compIdx) {
+    const prevIdx = state.activeCompartmentIdx;
     state.activeCompartmentIdx = compIdx;
+    if (state.spaceConfig.type === 'drawer' && prevIdx !== compIdx) {
+      refreshAll();
+    }
     const compartments = window.PackerEngine.getCompartments(state.spaceConfig);
     const comp = compartments[compIdx] || compartments[0];
     const activePlan = getActivePlan();
@@ -1312,7 +1380,7 @@
 
     const activePlan = getActivePlan();
     const compartments = window.PackerEngine.getCompartments(state.spaceConfig);
-    const compIdx = state.spaceConfig.type !== 'drawer' ? state.activeCompartmentIdx : 0;
+    const compIdx = Math.min(compartments.length - 1, Math.max(0, state.activeCompartmentIdx || 0));
     const comp = compartments[compIdx] || compartments[0];
 
     let xMinBound = 0;
@@ -1395,7 +1463,7 @@
 
     const activePlan = getActivePlan();
     const compartments = window.PackerEngine.getCompartments(state.spaceConfig);
-    const compIdx = state.spaceConfig.type !== 'drawer' ? state.activeCompartmentIdx : 0;
+    const compIdx = Math.min(compartments.length - 1, Math.max(0, state.activeCompartmentIdx || 0));
     const comp = compartments[compIdx] || compartments[0];
     const dims = window.PackerEngine.getOrientedDims(model, initialRot);
 
@@ -1788,6 +1856,13 @@
       setInputValue('drw-h', d.h);
       setInputValue('drw-clearance-h', d.clearanceH);
 
+      // 서랍 칸 수 표시
+      const tiers = Math.min(6, Math.max(1, Math.round(Number(d.tiers) || 2)));
+      const tiersVal = document.getElementById('drw-tiers-val');
+      const tiersLabel = document.getElementById('drw-tiers-label');
+      if (tiersVal) tiersVal.textContent = tiers;
+      if (tiersLabel) tiersLabel.textContent = tiers === 1 ? '칸' : `칸 (위 ${1}칸 열림)`;
+
       const drwConst = window.PackerEngine.getDrawerConstraints(state.spaceConfig);
       const ratioPct = Math.round((drwConst.exposedD / drwConst.totalD) * 100);
       document.getElementById('drw-exposure-summary').innerHTML =
@@ -2122,7 +2197,7 @@
   // 팝업 모달 내부 렌더링
   function renderPickerModalContent() {
     const compartments = window.PackerEngine.getCompartments(state.spaceConfig);
-    const compIdx = state.spaceConfig.type !== 'drawer' ? state.activeCompartmentIdx : 0;
+    const compIdx = Math.min(compartments.length - 1, Math.max(0, state.activeCompartmentIdx || 0));
     const activeComp = compartments[compIdx] || compartments[0];
 
     document.getElementById('picker-target-space-badge').textContent =
@@ -2160,36 +2235,96 @@
     const navSlot = document.getElementById('picker-brand-nav-slot');
     if (navSlot) { navSlot.innerHTML = ''; navSlot.appendChild(nav); } else tabsEl.appendChild(nav);
 
-    // 상자 종류 필터: 전체 · 서랍형 · 바구니형 · 뚜껑형
+    // 필터 조건에 맞는 카탈로그 모델 목록 계산
+    const getFilteredCatalogModels = () => {
+      const pf = state.pickerFilters;
+      const wMin = pf.wMin !== '' && Number.isFinite(Number(pf.wMin)) ? Number(pf.wMin) : null;
+      const wMax = pf.wMax !== '' && Number.isFinite(Number(pf.wMax)) ? Number(pf.wMax) : null;
+      const dMin = pf.dMin !== '' && Number.isFinite(Number(pf.dMin)) ? Number(pf.dMin) : null;
+      const dMax = pf.dMax !== '' && Number.isFinite(Number(pf.dMax)) ? Number(pf.dMax) : null;
+      const hMin = pf.hMin !== '' && Number.isFinite(Number(pf.hMin)) ? Number(pf.hMin) : null;
+      const hMax = pf.hMax !== '' && Number.isFinite(Number(pf.hMax)) ? Number(pf.hMax) : null;
+
+      return state.catalogModels.filter((m) => {
+        if (state.pickerBrand !== 'ALL' && m.brand !== state.pickerBrand) return false;
+        // 수납함 형태 (체크된 항목이 있을 때만 해당 항목으로 필터링)
+        if (pf.kinds.length > 0 && pf.kinds.length < 3) {
+          if (!pf.kinds.includes(window.getModelKind(m))) return false;
+        }
+        // 적층 가능 여부
+        if (pf.stackable.length > 0 && pf.stackable.length < 2) {
+          const stkKey = m.stackable ? 'yes' : 'no';
+          if (!pf.stackable.includes(stkKey)) return false;
+        }
+        // 투명 / 반투명 / 불투명
+        if (pf.transparency.length > 0 && pf.transparency.length < 3) {
+          const trKey = window.getModelTransparency ? window.getModelTransparency(m) : 'opaque';
+          if (!pf.transparency.includes(trKey)) return false;
+        }
+        // 찾는 사이즈 (가로 wTop, 세로 dTop, 높이 h)
+        if (wMin !== null && m.wTop < wMin) return false;
+        if (wMax !== null && m.wTop > wMax) return false;
+        if (dMin !== null && m.dTop < dMin) return false;
+        if (dMax !== null && m.dTop > dMax) return false;
+        if (hMin !== null && m.h < hMin) return false;
+        if (hMax !== null && m.h > hMax) return false;
+
+        if (state.pickerSearch) {
+          const q = state.pickerSearch.toLowerCase();
+          const match =
+            m.name.toLowerCase().includes(q) ||
+            m.brand.toLowerCase().includes(q) ||
+            m.lineup.toLowerCase().includes(q) ||
+            `${m.wTop}x${m.dTop}`.includes(q);
+          if (!match) return false;
+        }
+        return true;
+      });
+    };
+
+    const isFilterCustomized = () => {
+      const pf = state.pickerFilters;
+      const hasKindFilter = pf.kinds.length > 0 && pf.kinds.length < 3;
+      const hasStackFilter = pf.stackable.length > 0 && pf.stackable.length < 2;
+      const hasTransFilter = pf.transparency.length > 0 && pf.transparency.length < 3;
+      const hasSizeFilter = [pf.wMin, pf.wMax, pf.dMin, pf.dMax, pf.hMin, pf.hMax].some((v) => v !== '' && v !== null);
+      return hasKindFilter || hasStackFilter || hasTransFilter || hasSizeFilter;
+    };
+
+    // 새로운 '필터' 버튼 (슬라이더 조절 아이콘 + '필터' 글자) + 우측 '+ 직접 추가' 버튼
+    let filterBtnEl = null;
     if (state.pickerBrand !== 'COMBOS') {
       const chips = document.createElement('div');
       chips.className = 'kind-chips';
-      const brandModels = state.catalogModels.filter((m) => state.pickerBrand === 'ALL' || m.brand === state.pickerBrand);
-      // 종류 칩은 큰 도형 하나 안에 | 로 나눠서 넣어요
-      const seg = document.createElement('div');
-      seg.className = 'kind-seg';
-      [['ALL', '전체'], ['drawer', '서랍형'], ['basket', '바구니형'], ['lid', '뚜껑형']].forEach(([key, label], idx) => {
-        if (idx > 0) {
-          const bar = document.createElement('span');
-          bar.className = 'kind-bar';
-          bar.setAttribute('aria-hidden', 'true');
-          bar.textContent = '|';
-          seg.appendChild(bar);
-        }
-        const n = key === 'ALL' ? brandModels.length : brandModels.filter((m) => window.getModelKind(m) === key).length;
-        const chip = document.createElement('button');
-        chip.type = 'button';
-        chip.className = 'kind-chip' + (state.pickerKind === key ? ' active' : '');
-        chip.textContent = `${label} ${n}`;
-        chip.disabled = n === 0 && key !== 'ALL';
-        chip.addEventListener('click', () => {
-          state.pickerKind = key;
-          renderPickerModalContent();
-        });
-        seg.appendChild(chip);
+
+      const filterBtn = document.createElement('button');
+      filterBtn.type = 'button';
+      filterBtnEl = filterBtn;
+      const updateFilterBtnLabel = () => {
+        const count = getFilteredCatalogModels().length;
+        const active = state.pickerFilterOpen || isFilterCustomized();
+        filterBtn.className = 'picker-filter-btn' + (active ? ' active' : '');
+        filterBtn.innerHTML = `
+          <svg class="picker-filter-icon" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+            <line x1="3" y1="5" x2="17" y2="5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="8" cy="5" r="2.1" fill="var(--pf-knob-bg, #fff)" stroke="currentColor" stroke-width="1.6"/>
+            <line x1="3" y1="10" x2="17" y2="10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="12.5" cy="10" r="2.1" fill="var(--pf-knob-bg, #fff)" stroke="currentColor" stroke-width="1.6"/>
+            <line x1="3" y1="15" x2="17" y2="15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="7" cy="15" r="2.1" fill="var(--pf-knob-bg, #fff)" stroke="currentColor" stroke-width="1.6"/>
+          </svg>
+          <span>필터</span>
+          <span class="picker-filter-count">${count}</span>
+        `;
+      };
+      updateFilterBtnLabel();
+      filterBtn.addEventListener('click', () => {
+        state.pickerFilterOpen = !state.pickerFilterOpen;
+        renderPickerModalContent();
       });
-      chips.appendChild(seg);
-      // 목록에 없는 상자 직접 추가 (종류 칩과는 조금 떨어진 오른쪽 끝)
+      chips.appendChild(filterBtn);
+
+      // 목록에 없는 상자 직접 추가 (오른쪽 끝)
       const addBtn = document.createElement('button');
       addBtn.type = 'button';
       addBtn.className = 'kind-add-btn';
@@ -2202,6 +2337,145 @@
       chips.appendChild(sep);
       chips.appendChild(addBtn);
       tabsEl.appendChild(chips);
+
+      // 필터 패널이 열려 있으면 바로 아래에 표시
+      if (state.pickerFilterOpen) {
+        const pf = state.pickerFilters;
+        const panel = document.createElement('div');
+        panel.className = 'picker-filter-panel';
+        panel.innerHTML = `
+          <div class="pfp-top-actions">
+            <span class="pfp-top-title">상세 조건 필터 (중복 체크 가능)</span>
+            <div class="pfp-top-btns">
+              <button type="button" class="pfp-action-btn" data-act="check-all">모두 체크</button>
+              <button type="button" class="pfp-action-btn" data-act="uncheck-all">모두 해제</button>
+            </div>
+          </div>
+
+          <div class="pfp-group">
+            <div class="pfp-group-label">수납함 형태</div>
+            <div class="pfp-checks">
+              <label class="pfp-check-chip"><input type="checkbox" data-group="kinds" value="drawer" ${pf.kinds.includes('drawer') ? 'checked' : ''} /><span>서랍형</span></label>
+              <label class="pfp-check-chip"><input type="checkbox" data-group="kinds" value="basket" ${pf.kinds.includes('basket') ? 'checked' : ''} /><span>바구니형</span></label>
+              <label class="pfp-check-chip"><input type="checkbox" data-group="kinds" value="lid" ${pf.kinds.includes('lid') ? 'checked' : ''} /><span>뚜껑형</span></label>
+            </div>
+          </div>
+
+          <div class="pfp-group">
+            <div class="pfp-group-label">적층 가능 여부</div>
+            <div class="pfp-checks">
+              <label class="pfp-check-chip"><input type="checkbox" data-group="stackable" value="yes" ${pf.stackable.includes('yes') ? 'checked' : ''} /><span>적층 가능</span></label>
+              <label class="pfp-check-chip"><input type="checkbox" data-group="stackable" value="no" ${pf.stackable.includes('no') ? 'checked' : ''} /><span>적층 불가</span></label>
+            </div>
+          </div>
+
+          <div class="pfp-group">
+            <div class="pfp-group-head">
+              <span class="pfp-group-label">찾는 사이즈 (단위: mm)</span>
+              <div class="pfp-size-quick">
+                <button type="button" class="pfp-mini-btn" data-act="fit-comp">현재 칸 이하로</button>
+                <button type="button" class="pfp-mini-btn" data-act="clear-size">치수 지우기</button>
+              </div>
+            </div>
+            <div class="pfp-size-rows">
+              <div class="pfp-size-row">
+                <span class="pfp-size-name">가로(폭)</span>
+                <input type="number" class="pfp-size-input" data-size="wMin" placeholder="최소" value="${pf.wMin}" step="10" min="0" />
+                <span class="pfp-tilde">~</span>
+                <input type="number" class="pfp-size-input" data-size="wMax" placeholder="최대 (${Math.round(activeComp.w)})" value="${pf.wMax}" step="10" min="0" />
+                <span class="pfp-unit">mm</span>
+              </div>
+              <div class="pfp-size-row">
+                <span class="pfp-size-name">세로(깊이)</span>
+                <input type="number" class="pfp-size-input" data-size="dMin" placeholder="최소" value="${pf.dMin}" step="10" min="0" />
+                <span class="pfp-tilde">~</span>
+                <input type="number" class="pfp-size-input" data-size="dMax" placeholder="최대 (${Math.round(activeComp.d)})" value="${pf.dMax}" step="10" min="0" />
+                <span class="pfp-unit">mm</span>
+              </div>
+              <div class="pfp-size-row">
+                <span class="pfp-size-name">높이</span>
+                <input type="number" class="pfp-size-input" data-size="hMin" placeholder="최소" value="${pf.hMin}" step="10" min="0" />
+                <span class="pfp-tilde">~</span>
+                <input type="number" class="pfp-size-input" data-size="hMax" placeholder="최대 (${Math.round(activeComp.clearH)})" value="${pf.hMax}" step="10" min="0" />
+                <span class="pfp-unit">mm</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pfp-group">
+            <div class="pfp-group-label">투명 · 반투명 여부</div>
+            <div class="pfp-checks">
+              <label class="pfp-check-chip"><input type="checkbox" data-group="transparency" value="clear" ${pf.transparency.includes('clear') ? 'checked' : ''} /><span>투명</span></label>
+              <label class="pfp-check-chip"><input type="checkbox" data-group="transparency" value="translucent" ${pf.transparency.includes('translucent') ? 'checked' : ''} /><span>반투명</span></label>
+              <label class="pfp-check-chip"><input type="checkbox" data-group="transparency" value="opaque" ${pf.transparency.includes('opaque') ? 'checked' : ''} /><span>불투명(일반)</span></label>
+            </div>
+          </div>
+        `;
+
+        // 체크박스 이벤트
+        panel.querySelectorAll('input[type="checkbox"][data-group]').forEach((chk) => {
+          chk.addEventListener('change', () => {
+            const grp = chk.dataset.group;
+            const val = chk.value;
+            const arr = state.pickerFilters[grp] || [];
+            if (chk.checked) {
+              if (!arr.includes(val)) arr.push(val);
+            } else {
+              state.pickerFilters[grp] = arr.filter((x) => x !== val);
+            }
+            updateFilterBtnLabel();
+            renderCardsOnly();
+          });
+        });
+
+        // 사이즈 입력 이벤트 (포커스가 끊기지 않도록 카드 목록과 버튼 배지만 즉시 갱신)
+        panel.querySelectorAll('.pfp-size-input').forEach((inp) => {
+          inp.addEventListener('input', () => {
+            const k = inp.dataset.size;
+            state.pickerFilters[k] = inp.value.trim();
+            updateFilterBtnLabel();
+            renderCardsOnly();
+          });
+        });
+
+        // 상단 액션 버튼 (모두 체크 / 모두 해제)
+        panel.querySelector('[data-act="check-all"]').addEventListener('click', () => {
+          state.pickerFilters.kinds = ['drawer', 'basket', 'lid'];
+          state.pickerFilters.stackable = ['yes', 'no'];
+          state.pickerFilters.transparency = ['clear', 'translucent', 'opaque'];
+          panel.querySelectorAll('input[type="checkbox"][data-group]').forEach((c) => { c.checked = true; });
+          updateFilterBtnLabel();
+          renderCardsOnly();
+        });
+        panel.querySelector('[data-act="uncheck-all"]').addEventListener('click', () => {
+          state.pickerFilters.kinds = [];
+          state.pickerFilters.stackable = [];
+          state.pickerFilters.transparency = [];
+          panel.querySelectorAll('input[type="checkbox"][data-group]').forEach((c) => { c.checked = false; });
+          updateFilterBtnLabel();
+          renderCardsOnly();
+        });
+        panel.querySelector('[data-act="fit-comp"]').addEventListener('click', () => {
+          state.pickerFilters.wMax = String(Math.round(activeComp.w));
+          state.pickerFilters.dMax = String(Math.round(activeComp.d));
+          state.pickerFilters.hMax = String(Math.round(activeComp.clearH));
+          panel.querySelector('[data-size="wMax"]').value = state.pickerFilters.wMax;
+          panel.querySelector('[data-size="dMax"]').value = state.pickerFilters.dMax;
+          panel.querySelector('[data-size="hMax"]').value = state.pickerFilters.hMax;
+          updateFilterBtnLabel();
+          renderCardsOnly();
+        });
+        panel.querySelector('[data-act="clear-size"]').addEventListener('click', () => {
+          state.pickerFilters.wMin = ''; state.pickerFilters.wMax = '';
+          state.pickerFilters.dMin = ''; state.pickerFilters.dMax = '';
+          state.pickerFilters.hMin = ''; state.pickerFilters.hMax = '';
+          panel.querySelectorAll('.pfp-size-input').forEach((inp) => { inp.value = ''; });
+          updateFilterBtnLabel();
+          renderCardsOnly();
+        });
+
+        tabsEl.appendChild(panel);
+      }
     }
 
     // 글자 누르면 펼쳐지는 전체 목록
@@ -2222,163 +2496,153 @@
       tabsEl.appendChild(dd);
     }
 
-    const brands = ['ALL', ...new Set(state.catalogModels.map((m) => m.brand))];
-
     const gridEl = document.getElementById('picker-cards-grid');
-    gridEl.innerHTML = '';
 
-    if (state.pickerBrand === 'COMBOS') {
-      const filteredCombos = state.savedCombos.filter((c) => {
-        if (!state.pickerSearch) return true;
-        return c.name.toLowerCase().includes(state.pickerSearch.toLowerCase());
-      });
+    function renderCardsOnly() {
+      gridEl.innerHTML = '';
 
-      if (filteredCombos.length === 0) {
-        gridEl.innerHTML = `<div style="grid-column:1/-1;padding:24px;text-align:center;color:var(--text-sub);">저장한 묶음이 없어요.</div>`;
+      if (state.pickerBrand === 'COMBOS') {
+        const filteredCombos = state.savedCombos.filter((c) => {
+          if (!state.pickerSearch) return true;
+          return c.name.toLowerCase().includes(state.pickerSearch.toLowerCase());
+        });
+
+        if (filteredCombos.length === 0) {
+          gridEl.innerHTML = `<div style="grid-column:1/-1;padding:24px;text-align:center;color:var(--text-sub);">저장한 묶음이 없어요.</div>`;
+          return;
+        }
+
+        filteredCombos.forEach((combo) => {
+          const fits = combo.totalW <= activeComp.w && combo.totalD <= activeComp.d && combo.maxH <= activeComp.clearH;
+          const svgHtml = window.getComboThumbnailSVG ? window.getComboThumbnailSVG(combo, state.modelsMap) : '';
+          const itemNames = combo.items
+            .map((it) => state.modelsMap[it.modelId]?.name || it.modelId)
+            .slice(0, 3)
+            .join(', ') + (combo.items.length > 3 ? ` 외 ${combo.items.length - 3}개` : '');
+          const card = document.createElement('div');
+          card.className = 'picker-card';
+          card.innerHTML = `
+            <div class="picker-thumb">
+              <span class="picker-brand-badge" style="background:#b45309;">저장한 묶음</span>
+              <span class="picker-fit-badge ${fits ? 'fit-ok' : 'fit-warn'}">${fits ? '들어감' : '크기 확인'}</span>
+              ${svgHtml}
+            </div>
+            <div class="picker-body">
+              <div class="picker-lineup">상자 ${combo.items.length}개</div>
+              <div class="picker-title">${combo.name}</div>
+              <div class="picker-spec-box">
+                <strong>묶음 크기:</strong> 가로 ${combo.totalW} × 깊이 ${combo.totalD} × 높이 ${combo.maxH} mm<br>
+                <span style="font-size:0.7rem;color:var(--text-muted);">들어있는 것: ${itemNames}</span>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:8px;">
+                <button class="btn btn-primary btn-sm combo-pick-insert">+ 이 칸에 넣기</button>
+                <button class="btn btn-danger btn-sm combo-pick-del">빼기</button>
+              </div>
+            </div>
+          `;
+
+          card.querySelector('.combo-pick-insert').addEventListener('click', () => {
+            insertSavedComboToActiveSpace(combo.id);
+            document.getElementById('modal-box-picker').classList.remove('open');
+          });
+          card.querySelector('.combo-pick-del').addEventListener('click', () => {
+            deleteSavedCombo(combo.id);
+            renderPickerModalContent();
+          });
+          gridEl.appendChild(card);
+        });
         return;
       }
 
-      filteredCombos.forEach((combo) => {
-        const fits = combo.totalW <= activeComp.w && combo.totalD <= activeComp.d && combo.maxH <= activeComp.clearH;
-        const svgHtml = window.getComboThumbnailSVG ? window.getComboThumbnailSVG(combo, state.modelsMap) : '';
-        const itemNames = combo.items
-          .map((it) => state.modelsMap[it.modelId]?.name || it.modelId)
-          .slice(0, 3)
-          .join(', ') + (combo.items.length > 3 ? ` 외 ${combo.items.length - 3}개` : '');
+      const filtered = getFilteredCatalogModels();
+      if (filtered.length === 0) {
+        gridEl.innerHTML = `<div style="padding:28px 16px;text-align:center;color:var(--text-sub);font-size:0.86rem;">찾으시는 조건에 맞는 수납함이 없어요.<br><span style="font-size:0.76rem;color:var(--text-muted);">필터 조건을 조정하거나 '모두 체크'를 눌러 보세요.</span></div>`;
+        updatePickerCartBar();
+        return;
+      }
+
+      filtered.forEach((model) => {
+        const fitInfo = window.PackerEngine.checkModelFitForCompartment(state.spaceConfig, compIdx, model);
+        const svgHtml = window.getProductThumbnailSVG ? window.getProductThumbnailSVG(model) : '';
+        const qty = state.pickerCart[model.id] || 0;
+
         const card = document.createElement('div');
-        card.className = 'picker-card';
+        card.className = 'picker-card pick-slide-card pick-row-card';
+        card.dataset.modelId = model.id;
+        const sizeLine = `${model.wTop}×${model.dTop}×${model.h}`;
         card.innerHTML = `
-          <div class="picker-thumb">
-            <span class="picker-brand-badge" style="background:#b45309;">저장한 묶음</span>
-            <span class="picker-fit-badge ${fits ? 'fit-ok' : 'fit-warn'}">${fits ? '들어감' : '크기 확인'}</span>
+          <div class="pick-row-thumb">
             ${svgHtml}
+            <span class="pick-qty-badge" style="display:${qty > 0 ? 'flex' : 'none'};">${qty}</span>
           </div>
-          <div class="picker-body">
-            <div class="picker-lineup">상자 ${combo.items.length}개</div>
-            <div class="picker-title">${combo.name}</div>
-            <div class="picker-spec-box">
-              <strong>묶음 크기:</strong> 가로 ${combo.totalW} × 깊이 ${combo.totalD} × 높이 ${combo.maxH} mm<br>
-              <span style="font-size:0.7rem;color:var(--text-muted);">들어있는 것: ${itemNames}</span>
+          <div class="pick-row-main">
+            <div class="pick-row-top">
+              <span class="pick-row-brand">${model.brand}</span>
+              <span class="picker-fit-badge ${fitInfo.ok ? 'fit-ok' : 'fit-warn'}">${fitInfo.reason}</span>
             </div>
-            <div style="display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:8px;">
-              <button class="btn btn-primary btn-sm combo-pick-insert">+ 이 칸에 넣기</button>
-              <button class="btn btn-danger btn-sm combo-pick-del">빼기</button>
-            </div>
+            <div class="pick-row-name">${model.name}</div>
+            <div class="pick-row-size">${sizeLine} mm</div>
+          </div>
+          <div class="pick-row-qty">
+            <button class="pick-minus" title="빼기">−</button>
+            <span class="pick-row-qtynum">${qty}</span>
+            <button class="pick-plus" title="담기">＋</button>
           </div>
         `;
 
-        card.querySelector('.combo-pick-insert').addEventListener('click', () => {
-          insertSavedComboToActiveSpace(combo.id);
-          document.getElementById('modal-box-picker').classList.remove('open');
+        const syncQty = () => {
+          const n = state.pickerCart[model.id] || 0;
+          const badge = card.querySelector('.pick-qty-badge');
+          badge.textContent = n;
+          badge.style.display = n > 0 ? 'flex' : 'none';
+          card.querySelector('.pick-row-qtynum').textContent = n;
+        };
+
+        const addOne = () => {
+          state.pickerCart[model.id] = (state.pickerCart[model.id] || 0) + 1;
+          updatePickerCartBar();
+          syncQty();
+          card.classList.add('pick-bump');
+          setTimeout(() => card.classList.remove('pick-bump'), 180);
+        };
+        const removeOne = () => {
+          const cur = state.pickerCart[model.id] || 0;
+          if (cur <= 0) return;
+          if (cur - 1 <= 0) delete state.pickerCart[model.id];
+          else state.pickerCart[model.id] = cur - 1;
+          updatePickerCartBar();
+          syncQty();
+        };
+
+        card.querySelector('.pick-plus').addEventListener('click', addOne);
+        card.querySelector('.pick-minus').addEventListener('click', removeOne);
+
+        // 가로 슬라이드: 오른쪽 +1, 왼쪽 -1
+        let startX = null, moved = false;
+        card.addEventListener('pointerdown', (e) => { startX = e.clientX; moved = false; });
+        card.addEventListener('pointermove', (e) => {
+          if (startX === null) return;
+          const dx = e.clientX - startX;
+          if (Math.abs(dx) > 6) e.preventDefault();
+          card.style.transform = `translateX(${Math.max(-50, Math.min(50, dx))}px)`;
+          if (Math.abs(dx) > 44 && !moved) {
+            moved = true;
+            if (dx > 0) addOne(); else removeOne();
+            startX = e.clientX;
+          }
         });
-        card.querySelector('.combo-pick-del').addEventListener('click', () => {
-          deleteSavedCombo(combo.id);
-          renderPickerModalContent();
-        });
+        const endSlide = () => { startX = null; card.style.transform = ''; };
+        card.addEventListener('pointerup', endSlide);
+        card.addEventListener('pointercancel', endSlide);
+        card.addEventListener('pointerleave', endSlide);
+
         gridEl.appendChild(card);
       });
-      return;
+
+      updatePickerCartBar();
     }
 
-    const filtered = state.catalogModels.filter((m) => {
-      if (state.pickerBrand !== 'ALL' && m.brand !== state.pickerBrand) return false;
-      if (state.pickerKind !== 'ALL' && window.getModelKind(m) !== state.pickerKind) return false;
-      if (state.pickerSearch) {
-        const q = state.pickerSearch.toLowerCase();
-        const match =
-          m.name.toLowerCase().includes(q) ||
-          m.brand.toLowerCase().includes(q) ||
-          m.lineup.toLowerCase().includes(q) ||
-          `${m.wTop}x${m.dTop}`.includes(q);
-        if (!match) return false;
-      }
-      return true;
-    });
-
-    filtered.forEach((model) => {
-      const fitInfo = window.PackerEngine.checkModelFitForCompartment(state.spaceConfig, compIdx, model);
-      const isTapered = model.shapeType === 'tapered' && (model.wBot !== model.wTop || model.dBot !== model.dTop);
-      const specHtml = isTapered
-        ? `<strong>크기:</strong> 가로 ${model.wTop} × 깊이 ${model.dTop} × 높이 ${model.h} mm<br><span style="font-size:0.7rem;">(바닥: ${model.wBot} × ${model.dBot} mm)</span>`
-        : `<strong>크기:</strong> 가로 ${model.wTop} × 깊이 ${model.dTop} × 높이 ${model.h} mm`;
-
-      const svgHtml = window.getProductThumbnailSVG ? window.getProductThumbnailSVG(model) : '';
-      const qty = state.pickerCart[model.id] || 0;
-
-      const card = document.createElement('div');
-      card.className = 'picker-card pick-slide-card pick-row-card';
-      card.dataset.modelId = model.id;
-      const sizeLine = `${model.wTop}×${model.dTop}×${model.h}`;
-      card.innerHTML = `
-        <div class="pick-row-thumb">
-          ${svgHtml}
-          <span class="pick-qty-badge" style="display:${qty > 0 ? 'flex' : 'none'};">${qty}</span>
-        </div>
-        <div class="pick-row-main">
-          <div class="pick-row-top">
-            <span class="pick-row-brand">${model.brand}</span>
-            <span class="picker-fit-badge ${fitInfo.ok ? 'fit-ok' : 'fit-warn'}">${fitInfo.reason}</span>
-          </div>
-          <div class="pick-row-name">${model.name}</div>
-          <div class="pick-row-size">${sizeLine} mm</div>
-        </div>
-        <div class="pick-row-qty">
-          <button class="pick-minus" title="빼기">−</button>
-          <span class="pick-row-qtynum">${qty}</span>
-          <button class="pick-plus" title="담기">＋</button>
-        </div>
-      `;
-
-      const syncQty = () => {
-        const n = state.pickerCart[model.id] || 0;
-        const badge = card.querySelector('.pick-qty-badge');
-        badge.textContent = n;
-        badge.style.display = n > 0 ? 'flex' : 'none';
-        card.querySelector('.pick-row-qtynum').textContent = n;
-      };
-
-      const addOne = () => {
-        state.pickerCart[model.id] = (state.pickerCart[model.id] || 0) + 1;
-        updatePickerCartBar();
-        syncQty();
-        card.classList.add('pick-bump');
-        setTimeout(() => card.classList.remove('pick-bump'), 180);
-      };
-      const removeOne = () => {
-        const cur = state.pickerCart[model.id] || 0;
-        if (cur <= 0) return;
-        if (cur - 1 <= 0) delete state.pickerCart[model.id];
-        else state.pickerCart[model.id] = cur - 1;
-        updatePickerCartBar();
-        syncQty();
-      };
-
-      card.querySelector('.pick-plus').addEventListener('click', addOne);
-      card.querySelector('.pick-minus').addEventListener('click', removeOne);
-
-      // 가로 슬라이드: 오른쪽 +1, 왼쪽 -1
-      let startX = null, moved = false;
-      card.addEventListener('pointerdown', (e) => { startX = e.clientX; moved = false; });
-      card.addEventListener('pointermove', (e) => {
-        if (startX === null) return;
-        const dx = e.clientX - startX;
-        if (Math.abs(dx) > 6) e.preventDefault();
-        card.style.transform = `translateX(${Math.max(-50, Math.min(50, dx))}px)`;
-        if (Math.abs(dx) > 44 && !moved) {
-          moved = true;
-          if (dx > 0) addOne(); else removeOne();
-          startX = e.clientX;
-        }
-      });
-      const endSlide = () => { startX = null; card.style.transform = ''; };
-      card.addEventListener('pointerup', endSlide);
-      card.addEventListener('pointercancel', endSlide);
-      card.addEventListener('pointerleave', endSlide);
-
-      gridEl.appendChild(card);
-    });
-
-    updatePickerCartBar();
+    renderCardsOnly();
   }
 
   // 담기 바구니 하단 바 갱신
@@ -2655,7 +2919,11 @@
       state.pickerSearch = '';
       const si = document.getElementById('picker-search-input');
       if (si) si.value = '';
-      state.pickerKind = window.getModelKind(newModel);
+      const newKind = window.getModelKind(newModel);
+      state.pickerKind = newKind;
+      if (state.pickerFilters && Array.isArray(state.pickerFilters.kinds) && state.pickerFilters.kinds.length > 0 && !state.pickerFilters.kinds.includes(newKind)) {
+        state.pickerFilters.kinds.push(newKind);
+      }
       state.pickerCart = state.pickerCart || {};
       state.pickerCart[newModel.id] = 1;
       close();
@@ -2706,10 +2974,53 @@
     });
   }
 
-  // ---------- 3D 화면 사진 저장 (오른쪽 아래에 만든 사람 표시) ----------
+  // ---------- 3D 화면 사진 저장 (남는 공간 상·좌·우·전·후 표시 선택 + 오른쪽 아래 만든 사람 표시) ----------
+  function getSelectedMarginDirs() {
+    const chkMain = document.getElementById('chk-export-show-margins');
+    const show = chkMain ? chkMain.checked : true;
+    const dirsWrap = document.getElementById('export-margin-dirs');
+    const dirs = [];
+    if (dirsWrap) {
+      dirsWrap.querySelectorAll('input[type="checkbox"]:checked').forEach((c) => dirs.push(c.value));
+    } else {
+      dirs.push('top', 'left', 'right', 'front', 'back');
+    }
+    return { show: show && dirs.length > 0, dirs };
+  }
+
+  function formatMarginLine(m, dirs) {
+    const dirMap = {
+      top: `상 ${m.top}`,
+      left: `좌 ${m.left}`,
+      right: `우 ${m.right}`,
+      front: `전 ${m.front}`,
+      back: `후 ${m.back}`
+    };
+    return dirs.map((k) => dirMap[k]).filter(Boolean).join(' · ') + ' mm';
+  }
+
+  function drawRoundedRect(ctx, x, y, w, h, r) {
+    const rad = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rad, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rad);
+    ctx.arcTo(x + w, y + h, x, y + h, rad);
+    ctx.arcTo(x, y + h, x, y, rad);
+    ctx.arcTo(x, y, x + w, y, rad);
+    ctx.closePath();
+  }
+
   function savePhoto() {
     const url = window.Scene3DManager.snapshot && window.Scene3DManager.snapshot();
     if (!url) return;
+    const { show: showMargins, dirs: marginDirs } = getSelectedMarginDirs();
+    const activePlan = getActivePlan();
+    const allMargins = window.PackerEngine.getCompartmentMargins
+      ? window.PackerEngine.getCompartmentMargins(state.spaceConfig, activePlan.boxes, state.modelsMap)
+      : [];
+    const occupiedMargins = allMargins.filter((m) => m.boxCount > 0);
+    const targetMargins = occupiedMargins.length > 0 ? occupiedMargins : allMargins.slice(0, 1);
+
     const img = new Image();
     img.onload = () => {
       const cv = document.createElement('canvas');
@@ -2718,23 +3029,120 @@
       const g = cv.getContext('2d');
       g.drawImage(img, 0, 0);
 
+      const fontFamily = `Pretendard, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif`;
+
+      // [옵션] 공간 상·좌·우·전·후 남는 공간(mm) 표시
+      if (showMargins && targetMargins.length > 0) {
+        const wrapperEl = document.getElementById('canvas-wrapper');
+        const domW = (wrapperEl && wrapperEl.clientWidth) || cv.width;
+        const domH = (wrapperEl && wrapperEl.clientHeight) || cv.height;
+        const scaleX = cv.width / Math.max(1, domW);
+        const scaleY = cv.height / Math.max(1, domH);
+
+        // 1) 3D 각 칸 위치에 말풍선 배지 표시 (최대 6개 칸까지 겹치지 않게 표시)
+        if (lastShelfAnchors && lastShelfAnchors.length > 0 && targetMargins.length <= 6) {
+          const badgeFs = Math.max(12, Math.round(Math.min(cv.width, cv.height) * 0.021));
+          targetMargins.forEach((m) => {
+            const anc = lastShelfAnchors.find((a) => a.index === m.compartmentIndex);
+            if (!anc) return;
+            const cx = (Number.isFinite(anc.cx) ? anc.cx : anc.x) * scaleX;
+            const cy = (Number.isFinite(anc.cy) ? anc.cy : anc.y) * scaleY;
+            if (cx < 20 || cx > cv.width - 20 || cy < 20 || cy > cv.height - 20) return;
+
+            const titleStr = `${m.short || m.name}`;
+            const valStr = formatMarginLine(m, marginDirs);
+
+            g.font = `700 ${badgeFs}px ${fontFamily}`;
+            const w1 = g.measureText(titleStr).width;
+            g.font = `600 ${Math.round(badgeFs * 0.92)}px ${fontFamily}`;
+            const w2 = g.measureText(valStr).width;
+
+            const padX = Math.round(badgeFs * 0.75);
+            const padY = Math.round(badgeFs * 0.55);
+            const boxW = Math.max(w1, w2) + padX * 2;
+            const boxH = badgeFs * 2.25 + padY;
+            const bx = Math.max(12, Math.min(cv.width - boxW - 12, cx - boxW / 2));
+            const by = Math.max(12, Math.min(cv.height - boxH - 12, cy - boxH / 2));
+
+            drawRoundedRect(g, bx, by, boxW, boxH, Math.round(badgeFs * 0.6));
+            g.fillStyle = 'rgba(255, 252, 246, 0.92)';
+            g.fill();
+            g.lineWidth = Math.max(1.5, badgeFs * 0.1);
+            g.strokeStyle = 'rgba(125, 98, 68, 0.45)';
+            g.stroke();
+
+            g.textBaseline = 'top';
+            g.fillStyle = '#7d6244';
+            g.font = `700 ${Math.round(badgeFs * 0.88)}px ${fontFamily}`;
+            g.fillText(titleStr + ' 남는 공간', bx + padX, by + padY * 0.65);
+
+            g.fillStyle = '#2b2118';
+            g.font = `700 ${Math.round(badgeFs * 0.94)}px ${fontFamily}`;
+            g.fillText(valStr, bx + padX, by + padY * 0.65 + badgeFs * 1.15);
+          });
+        }
+
+        // 2) 좌측 상단 요약 카드: 칸별 상·좌·우·전·후 남은 공간 일람표
+        const cardFs = Math.max(13, Math.round(Math.min(cv.width, cv.height) * 0.023));
+        const lineH = Math.round(cardFs * 1.55);
+        const cardPad = Math.round(cardFs * 0.95);
+        const headerText = '남는 공간 여백 (단위: mm)';
+        const rows = targetMargins.slice(0, 8).map((m) => ({
+          name: `${m.name} (${m.compW}×${m.compD}×${m.compH})`,
+          vals: formatMarginLine(m, marginDirs)
+        }));
+
+        g.font = `700 ${cardFs}px ${fontFamily}`;
+        let maxRowW = g.measureText(headerText).width;
+        rows.forEach((r) => {
+          g.font = `700 ${Math.round(cardFs * 0.9)}px ${fontFamily}`;
+          const nw = g.measureText(r.name).width;
+          g.font = `600 ${Math.round(cardFs * 0.92)}px ${fontFamily}`;
+          const vw = g.measureText(r.vals).width;
+          maxRowW = Math.max(maxRowW, nw + vw + cardFs * 1.2);
+        });
+
+        const cardW = Math.min(cv.width - 24, maxRowW + cardPad * 2);
+        const cardH = cardPad * 1.8 + lineH * (1 + rows.length);
+        const cx0 = Math.round(cardFs * 0.9);
+        const cy0 = Math.round(cardFs * 0.9);
+
+        drawRoundedRect(g, cx0, cy0, cardW, cardH, Math.round(cardFs * 0.75));
+        g.fillStyle = 'rgba(255, 253, 249, 0.90)';
+        g.fill();
+        g.lineWidth = 1.5;
+        g.strokeStyle = 'rgba(125, 98, 68, 0.32)';
+        g.stroke();
+
+        g.textBaseline = 'middle';
+        g.fillStyle = '#5c4630';
+        g.font = `800 ${cardFs}px ${fontFamily}`;
+        g.fillText(headerText, cx0 + cardPad, cy0 + cardPad * 0.9 + lineH * 0.35);
+
+        rows.forEach((r, idx) => {
+          const ry = cy0 + cardPad * 1.0 + lineH * (idx + 1.25);
+          g.font = `700 ${Math.round(cardFs * 0.88)}px ${fontFamily}`;
+          g.fillStyle = '#6e5236';
+          g.fillText(r.name, cx0 + cardPad, ry);
+
+          const nw = g.measureText(r.name).width;
+          g.font = `700 ${Math.round(cardFs * 0.9)}px ${fontFamily}`;
+          g.fillStyle = '#1a1714';
+          g.fillText(r.vals, cx0 + cardPad + nw + Math.round(cardFs * 0.8), ry);
+        });
+      }
+
       // 표시 크기는 사진 크기에 맞춰요 (짧은 변의 3.2%)
       const fs = Math.max(14, Math.round(Math.min(cv.width, cv.height) * 0.032));
       const pad = Math.round(fs * 0.9);
       const text = 'made by joshleeliving';
-      g.font = `600 ${fs}px Pretendard, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif`;
+      g.font = `600 ${fs}px ${fontFamily}`;
       const tw = g.measureText(text).width;
       const bw = tw + pad * 1.4, bh = fs * 1.9;
       const bx = cv.width - bw - pad, by = cv.height - bh - pad;
       const r = Math.round(bh * 0.3);
       g.fillStyle = 'rgba(255, 255, 255, 0.78)';
-      g.beginPath();
-      g.moveTo(bx + r, by);
-      g.arcTo(bx + bw, by, bx + bw, by + bh, r);
-      g.arcTo(bx + bw, by + bh, bx, by + bh, r);
-      g.arcTo(bx, by + bh, bx, by, r);
-      g.arcTo(bx, by, bx + bw, by, r);
-      g.closePath();
+      drawRoundedRect(g, bx, by, bw, bh, r);
       g.fill();
       g.fillStyle = '#5c4630';
       g.textBaseline = 'middle';
@@ -3327,6 +3735,24 @@
         min: 40, max: 600, step: 5,
         get: () => d.clearanceH,
         set: (v) => { d.clearanceH = v; }
+      }),
+      num({
+        title: '서랍은 모두<br>몇 칸인가요?',
+        measure: WIZ_MEASURE.panLevels,
+        unit: '칸', step: 1, min: 1, max: 6,
+        hint: () => {
+          const t = Math.min(6, Math.max(1, Math.round(Number(d.tiers) || 2)));
+          return t === 1 ? '서랍 1칸짜리예요.' : `서랍 ${t}칸 중 맨 위 1칸이 열린 모습으로 보여요.`;
+        },
+        get: () => Math.min(6, Math.max(1, Math.round(Number(d.tiers) || 2))),
+        set: (v) => {
+          const nt = Math.min(6, Math.max(1, Math.round(Number(v) || 2)));
+          d.tiers = nt;
+          state.plans.forEach((pl) => pl.boxes.forEach((b) => {
+            if (b.compartmentIndex >= nt) b.compartmentIndex = nt - 1;
+          }));
+          if (state.activeCompartmentIdx >= nt) state.activeCompartmentIdx = nt - 1;
+        }
       })
     ];
   }
@@ -3347,7 +3773,7 @@
       ? ['가구 종류', '입구 쪽', '안쪽 벽', '옆 벽', '전체 높이', '선반 깊이', '안쪽 벽 열', '옆 벽 열', '단 수']
       : state.spaceConfig.type === 'cabinet'
       ? ['가구 종류', '가로', '깊이', '높이', '문 여는 쪽', '문틀 폭', '선반 개수']
-      : ['가구 종류', '가로', '깊이', '보이는 깊이', '넣을 수 있는 높이'];
+      : ['가구 종류', '가로', '깊이', '보이는 깊이', '넣을 수 있는 높이', '서랍 칸 수'];
 
     body.innerHTML = '';
     const minusSvg = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg>';
@@ -3788,6 +4214,31 @@
     bindDrwInput('drw-h', 'h');
     bindDrwInput('drw-clearance-h', 'clearanceH');
 
+    // 서랍 칸 수 +/- 버튼
+    const setDrawerTiers = (nextTiers) => {
+      const nt = Math.min(6, Math.max(1, Math.round(Number(nextTiers) || 2)));
+      state.spaceConfig.drawer.tiers = nt;
+      state.plans.forEach((pl) => pl.boxes.forEach((b) => {
+        if (b.compartmentIndex >= nt) b.compartmentIndex = nt - 1;
+      }));
+      if (state.activeCompartmentIdx >= nt) state.activeCompartmentIdx = nt - 1;
+      refreshAll();
+    };
+    const tiersInc = document.getElementById('drw-tiers-inc');
+    const tiersDec = document.getElementById('drw-tiers-dec');
+    if (tiersInc) {
+      tiersInc.addEventListener('click', () => {
+        const cur = Math.min(6, Math.max(1, Math.round(Number(state.spaceConfig.drawer.tiers) || 2)));
+        if (cur < 6) setDrawerTiers(cur + 1);
+      });
+    }
+    if (tiersDec) {
+      tiersDec.addEventListener('click', () => {
+        const cur = Math.min(6, Math.max(1, Math.round(Number(state.spaceConfig.drawer.tiers) || 2)));
+        if (cur > 1) setDrawerTiers(cur - 1);
+      });
+    }
+
     // 4. 하단 카메라 시점 & 서랍 슬라이더
     document.querySelectorAll('[data-cam]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -4080,6 +4531,7 @@
     if (restored) {
       state.spaceConfig = restored.spaceConfig;
       if (!state.spaceConfig.pantry) state.spaceConfig.pantry = defaultPantry();
+      if (state.spaceConfig.drawer && !state.spaceConfig.drawer.tiers) state.spaceConfig.drawer.tiers = 2;
       state.plans = restored.plans;
       if (restored.plans.some((p) => p.id === restored.activePlanId)) state.activePlanId = restored.activePlanId;
       if (restored.setupDone) {
@@ -4122,6 +4574,211 @@
     });
 
     bindEvents();
+
+    // ===== 내보내기 모달 (#modal-export) & 칸별 금액 오버레이 (#cost-overlay) =====
+    const exportModal = document.getElementById('modal-export');
+    const costOverlay = document.getElementById('cost-overlay');
+
+    function renderCostOverlayLabels(anchors) {
+      const labelsEl = document.getElementById('cost-overlay-labels');
+      if (!labelsEl) return;
+      const activePlan = getActivePlan();
+      const compartments = window.PackerEngine.getCompartments(state.spaceConfig);
+      labelsEl.innerHTML = '';
+
+      (anchors || []).forEach((anc) => {
+        const comp = compartments[anc.index];
+        if (!comp) return;
+        const compBoxes = activePlan.boxes.filter((b) => b.compartmentIndex === anc.index);
+        const compCost = compBoxes.reduce((sum, b) => sum + (Number(state.modelsMap[b.modelId]?.price) || 0), 0);
+        const hasPrice = compBoxes.some((b) => Number(state.modelsMap[b.modelId]?.price) > 0);
+
+        let costText = '0원';
+        if (compBoxes.length > 0) {
+          costText = hasPrice
+            ? `${compCost.toLocaleString('ko-KR')}원 (${compBoxes.length}개)`
+            : `상자 ${compBoxes.length}개 · 가격 준비 중`;
+        }
+
+        const badge = document.createElement('div');
+        badge.className = 'cost-overlay-badge';
+        const px = Number.isFinite(anc.cx) ? anc.cx : anc.x;
+        const py = Number.isFinite(anc.cy) ? anc.cy : anc.y;
+        badge.style.left = `${px.toFixed(1)}px`;
+        badge.style.top = `${py.toFixed(1)}px`;
+        badge.innerHTML = `<span class="cob-name">${comp.name}</span><span class="cob-val">${costText}</span>`;
+        labelsEl.appendChild(badge);
+      });
+    }
+
+    function openCostOverlay() {
+      closeExportModal();
+      state.costOverlayOpen = true;
+      if (costOverlay) {
+        costOverlay.style.display = 'block';
+        renderCostOverlayLabels(lastShelfAnchors);
+      }
+    }
+
+    function closeCostOverlay() {
+      state.costOverlayOpen = false;
+      if (costOverlay) costOverlay.style.display = 'none';
+    }
+
+    function updateExportMarginPreview() {
+      const previewEl = document.getElementById('export-margin-preview');
+      const dirsEl = document.getElementById('export-margin-dirs');
+      const chkMain = document.getElementById('chk-export-show-margins');
+      if (!previewEl) return;
+      const enabled = chkMain ? chkMain.checked : true;
+      if (dirsEl) dirsEl.style.display = enabled ? 'flex' : 'none';
+      if (!enabled) {
+        previewEl.style.display = 'none';
+        return;
+      }
+      const { show, dirs } = getSelectedMarginDirs();
+      if (!show) {
+        previewEl.style.display = 'block';
+        previewEl.innerHTML = `<div class="emp-empty">표시할 방향(상·좌·우·전·후)을 하나 이상 체크해 주세요.</div>`;
+        return;
+      }
+      const activePlan = getActivePlan();
+      const allMargins = window.PackerEngine.getCompartmentMargins
+        ? window.PackerEngine.getCompartmentMargins(state.spaceConfig, activePlan.boxes, state.modelsMap)
+        : [];
+      const occupied = allMargins.filter((m) => m.boxCount > 0);
+      const targets = occupied.length > 0 ? occupied : allMargins.slice(0, 1);
+      previewEl.style.display = 'block';
+      previewEl.innerHTML = targets.map((m) => `
+        <div class="emp-row">
+          <span class="emp-name">${m.name}</span>
+          <span class="emp-vals">${formatMarginLine(m, dirs)}</span>
+        </div>
+      `).join('');
+    }
+
+    function renderExportModal() {
+      const activePlan = getActivePlan();
+      const boxes = activePlan.boxes || [];
+      const costTotalEl = document.getElementById('export-cost-total');
+      const linksListEl = document.getElementById('export-links-list');
+
+      updateExportMarginPreview();
+
+      // 1) 총 구매비용 계산
+      if (costTotalEl) {
+        if (boxes.length === 0) {
+          costTotalEl.textContent = '0원';
+        } else {
+          const totalCost = boxes.reduce((sum, b) => sum + (Number(state.modelsMap[b.modelId]?.price) || 0), 0);
+          const hasAnyPrice = boxes.some((b) => Number(state.modelsMap[b.modelId]?.price) > 0);
+          costTotalEl.textContent = hasAnyPrice
+            ? `${totalCost.toLocaleString('ko-KR')}원`
+            : '가격 정보 준비 중';
+        }
+      }
+
+      // 2) 브랜드별 구매 링크 모음 (중복 모델 제거, 3열 썸네일)
+      if (linksListEl) {
+        linksListEl.innerHTML = '';
+        if (boxes.length === 0) {
+          linksListEl.innerHTML = `<div style="font-size:13px;color:#6B7280;padding:4px 0;">아직 배치한 수납함이 없어요.</div>`;
+        } else {
+          // 브랜드별로 고유 모델과 수량 집계
+          const brandMap = new Map();
+          boxes.forEach((b) => {
+            const m = state.modelsMap[b.modelId];
+            if (!m) return;
+            const brand = m.brand || '기타';
+            if (!brandMap.has(brand)) brandMap.set(brand, new Map());
+            const modelGroup = brandMap.get(brand);
+            if (!modelGroup.has(m.id)) {
+              modelGroup.set(m.id, { model: m, count: 0 });
+            }
+            modelGroup.get(m.id).count += 1;
+          });
+
+          brandMap.forEach((modelGroup, brand) => {
+            const groupEl = document.createElement('div');
+            groupEl.className = 'export-brand-group';
+
+            const headerEl = document.createElement('div');
+            headerEl.className = 'export-brand-name open';
+            headerEl.innerHTML = `
+              <span>${brand} (${modelGroup.size}종)</span>
+              <span class="toggle-arrow">▾</span>
+            `;
+
+            const itemsEl = document.createElement('div');
+            itemsEl.className = 'export-brand-items';
+
+            headerEl.addEventListener('click', () => {
+              const isOpen = headerEl.classList.toggle('open');
+              itemsEl.style.display = isOpen ? 'grid' : 'none';
+            });
+
+            modelGroup.forEach(({ model, count }) => {
+              const card = document.createElement('div');
+              card.className = 'export-item-card';
+              const thumbHtml = model.image
+                ? `<img src="${model.image}" alt="${model.name}" style="width:100%;height:100%;object-fit:cover;" />`
+                : (window.getProductThumbnailSVG ? window.getProductThumbnailSVG(model) : '<span>사진 준비 중</span>');
+              card.innerHTML = `
+                <div class="export-item-thumb" style="position:relative;">
+                  ${thumbHtml}
+                  ${count > 1 ? `<span style="position:absolute;top:6px;right:6px;padding:1px 6px;border-radius:999px;background:rgba(59,42,26,0.82);color:#fff;font-size:10px;font-weight:600;">${count}개</span>` : ''}
+                </div>
+                <div class="export-item-name">${model.name}</div>
+              `;
+              card.addEventListener('click', () => {
+                if (model.url) {
+                  window.open(model.url, '_blank', 'noopener,noreferrer');
+                } else {
+                  showToast('구매 링크 준비 중이에요');
+                }
+              });
+              itemsEl.appendChild(card);
+            });
+
+            groupEl.appendChild(headerEl);
+            groupEl.appendChild(itemsEl);
+            linksListEl.appendChild(groupEl);
+          });
+        }
+      }
+    }
+
+    function openExportModal() {
+      renderExportModal();
+      if (exportModal) {
+        exportModal.classList.add('open');
+        exportModal.style.display = 'flex';
+      }
+    }
+
+    function closeExportModal() {
+      if (exportModal) {
+        exportModal.classList.remove('open');
+        exportModal.style.display = 'none';
+      }
+    }
+
+    document.getElementById('btn-export')?.addEventListener('click', openExportModal);
+    document.getElementById('btn-close-export')?.addEventListener('click', closeExportModal);
+    exportModal?.addEventListener('click', (e) => {
+      if (e.target === exportModal) closeExportModal();
+    });
+    document.getElementById('chk-export-show-margins')?.addEventListener('change', updateExportMarginPreview);
+    document.querySelectorAll('#export-margin-dirs input[type="checkbox"]').forEach((c) => {
+      c.addEventListener('change', updateExportMarginPreview);
+    });
+    document.getElementById('btn-export-photo')?.addEventListener('click', () => {
+      savePhoto();
+    });
+    document.getElementById('export-cost-total')?.addEventListener('click', openCostOverlay);
+    document.getElementById('btn-export-cost-view')?.addEventListener('click', openCostOverlay);
+    document.getElementById('btn-cost-overlay-close')?.addEventListener('click', closeCostOverlay);
+
     refreshAll();
     window.Scene3DManager.setCameraView('iso');
 

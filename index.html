@@ -6,7 +6,7 @@
   <title>수납 공간 꾸미기 - 옷장·서랍 3D로 짜보기</title>
   <meta name="theme-color" content="#f7f3ec" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <link rel="stylesheet" href="styles.css?v=1101i" />
+  <link rel="stylesheet" href="styles.css?v=1104b" />
   <script>
     // 실제로 보이는 화면 높이를 --vh 로 넣어요 (주소창·툴바가 생기고 없어질 때마다).
     // 브라우저마다 100vh 가 툴바를 포함해서 위아래가 잘리는 문제를 막아요.
@@ -38,10 +38,7 @@
   <header class="app-header">
     <div class="brand-title">
       <span>수납 공간 꾸미기</span>
-      <div class="ui-mode-switch" role="group" aria-label="화면 종류 고르기">
-        <button id="btn-mode-mobile" type="button" class="mode-switch-btn active" title="폰에 맞춘 화면">모바일</button>
-        <button id="btn-mode-pc" type="button" class="mode-switch-btn" title="컴퓨터·태블릿에 맞춘 화면">데스크탑</button>
-      </div>
+      <button id="btn-export" type="button" class="mode-switch-btn" title="내보내기">내보내기</button>
     </div>
 
     <!-- 상단 바 가운데: 만든 사람 -->
@@ -277,6 +274,15 @@
         <div id="drawer-config-section" style="display:none;">
           <div class="sub-block">
             <div class="sub-block-title">서랍 크기와 보이는 깊이 (mm)</div>
+            <div class="form-group" style="margin-bottom:8px;">
+              <label>서랍 칸 수 (1~6)</label>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+                <button id="drw-tiers-dec" type="button" class="btn btn-sm" style="min-width:32px;height:32px;padding:0;">−</button>
+                <span id="drw-tiers-val" style="font-size:15px;font-weight:600;min-width:24px;text-align:center;">2</span>
+                <button id="drw-tiers-inc" type="button" class="btn btn-sm" style="min-width:32px;height:32px;padding:0;">＋</button>
+                <span id="drw-tiers-label" class="hint-text"></span>
+              </div>
+            </div>
             <div class="form-grid-2">
               <div class="form-group">
                 <label>서랍 가로</label>
@@ -385,7 +391,6 @@
 
       <!-- 시점 전환 & 모바일 묶음선택 토글 캡슐 바 -->
       <div class="hud-pill-bar">
-        <button id="btn-save-photo" class="btn btn-sm" type="button" title="지금 3D 화면을 사진으로 저장">사진 저장</button>
         <button id="btn-touch-multiselect" class="btn btn-sm" title="폰·태블릿에서 상자 여러 개를 손가락으로 한 번에 고르기">
           여러 개 고르기: 꺼짐
         </button>
@@ -689,12 +694,65 @@
     </div>
   </div>
 
+  <!-- 내보내기 팝업 -->
+  <div id="modal-export" class="modal-backdrop" style="backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);">
+    <div class="modal-box" style="max-width:480px;width:calc(100% - 32px);max-height:90vh;overflow-y:auto;border-radius:16px;">
+      <div class="modal-header" style="position:sticky;top:0;background:inherit;z-index:1;">
+        <span style="font-size:17px;font-weight:600;">내보내기</span>
+        <button id="btn-close-export" class="btn btn-sm" type="button">✕</button>
+      </div>
+
+      <!-- 1. 사진 저장 -->
+      <div class="export-section">
+        <div class="export-section-title">사진 저장</div>
+        <p class="export-section-desc">3D 화면을 PNG로 저장해요. 오른쪽 아래에 <b>made by joshleeliving</b> 표시가 들어가요.</p>
+        <div class="export-margin-opt-box">
+          <label class="export-margin-main-toggle">
+            <input type="checkbox" id="chk-export-show-margins" checked />
+            <span>남는 공간(상·좌·우·전·후 여백) 함께 표시하기</span>
+          </label>
+          <div id="export-margin-dirs" class="export-margin-dirs">
+            <label class="export-dir-chip"><input type="checkbox" value="top" checked /><span>상(위)</span></label>
+            <label class="export-dir-chip"><input type="checkbox" value="left" checked /><span>좌(왼쪽)</span></label>
+            <label class="export-dir-chip"><input type="checkbox" value="right" checked /><span>우(오른쪽)</span></label>
+            <label class="export-dir-chip"><input type="checkbox" value="front" checked /><span>전(앞)</span></label>
+            <label class="export-dir-chip"><input type="checkbox" value="back" checked /><span>후(뒤)</span></label>
+          </div>
+          <div id="export-margin-preview" class="export-margin-preview"></div>
+        </div>
+        <button id="btn-export-photo" class="btn btn-primary" type="button" style="width:100%;height:48px;border-radius:10px;margin-top:10px;">사진 저장</button>
+      </div>
+
+      <!-- 2. 총 구매비용 -->
+      <div class="export-section">
+        <div class="export-section-title">총 구매비용</div>
+        <div id="export-cost-total" class="export-cost-total">계산 중...</div>
+        <p class="export-section-desc" style="margin-top:4px;">금액을 누르면 3D 화면에서 칸별 금액을 볼 수 있어요.</p>
+        <button id="btn-export-cost-view" class="btn" type="button" style="width:100%;height:44px;border-radius:10px;margin-top:8px;">칸별 금액 보기</button>
+      </div>
+
+      <!-- 3. 구매 링크 모음 -->
+      <div class="export-section">
+        <div class="export-section-title">구매 링크 모음</div>
+        <p class="export-section-desc">배치한 수납함을 브랜드별로 묶었어요. 제품을 누르면 구매 링크로 이동해요.</p>
+        <div id="export-links-list" class="export-links-list"></div>
+        <p class="export-section-desc" style="margin-top:12px;color:#9CA3AF;">구매 링크와 사진은 아직 준비 중이에요.<br>엑셀 파일을 보내 주시면 추가해 드릴게요.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 칸별 금액 오버레이 (구매비용 보기) -->
+  <div id="cost-overlay" style="display:none;position:fixed;inset:0;z-index:1200;pointer-events:none;">
+    <div id="cost-overlay-labels" style="position:absolute;inset:0;"></div>
+    <button id="btn-cost-overlay-close" type="button" style="pointer-events:all;position:absolute;top:16px;right:16px;padding:8px 18px;border-radius:10px;border:none;background:rgba(60,40,20,0.85);color:#fff;font-size:14px;cursor:pointer;">닫기</button>
+  </div>
+
   <!-- 애플리케이션 스크립트 로드 -->
-  <script src="js/presets.js?v=1101i"></script>
-  <script src="js/items.js?v=1101i"></script>
-  <script src="js/packer.js?v=1101i"></script>
-  <script src="js/scene3d.js?v=1101i"></script>
-  <script src="js/app.js?v=1101i"></script>
+  <script src="js/presets.js?v=1104b"></script>
+  <script src="js/items.js?v=1104b"></script>
+  <script src="js/packer.js?v=1104b"></script>
+  <script src="js/scene3d.js?v=1104b"></script>
+  <script src="js/app.js?v=1104b"></script>
 
   <!-- 보관함 자세히 보기: 뒤는 흐리게, 고른 보관함만 크게 + 물건 넣기 -->
   <div id="box-detail" class="box-detail" aria-hidden="true">
@@ -720,6 +778,6 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="js/boxdetail.js?v=1101i"></script>
+  <script src="js/boxdetail.js?v=1104b"></script>
 </body>
 </html>
