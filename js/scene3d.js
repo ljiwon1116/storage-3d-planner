@@ -384,8 +384,12 @@ window.Scene3DManager = (function () {
       const v = new THREE.Vector3(worldX, worldY, worldZ);
       v.project(camera);
 
-      const cp = window.PackerEngine.localToWorld(comp, comp.w * 0.5, comp.d * 0.65);
-      const cv = new THREE.Vector3(cp.x, comp.yStart + comp.clearH * 0.4, cp.z);
+      // 금액 표시 자리: 냉장고는 칸 앞면 정중앙 (안쪽 기준이면 위 선반에 걸려 보여서)
+      const isFridge = currentSpaceConfig.type === 'fridge';
+      const cp = isFridge
+        ? window.PackerEngine.localToWorld(comp, comp.w * 0.5, comp.d)
+        : window.PackerEngine.localToWorld(comp, comp.w * 0.5, comp.d * 0.65);
+      const cv = new THREE.Vector3(cp.x, comp.yStart + comp.clearH * (isFridge ? 0.5 : 0.4), cp.z);
       cv.project(camera);
       return {
         index: comp.index,

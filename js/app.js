@@ -918,7 +918,8 @@
     const baskets = pool.filter(fridgeIsBasket);
 
     if (k === 'drawer') {
-      placeRow(drawers, 'front', comp.d, comp.d * FRIDGE_DRAWER_DEPTH, true);
+      // 서랍형만: 안쪽(뒷벽)에 붙여서 한 줄 (깊이는 칸 깊이의 60%까지)
+      placeRow(drawers, 'back', 0, comp.d * FRIDGE_DRAWER_DEPTH, true);
     } else if (k === 'basket') {
       fillRowsFromFront(baskets, 0, true);
     } else {
@@ -1124,7 +1125,7 @@
       });
     };
     const kindRows = isFridge
-      ? [['drawer', '서랍형', '칸 깊이의 60%까지 앞쪽에'], ['basket', '바구니형', '칸 높이의 절반까지'], ['mix', '섞어서', '서랍형은 안쪽, 앞에 낮은 바구니 (서랍 절반 열림)']]
+      ? [['drawer', '서랍형', '칸 깊이의 60%까지 안쪽에'], ['basket', '바구니형', '칸 높이의 절반까지'], ['mix', '섞어서', '서랍형은 안쪽, 앞에 낮은 바구니 (서랍 절반 열림)']]
       : [['drawer', '서랍형', '앞으로 빼는 상자'], ['basket', '바구니형', '위가 열린 바구니·통'], ['mix', '섞어서', '서랍형과 바구니형을 같이']];
     kindRows.forEach(([k, label, sub], i) => {
       const n = countOf(k);
@@ -5108,8 +5109,10 @@
 
         const badge = document.createElement('div');
         badge.className = 'cost-overlay-badge';
-        const px = Number.isFinite(anc.cx) ? anc.cx : anc.x;
-        const py = Number.isFinite(anc.cy) ? anc.cy : anc.y;
+        // 칸 위치는 3D 영역 기준이라, 화면 전체를 덮는 금액 층에서는 3D 영역 위치만큼 더해 줘요
+        const stageRect = (document.getElementById('canvas-wrapper') || labelsEl).getBoundingClientRect();
+        const px = (Number.isFinite(anc.cx) ? anc.cx : anc.x) + stageRect.left;
+        const py = (Number.isFinite(anc.cy) ? anc.cy : anc.y) + stageRect.top;
         badge.style.left = `${px.toFixed(1)}px`;
         badge.style.top = `${py.toFixed(1)}px`;
         badge.innerHTML = `<span class="cob-name">${comp.name}</span><span class="cob-val">${costText}</span>`;
