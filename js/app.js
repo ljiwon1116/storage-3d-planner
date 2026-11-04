@@ -348,9 +348,19 @@
       }
     }
 
+    // 휴대폰: 카톡·문자 고르는 공유 창을 바로 열어요
+    const isTouch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    if (isTouch && navigator.share) {
+      try {
+        await navigator.share({ title: '내 수납 3D 배치', text: '내가 짠 수납 배치예요. 눌러서 3D로 보세요.', url: shareUrl });
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return; // 사용자가 공유 창을 닫음
+      }
+    }
     try {
       await navigator.clipboard.writeText(shareUrl);
-      alert(`🔗 링크를 복사했어요!\n\n${shareUrl}\n\n이 링크를 보내면 똑같은 화면이 바로 열려요.`);
+      showToast('링크를 복사했어요. 카톡이나 문자에 붙여 넣어 보내세요');
     } catch (e) {
       prompt('이 링크를 복사해서 보내세요:', shareUrl);
     }
@@ -1000,6 +1010,32 @@
     return boxes.length;
   }
 
+  // 한 번에 채우기 실행: 이미 상자가 있으면 묻고, 채운 뒤 [되돌리기] [다른 조합] 알림
+  async function runAutofillWithUndo(compIdx, brand, kind, onEmpty) {
+    const plan = getActivePlan();
+    const existing = plan.boxes.filter((b) => b.compartmentIndex === compIdx).length;
+    if (existing > 0) {
+      const ok = await confirmDialog({
+        title: '이 칸 상자를 바꿀까요?',
+        message: `지금 놓인 상자 ${existing}개가 새 상자로 바뀌어요.`,
+        ok: '바꾸기'
+      });
+      if (!ok) return;
+    }
+    const before = JSON.parse(JSON.stringify(plan.boxes));
+    const n = runTypeFill(compIdx, brand, kind);
+    if (n === 0) { if (onEmpty) onEmpty(); return; }
+    closeShelfSheet();
+    refreshAll();
+    const announce = (count) => showToast(`상자 ${count}개를 넣었어요`, {
+      actions: [
+        { label: '되돌리기', onClick: () => { getActivePlan().boxes = before; state.selectedBoxIds = []; refreshAll(); showToast('채우기 전으로 돌렸어요'); } },
+        { label: '다른 조합', onClick: () => { const m = runTypeFill(compIdx, brand, kind); refreshAll(); announce(m || count); } }
+      ]
+    });
+    announce(n);
+  }
+
   function sheetBtn(label, sub, cls, onClick) {
     const b = document.createElement('button');
     b.type = 'button';
@@ -1025,7 +1061,7 @@
     head.className = 'sheet-step-head';
     head.innerHTML = mode === 'brand'
       ? `<div class="sheet-step-title">어떤 브랜드로 채울까요?</div><div class="sheet-step-hint">이 칸에 맞는 ${kind}만 보여요.</div>`
-      : `<div class="sheet-step-title">어떻게 채울까요?</div><div class="sheet-step-hint">${isPan ? '먼저 브랜드를 골라요. 다음에 상자 종류를 골라요.' : `이 칸에 맞는 ${kind}로 채워요. 지금 놓인 상자는 바뀌어요.`}</div>`;
+      : `<div class="sheet-step-title">어떻게 채울까요?</div><div class="sheet-step-hint">${isPan ? '먼저 브랜드를 골라요. 다음에 상자 종류를 골라요.' : `이 칸에 맞는 ${kind}로 알아서 채워요. 다시 하면 다른 조합이 나와요.`}</div>`;
     body.appendChild(head);
 
     const fillAndClose = (brand) => {
@@ -1034,17 +1070,13 @@
         return;
       }
       if (isPan) { renderPantryKindChoice(compIdx, brand); return; }
-      const n = runTypeFill(compIdx, brand);
-      if (n === 0) {
+      runAutofillWithUndo(compIdx, brand, undefined, () => {
         head.querySelector('.sheet-step-hint').textContent = '이 칸에 들어가는 상자가 없어요.';
-        return;
-      }
-      closeShelfSheet();
-      refreshAll();
+      });
     };
 
     if (pool.length === 0) {
-      head.querySelector('.sheet-step-hint').textContent = `이 칸 높이(${comp.clearH} mm)에 맞는 ${kind}가 없어요.`;
+      head.querySelector('.sheet-step-hint').textContent = `이 칸 높이(${window.Units.len(comp.clearH)})에 맞는 ${kind}가 없어요.`;
     } else if (mode === 'brand') {
       brands.forEach((br) => {
         const cnt = pool.filter((m) => m.brand === br).length;
@@ -1073,17 +1105,13 @@
     body.innerHTML = '';
     const head = document.createElement('div');
     head.className = 'sheet-step-head';
-    head.innerHTML = `<div class="sheet-step-title">어떤 상자로 채울까요?</div><div class="sheet-step-hint">${isFridge ? '냉장고·주방용 상자만 골라요. ' : ''}${brand ? `${brand} 상자 중에서 골라요.` : '모든 브랜드 상자 중에서 골라요.'} 지금 놓인 상자는 바뀌어요.</div>`;
+    head.innerHTML = `<div class="sheet-step-title">어떤 상자로 채울까요?</div><div class="sheet-step-hint">${isFridge ? '냉장고·주방용 상자만 골라요. ' : ''}${brand ? `${brand} 상자 중에서 골라요.` : '모든 브랜드 상자 중에서 골라요.'} 다시 하면 다른 조합이 나와요.</div>`;
     body.appendChild(head);
 
     const go = (k) => {
-      const n = runTypeFill(compIdx, brand, k);
-      if (n === 0) {
+      runAutofillWithUndo(compIdx, brand, k, () => {
         head.querySelector('.sheet-step-hint').textContent = '이 칸에 들어가는 상자가 없어요.';
-        return;
-      }
-      closeShelfSheet();
-      refreshAll();
+      });
     };
     const kindRows = isFridge
       ? [['drawer', '서랍형', '칸 깊이의 60%까지 앞쪽에'], ['basket', '바구니형', '칸 높이의 절반까지'], ['mix', '섞어서', '서랍형은 안쪽, 앞에 낮은 바구니 (서랍 절반 열림)']]
@@ -1143,7 +1171,7 @@
     // 3. 한 번에 채우기 → 브랜드 상관없이 / 특정 브랜드만
     body.appendChild(makeBtn('', '한 번에 채우기', '', () => {
       renderAutofillChoice(compIdx);
-    }, 'AI가 이 칸에 맞는 알찬 조합을 골라 줘요'));
+    }, '이 칸에 맞는 상자로 알아서 채워 줘요'));
 
     // 4. 지금 놓은 것 보기/빼기
     if (compBoxes.length > 0) {
@@ -1159,7 +1187,7 @@
           <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
             <strong>[${model.brand}]</strong> ${model.name}
           </div>
-          <button class="btn btn-danger btn-sm" title="빼기">✕</button>`;
+          <button class="btn btn-danger btn-sm" title="치우기" aria-label="치우기">✕</button>`;
         row.querySelector('button').addEventListener('click', () => {
           activePlan.boxes = activePlan.boxes.filter((b) => b.id !== box.id);
           settleBoxes(activePlan.boxes, [box.compartmentIndex]);
@@ -1214,7 +1242,7 @@
     const c = state.spaceConfig.cabinet;
     body.innerHTML = `
       <div class="sub-block-title" style="margin-bottom:8px;">
-        <span>선반 높이 (바닥에서 mm)</span>
+        <span>선반 높이 (바닥에서 cm)</span>
         <button id="shelfh-add" class="btn btn-primary btn-sm">+ 선반 넣기</button>
       </div>
       <div id="shelfh-list" class="shelf-list"></div>
@@ -1226,8 +1254,8 @@
       row.className = 'shelf-item';
       row.innerHTML = `
         <span>선반 ${idx + 1}</span>
-        <input type="number" class="input-box shelfh-y" data-idx="${idx}" value="${sh.bottomY}" step="10" />
-        <span style="display:flex;align-items:center;gap:4px;">두께 <input type="number" class="input-box shelfh-t" data-idx="${idx}" value="${sh.thickness}" step="2" style="width:48px;" /></span>
+        <input type="number" data-unit="mm" class="input-box shelfh-y" data-idx="${idx}" value="${sh.bottomY}" step="10" />
+        <span style="display:flex;align-items:center;gap:4px;">두께 <input type="number" data-unit="mm" class="input-box shelfh-t" data-idx="${idx}" value="${sh.thickness}" step="2" style="width:48px;" /></span>
         <button class="btn btn-danger btn-sm shelfh-del" data-idx="${idx}">✕</button>
       `;
       listEl.appendChild(row);
@@ -1271,13 +1299,13 @@
     const { bays, startB } = window.PackerEngine.getPantryBays(state.spaceConfig);
     if (!bays.some((b) => b.key === state.pantryBay)) state.pantryBay = bays[0] ? bays[0].key : 'A0';
     const bay = bays.find((b) => b.key === state.pantryBay);
-    const bayLabel = (b) => `${b.wall === 'A' ? '안쪽' : '옆'} ${b.col + 1}열`;
+    const bayLabel = (b) => `${b.wall === 'A' ? '안쪽' : '옆'} ${b.col + 1}번 칸`;
     const clampNum = (v, lo, hi, dflt) => Math.max(lo, Math.min(hi, Number.isFinite(Number(v)) ? Number(v) : dflt));
     const after = (redraw) => { refreshAll(); if (redraw !== false) renderShelfHeightPopup(); };
 
     const walk = window.PackerEngine.getPantryWalkway(state.spaceConfig);
     body.innerHTML = `
-      ${walk.ok ? '' : `<div class="pp-warn">걷는 길이 ${walk.min} mm로 좁아요. 600 mm 이상이 좋아요. 선반 깊이를 줄여 보세요.</div>`}
+      ${walk.ok ? '' : `<div class="pp-warn">걷는 길이 ${window.Units.len(walk.min)}로 좁아요. 60 cm 이상이 좋아요. 선반 깊이를 줄여 보세요.</div>`}
       <div class="pp-sec">
         <label class="pp-toggle"><span>맨 아래 칸 비워두기 <span class="pp-cap">쌀통·생수·청소기 자리</span></span><input id="pp-keep-floor" type="checkbox" ${p.keepFloor ? 'checked' : ''}></label>
         <div class="pp-h" style="margin-top:8px;">입구 쪽</div>
@@ -1289,22 +1317,22 @@
       </div>
       <div class="pp-sec">
         <div class="pp-h-row">
-          <span class="pp-h">${bay ? bayLabel(bay) : ''} 선반 높이 <span class="pp-cap">바닥에서 mm</span></span>
+          <span class="pp-h">${bay ? bayLabel(bay) : ''} 선반 높이 <span class="pp-cap">바닥에서 cm</span></span>
           <button id="pp-add-shelf" class="pp-text-btn" type="button">+ 선반 넣기</button>
         </div>
         <div id="pp-shelves" class="shelf-list"></div>
         <button id="pp-apply-all" class="pp-outline-btn" type="button">모든 열을 이 열처럼</button>
       </div>
       <div class="pp-sec">
-        <div class="pp-h">세로 기둥 위치 <span class="pp-cap">벽 끝에서 mm</span></div>
+        <div class="pp-h">세로 기둥 위치 <span class="pp-cap">벽 끝에서 cm</span></div>
         <div id="pp-posts"></div>
       </div>
       <div class="pp-sec">
         <div class="pp-h">선반 깊이 · 기둥 굵기</div>
         <div class="pp-grid2">
-          <label class="pp-field"><span>안쪽 벽 깊이</span><input id="pp-depth-a" type="number" class="input-box" step="10" value="${p.depthA}"></label>
-          <label class="pp-field"><span>옆 벽 깊이</span><input id="pp-depth-b" type="number" class="input-box" step="10" value="${p.depthB}" ${p.wallB === false ? 'disabled' : ''}></label>
-          <label class="pp-field"><span>기둥 굵기</span><input id="pp-post-w" type="number" class="input-box" step="5" value="${p.postW}"></label>
+          <label class="pp-field"><span>안쪽 벽 깊이</span><input id="pp-depth-a" type="number" data-unit="mm" class="input-box" step="10" value="${p.depthA}"></label>
+          <label class="pp-field"><span>옆 벽 깊이</span><input id="pp-depth-b" type="number" data-unit="mm" class="input-box" step="10" value="${p.depthB}" ${p.wallB === false ? 'disabled' : ''}></label>
+          <label class="pp-field"><span>기둥 굵기</span><input id="pp-post-w" type="number" data-unit="mm" class="input-box" step="5" value="${p.postW}"></label>
         </div>
       </div>`;
 
@@ -1338,7 +1366,7 @@
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = 'sp-chip' + (b.key === state.pantryBay ? ' selected' : '');
-      chip.innerHTML = `${bayLabel(b)}<span class="pp-chip-sub">${Math.round(b.w)}mm</span>`;
+      chip.innerHTML = `${bayLabel(b)}<span class="pp-chip-sub">${window.Units.len(b.w)}</span>`;
       chip.addEventListener('click', () => { state.pantryBay = b.key; renderShelfHeightPopup(); });
       chipsEl.appendChild(chip);
     });
@@ -1351,9 +1379,9 @@
       row.className = 'shelf-item';
       row.innerHTML = `
         <span>${idx + 1}단 위</span>
-        <input type="number" class="input-box pp-y" value="${sh.bottomY}" step="10" aria-label="${idx + 1}번째 선반 높이" />
-        <span style="display:flex;align-items:center;gap:4px;">두께 <input type="number" class="input-box pp-t" value="${sh.thickness || 18}" step="2" style="width:48px;" aria-label="두께" /></span>
-        <button class="btn btn-danger btn-sm pp-del" type="button" aria-label="이 선반 빼기">✕</button>`;
+        <input type="number" data-unit="mm" class="input-box pp-y" value="${sh.bottomY}" step="10" aria-label="${idx + 1}번째 선반 높이" />
+        <span style="display:flex;align-items:center;gap:4px;">두께 <input type="number" data-unit="mm" class="input-box pp-t" value="${sh.thickness || 18}" step="2" style="width:48px;" aria-label="두께" /></span>
+        <button class="btn btn-danger btn-sm pp-del" type="button" aria-label="이 선반 지우기">✕</button>`;
       row.querySelector('.pp-y').addEventListener('change', (e) => {
         const own = pantryBayShelves(bay.key, true);
         own[idx].bottomY = clampNum(e.target.value, 30, p.h - 30, own[idx].bottomY);
@@ -1419,9 +1447,9 @@
         row.className = 'shelf-item';
         row.innerHTML = `
           <span>기둥 ${i + 1}</span>
-          <input type="number" class="input-box" value="${pos}" step="10" aria-label="기둥 ${i + 1} 위치" />
-          <span class="pp-cap">mm</span>
-          <button class="btn btn-danger btn-sm" type="button" aria-label="기둥 ${i + 1} 빼기">✕</button>`;
+          <input type="number" data-unit="mm" class="input-box" value="${pos}" step="10" aria-label="기둥 ${i + 1} 위치" />
+          <span class="pp-cap">cm</span>
+          <button class="btn btn-danger btn-sm" type="button" aria-label="기둥 ${i + 1} 지우기">✕</button>`;
         row.querySelector('input').addEventListener('change', (e) => {
           snapPantryComps();
           posts[i] = clampNum(e.target.value, lo + 60, hi - 60, pos);
@@ -2003,8 +2031,8 @@
 
       const cabConst = window.PackerEngine.getCabinetConstraints(state.spaceConfig);
       document.getElementById('cab-opening-summary').innerHTML =
-        `들어가는 문 크기: <strong>${cabConst.doorClearW} × ${cabConst.doorClearH} mm</strong> ` +
-        `(왼쪽 걸림 ${cabConst.leftDeadW}mm / 오른쪽 걸림 ${cabConst.rightDeadW}mm)`;
+        `들어가는 문 크기: <strong>${window.Units.cm(cabConst.doorClearW)} × ${window.Units.len(cabConst.doorClearH)}</strong> ` +
+        `(왼쪽 걸림 ${window.Units.len(cabConst.leftDeadW)} / 오른쪽 걸림 ${window.Units.len(cabConst.rightDeadW)})`;
 
       const shelfListEl = document.getElementById('shelf-list');
       shelfListEl.innerHTML = '';
@@ -2013,8 +2041,8 @@
         row.className = 'shelf-item';
         row.innerHTML = `
           <span>선반 ${idx + 1} 높이</span>
-          <input type="number" class="input-box shelf-y-input" data-idx="${idx}" value="${sh.bottomY}" step="10" />
-          <span style="display:flex;align-items:center;gap:4px;">두께 <input type="number" class="input-box shelf-t-input" data-idx="${idx}" value="${sh.thickness}" step="2" style="width:48px;" /></span>
+          <input type="number" data-unit="mm" class="input-box shelf-y-input" data-idx="${idx}" value="${sh.bottomY}" step="10" />
+          <span style="display:flex;align-items:center;gap:4px;">두께 <input type="number" data-unit="mm" class="input-box shelf-t-input" data-idx="${idx}" value="${sh.thickness}" step="2" style="width:48px;" /></span>
           <button class="btn btn-danger btn-sm shelf-del-btn" data-idx="${idx}">✕</button>
         `;
         shelfListEl.appendChild(row);
@@ -2064,8 +2092,8 @@
       const drwConst = window.PackerEngine.getDrawerConstraints(state.spaceConfig);
       const ratioPct = Math.round((drwConst.exposedD / drwConst.totalD) * 100);
       document.getElementById('drw-exposure-summary').innerHTML =
-        `보이는 곳: <strong style="color:#3b8a64">${drwConst.exposedD}mm (${ratioPct}%)</strong> / ` +
-        `꺼내기 힘든 곳: <strong style="color:#d97706">${drwConst.unexposedD}mm (${100 - ratioPct}%)</strong>`;
+        `보이는 곳: <strong style="color:#3b8a64">${window.Units.len(drwConst.exposedD)} (${ratioPct}%)</strong> / ` +
+        `꺼내기 힘든 곳: <strong style="color:#d97706">${window.Units.len(drwConst.unexposedD)} (${100 - ratioPct}%)</strong>`;
     }
   }
 
@@ -2125,7 +2153,7 @@
           </div>
           <span class="badge">${compBoxes.length}개 놓음</span>
         </div>
-        <div class="shelf-callout-dims">가로 ${comp.w} × 깊이 ${comp.d} × 높이 ${comp.clearH} mm</div>
+        <div class="shelf-callout-dims">가로 ${window.Units.cm(comp.w)} × 깊이 ${window.Units.cm(comp.d)} × 높이 ${window.Units.len(comp.clearH)}</div>
       `;
 
       card.addEventListener('click', () => {
@@ -2201,7 +2229,7 @@
                 <div class="form-group">
                   <label>2. 상자 (${state.autofillSingleBrand})</label>
                   <select class="exp-autofill-model">
-                    ${singleBrandModels.map((m) => `<option value="${m.id}" ${m.id === state.selectedCatalogModelId ? 'selected' : ''}>[${m.lineup}] ${m.name} (${m.wTop}×${m.dTop}×H${m.h}mm)</option>`).join('')}
+                    ${singleBrandModels.map((m) => `<option value="${m.id}" ${m.id === state.selectedCatalogModelId ? 'selected' : ''}>[${m.lineup}] ${m.name} (${window.Units.dims(m.wTop, m.dTop, m.h)})</option>`).join('')}
                   </select>
                 </div>
               </div>
@@ -2215,7 +2243,7 @@
 
               <label class="checkbox-row">
                 <input type="checkbox" class="exp-chk-deadzone" ${state.autofillAvoidDeadzone ? 'checked' : ''} />
-                <span>${state.spaceConfig.type === 'cabinet' ? '문에 걸리는 곳 빼기' : '꺼내기 힘든 곳 빼기'}</span>
+                <span>${state.spaceConfig.type === 'cabinet' ? '문에 걸리는 곳은 비우기' : '꺼내기 힘든 곳은 비우기'}</span>
               </label>
               <label class="checkbox-row">
                 <input type="checkbox" class="exp-chk-rotate" ${state.autofillRotate ? 'checked' : ''} />
@@ -2260,7 +2288,7 @@
             if (!model) return;
             const dims = window.PackerEngine.getOrientedDims(model, box.rot || 0);
             const isSel = state.selectedBoxIds.includes(box.id);
-            const layerTag = (box.y || 0) > 5 ? ` · 위로 +${box.y}mm` : '';
+            const layerTag = (box.y || 0) > 5 ? ` · 위로 +${window.Units.len(box.y)}` : '';
 
             const item = document.createElement('div');
             item.className = 'placed-mini-item' + (isSel ? (isMultiBundle ? ' in-bundle' : ' active') : '');
@@ -2270,7 +2298,7 @@
               </div>
               <div style="display:flex;gap:4px;flex-shrink:0;">
                 <button class="btn btn-sm mini-rot-btn" title="돌리기">↻</button>
-                <button class="btn btn-danger btn-sm mini-del-btn" title="빼기">✕</button>
+                <button class="btn btn-danger btn-sm mini-del-btn" title="치우기" aria-label="치우기">✕</button>
               </div>
             `;
             item.addEventListener('click', (e) => {
@@ -2312,7 +2340,7 @@
               <div style="flex:1;min-width:0;">
                 <div style="font-weight:700;font-size:0.75rem;">${combo.name}</div>
                 <div style="font-size:0.68rem;color:var(--text-sub);">
-                  ${combo.items.length}개 · ${combo.totalW}×${combo.totalD}×H${combo.maxH}mm
+                  ${combo.items.length}개 · ${window.Units.dims(combo.totalW, combo.totalD, combo.maxH)}
                   <span style="color:${fitsSize ? '#047857' : '#b91c1c'};font-weight:700;">${fitsSize ? '(들어감)' : '(안 들어감)'}</span>
                 </div>
               </div>
@@ -2363,8 +2391,7 @@
         panel.querySelector('.exp-run-autofill-btn').addEventListener('click', () => {
           // 여러 크기로 채우기: 가구 종류에 맞는 상자로, 누를 때마다 다른 조합
           if (state.autofillMode === 'brand_mix') {
-            runTypeFill(comp.index, state.autofillBrand === 'ALL' ? null : state.autofillBrand);
-            refreshAll();
+            runAutofillWithUndo(comp.index, state.autofillBrand === 'ALL' ? null : state.autofillBrand, undefined, () => showToast('이 칸에 들어가는 상자가 없어요'));
             return;
           }
           const generated = window.PackerEngine.autoFill(
@@ -2400,7 +2427,7 @@
     const activeComp = compartments[compIdx] || compartments[0];
 
     document.getElementById('picker-target-space-badge').textContent =
-      `놓을 곳: ${activeComp.name} (${Math.round(activeComp.w)}×${Math.round(activeComp.d)}×높이 ${Math.round(activeComp.clearH)}mm)`;
+      `놓을 곳: ${activeComp.name} (가로 ${window.Units.cm(activeComp.w)} × 깊이 ${window.Units.cm(activeComp.d)} × 높이 ${window.Units.len(activeComp.clearH)})`;
 
     const tabsEl = document.getElementById('picker-brand-tabs');
     tabsEl.innerHTML = '';
@@ -2555,7 +2582,7 @@
           </div>
 
           <div class="pfp-group">
-            <div class="pfp-group-label">수납함 형태</div>
+            <div class="pfp-group-label">상자 모양</div>
             <div class="pfp-checks">
               <label class="pfp-check-chip"><input type="checkbox" data-group="kinds" value="drawer" ${pf.kinds.includes('drawer') ? 'checked' : ''} /><span>서랍형</span></label>
               <label class="pfp-check-chip"><input type="checkbox" data-group="kinds" value="basket" ${pf.kinds.includes('basket') ? 'checked' : ''} /><span>바구니형</span></label>
@@ -2564,16 +2591,16 @@
           </div>
 
           <div class="pfp-group">
-            <div class="pfp-group-label">적층 가능 여부</div>
+            <div class="pfp-group-label">위에 쌓기</div>
             <div class="pfp-checks">
-              <label class="pfp-check-chip"><input type="checkbox" data-group="stackable" value="yes" ${pf.stackable.includes('yes') ? 'checked' : ''} /><span>적층 가능</span></label>
-              <label class="pfp-check-chip"><input type="checkbox" data-group="stackable" value="no" ${pf.stackable.includes('no') ? 'checked' : ''} /><span>적층 불가</span></label>
+              <label class="pfp-check-chip"><input type="checkbox" data-group="stackable" value="yes" ${pf.stackable.includes('yes') ? 'checked' : ''} /><span>쌓을 수 있어요</span></label>
+              <label class="pfp-check-chip"><input type="checkbox" data-group="stackable" value="no" ${pf.stackable.includes('no') ? 'checked' : ''} /><span>쌓을 수 없어요</span></label>
             </div>
           </div>
 
           <div class="pfp-group">
             <div class="pfp-group-head">
-              <span class="pfp-group-label">찾는 사이즈 (단위: mm)</span>
+              <span class="pfp-group-label">찾는 크기 (cm)</span>
               <div class="pfp-size-quick">
                 <button type="button" class="pfp-mini-btn" data-act="fit-comp">현재 칸 이하로</button>
                 <button type="button" class="pfp-mini-btn" data-act="clear-size">치수 지우기</button>
@@ -2582,24 +2609,24 @@
             <div class="pfp-size-rows">
               <div class="pfp-size-row">
                 <span class="pfp-size-name">가로(폭)</span>
-                <input type="number" class="pfp-size-input" data-size="wMin" placeholder="최소" value="${pf.wMin}" step="10" min="0" />
+                <input type="number" data-unit="mm" class="pfp-size-input" data-size="wMin" placeholder="최소" value="${pf.wMin}" step="10" min="0" />
                 <span class="pfp-tilde">~</span>
-                <input type="number" class="pfp-size-input" data-size="wMax" placeholder="최대 (${Math.round(activeComp.w)})" value="${pf.wMax}" step="10" min="0" />
-                <span class="pfp-unit">mm</span>
+                <input type="number" data-unit="mm" class="pfp-size-input" data-size="wMax" placeholder="최대 (${Math.round(activeComp.w)})" value="${pf.wMax}" step="10" min="0" />
+                <span class="pfp-unit">cm</span>
               </div>
               <div class="pfp-size-row">
                 <span class="pfp-size-name">세로(깊이)</span>
-                <input type="number" class="pfp-size-input" data-size="dMin" placeholder="최소" value="${pf.dMin}" step="10" min="0" />
+                <input type="number" data-unit="mm" class="pfp-size-input" data-size="dMin" placeholder="최소" value="${pf.dMin}" step="10" min="0" />
                 <span class="pfp-tilde">~</span>
-                <input type="number" class="pfp-size-input" data-size="dMax" placeholder="최대 (${Math.round(activeComp.d)})" value="${pf.dMax}" step="10" min="0" />
-                <span class="pfp-unit">mm</span>
+                <input type="number" data-unit="mm" class="pfp-size-input" data-size="dMax" placeholder="최대 (${Math.round(activeComp.d)})" value="${pf.dMax}" step="10" min="0" />
+                <span class="pfp-unit">cm</span>
               </div>
               <div class="pfp-size-row">
                 <span class="pfp-size-name">높이</span>
-                <input type="number" class="pfp-size-input" data-size="hMin" placeholder="최소" value="${pf.hMin}" step="10" min="0" />
+                <input type="number" data-unit="mm" class="pfp-size-input" data-size="hMin" placeholder="최소" value="${pf.hMin}" step="10" min="0" />
                 <span class="pfp-tilde">~</span>
-                <input type="number" class="pfp-size-input" data-size="hMax" placeholder="최대 (${Math.round(activeComp.clearH)})" value="${pf.hMax}" step="10" min="0" />
-                <span class="pfp-unit">mm</span>
+                <input type="number" data-unit="mm" class="pfp-size-input" data-size="hMax" placeholder="최대 (${Math.round(activeComp.clearH)})" value="${pf.hMax}" step="10" min="0" />
+                <span class="pfp-unit">cm</span>
               </div>
             </div>
           </div>
@@ -2734,12 +2761,12 @@
               <div class="picker-lineup">상자 ${combo.items.length}개</div>
               <div class="picker-title">${combo.name}</div>
               <div class="picker-spec-box">
-                <strong>묶음 크기:</strong> 가로 ${combo.totalW} × 깊이 ${combo.totalD} × 높이 ${combo.maxH} mm<br>
+                <strong>묶음 크기:</strong> 가로 ${window.Units.cm(combo.totalW)} × 깊이 ${window.Units.cm(combo.totalD)} × 높이 ${window.Units.len(combo.maxH)}<br>
                 <span style="font-size:0.7rem;color:var(--text-muted);">들어있는 것: ${itemNames}</span>
               </div>
               <div style="display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:8px;">
                 <button class="btn btn-primary btn-sm combo-pick-insert">+ 이 칸에 넣기</button>
-                <button class="btn btn-danger btn-sm combo-pick-del">빼기</button>
+                <button class="btn btn-danger btn-sm combo-pick-del">묶음 지우기</button>
               </div>
             </div>
           `;
@@ -2748,7 +2775,9 @@
             insertSavedComboToActiveSpace(combo.id);
             document.getElementById('modal-box-picker').classList.remove('open');
           });
-          card.querySelector('.combo-pick-del').addEventListener('click', () => {
+          card.querySelector('.combo-pick-del').addEventListener('click', async () => {
+            const ok = await confirmDialog({ title: '이 묶음을 지울까요?', message: `'${combo.name}' 묶음이 저장 목록에서 사라져요.`, ok: '지우기' });
+            if (!ok) return;
             deleteSavedCombo(combo.id);
             renderPickerModalContent();
           });
@@ -2759,7 +2788,7 @@
 
       const filtered = getFilteredCatalogModels();
       if (filtered.length === 0) {
-        gridEl.innerHTML = `<div style="padding:28px 16px;text-align:center;color:var(--text-sub);font-size:0.86rem;">찾으시는 조건에 맞는 수납함이 없어요.<br><span style="font-size:0.76rem;color:var(--text-muted);">필터 조건을 조정하거나 '모두 체크'를 눌러 보세요.</span></div>`;
+        gridEl.innerHTML = `<div style="padding:28px 16px;text-align:center;color:var(--text-sub);font-size:0.86rem;">조건에 맞는 상자가 없어요.<br><span style="font-size:0.76rem;color:var(--text-muted);">필터 조건을 조정하거나 '모두 체크'를 눌러 보세요.</span></div>`;
         updatePickerCartBar();
         return;
       }
@@ -2772,7 +2801,7 @@
         const card = document.createElement('div');
         card.className = 'picker-card pick-slide-card pick-row-card';
         card.dataset.modelId = model.id;
-        const sizeLine = `${model.wTop}×${model.dTop}×${model.h}`;
+        const sizeLine = `${window.Units.cm(model.wTop)}×${window.Units.cm(model.dTop)}×${window.Units.cm(model.h)}`;
         card.innerHTML = `
           <div class="pick-row-thumb">
             ${svgHtml}
@@ -2784,12 +2813,12 @@
               <span class="picker-fit-badge ${fitInfo.ok ? 'fit-ok' : 'fit-warn'}">${fitInfo.reason}</span>
             </div>
             <div class="pick-row-name">${model.name}</div>
-            <div class="pick-row-size">${sizeLine} mm</div>
+            <div class="pick-row-size" title="가로×깊이×높이">${sizeLine} cm</div>
           </div>
           <div class="pick-row-qty">
-            <button class="pick-minus" title="빼기">−</button>
+            <button class="pick-minus" title="1개 줄이기" aria-label="1개 줄이기">−</button>
             <span class="pick-row-qtynum">${qty}</span>
-            <button class="pick-plus" title="담기">＋</button>
+            <button class="pick-plus" title="1개 더하기" aria-label="1개 더하기">＋</button>
           </div>
         `;
 
@@ -2857,8 +2886,8 @@
     // 저장한 묶음 탭에서는 담기 바 숨김
     bar.style.display = state.pickerBrand === 'COMBOS' ? 'none' : 'flex';
     const total = Object.values(state.pickerCart).reduce((a, b) => a + b, 0);
-    countEl.textContent = `담은 상자 ${total}개`;
-    btn.textContent = total > 0 ? `${total}개 담기` : '담기';
+    countEl.textContent = `고른 상자 ${total}개`;
+    btn.textContent = total > 0 ? `칸에 넣기 (${total}개)` : '칸에 넣기';
     btn.disabled = total === 0;
   }
 
@@ -2907,10 +2936,10 @@
       const model = state.modelsMap[box.modelId];
       if (!model) return;
       const dims = window.PackerEngine.getOrientedDims(model, box.rot || 0);
-      const yInfo = (box.y || 0) > 0 ? ` · 바닥에서 +${box.y}mm 위` : '';
+      const yInfo = (box.y || 0) > 0 ? ` · 바닥에서 ${window.Units.len(box.y)} 위` : '';
       document.getElementById('sel-box-title').innerHTML =
         `<strong>[${model.brand}] ${model.name}</strong> ` +
-        `<span class="sel-box-meta">${dims.w}×${dims.d}×${dims.h}mm · ${box.rot || 0}°${yInfo}</span>`;
+        `<span class="sel-box-meta">${window.Units.dims(dims.w, dims.d, dims.h)}${box.rot ? ' · 돌려 놓음' : ''}${yInfo}</span>`;
     } else {
       saveComboBtn.style.display = 'inline-flex';
       document.getElementById('sel-box-title').innerHTML =
@@ -2926,6 +2955,7 @@
     container.innerHTML = '';
 
     const mobileErrLabel = document.getElementById('mobile-nav-err-label');
+    notifyNewIssues(val.messages);
 
     if (val.messages.length === 0) {
       tabTitle.textContent = `문제 알림 (괜찮아요)`;
@@ -2952,6 +2982,23 @@
       });
       container.appendChild(div);
     });
+  }
+
+  // 새로 생긴 '문제'만 화면 아래에 3초 동안 잠깐 보여 줘요 (자세한 내용은 '문제' 탭)
+  let lastIssueKeys = null;
+  function notifyNewIssues(messages) {
+    const errors = messages.filter((m) => m.severity === 'error');
+    const keys = new Set(errors.map((m) => `${m.boxId || ''}|${m.text}`));
+    const prev = lastIssueKeys;
+    lastIssueKeys = keys;
+    if (!prev || state.mobileStep === 'setup') return; // 처음 열 때·첫 설정 중에는 조용히
+    const fresh = errors.filter((m) => !prev.has(`${m.boxId || ''}|${m.text}`));
+    if (fresh.length === 0) return;
+    const first = fresh[0];
+    const tag = (first.text.match(/^\[([^\]]+)\]/) || [])[1];
+    const name = (first.text.match(/'([^']+)'/) || [])[1];
+    const short = tag && name ? `${tag} · ${name}` : first.text.replace(/^\[[^\]]+\]\s*/, '');
+    showToast(fresh.length > 1 ? `${short} 외 ${fresh.length - 1}개` : short, { type: 'warn', duration: 3000 });
   }
 
   function renderComparisonTable() {
@@ -3133,13 +3180,14 @@
       state.pickerCart[newModel.id] = 1;
       close();
       renderPickerModalContent();
-      showToast('목록에 추가했어요. 담기를 누르면 칸에 들어가요');
+      showToast('목록에 추가했어요. 칸에 넣기를 누르면 들어가요');
     });
   }
 
   // ---------- 짧은 알림 · 확인 창 ----------
   let toastTimer = null;
-  function showToast(msg) {
+  // 짧은 알림. opts: { type: 'warn', duration(ms), actions: [{ label, onClick }] }
+  function showToast(msg, opts = {}) {
     let el = document.getElementById('app-toast');
     if (!el) {
       el = document.createElement('div');
@@ -3149,13 +3197,32 @@
       el.setAttribute('aria-live', 'polite');
       document.body.appendChild(el);
     }
-    el.textContent = msg;
+    el.innerHTML = '';
+    const text = document.createElement('span');
+    text.className = 'app-toast-text';
+    text.textContent = msg;
+    el.appendChild(text);
+    const actions = opts.actions || [];
+    actions.forEach((a) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'app-toast-btn';
+      b.textContent = a.label;
+      b.addEventListener('click', () => {
+        clearTimeout(toastTimer);
+        el.classList.remove('show');
+        a.onClick();
+      });
+      el.appendChild(b);
+    });
+    el.classList.toggle('warn', opts.type === 'warn');
+    el.classList.toggle('has-actions', actions.length > 0);
     el.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+    toastTimer = setTimeout(() => el.classList.remove('show'), opts.duration || (actions.length ? 6000 : 1800));
   }
   // 되돌리기 힘든 동작 전에 한 번 묻기. 결과: true(진행) / false(취소)
-  function confirmDialog({ title, message, ok }) {
+  function confirmDialog({ title, message, ok, cancel }) {
     return new Promise((resolve) => {
       const wrap = document.createElement('div');
       wrap.className = 'app-confirm';
@@ -3164,7 +3231,7 @@
           <div id="app-confirm-t" class="app-confirm-t">${title}</div>
           ${message ? `<div class="app-confirm-m">${message}</div>` : ''}
           <div class="app-confirm-btns">
-            <button type="button" class="app-confirm-no">취소</button>
+            <button type="button" class="app-confirm-no">${cancel || '취소'}</button>
             <button type="button" class="app-confirm-yes">${ok || '확인'}</button>
           </div>
         </div>`;
@@ -3195,13 +3262,13 @@
 
   function formatMarginLine(m, dirs) {
     const dirMap = {
-      top: `상 ${m.top}`,
-      left: `좌 ${m.left}`,
-      right: `우 ${m.right}`,
-      front: `전 ${m.front}`,
-      back: `후 ${m.back}`
+      top: `위 ${window.Units.cm(m.top)}`,
+      left: `왼쪽 ${window.Units.cm(m.left)}`,
+      right: `오른쪽 ${window.Units.cm(m.right)}`,
+      front: `앞 ${window.Units.cm(m.front)}`,
+      back: `뒤 ${window.Units.cm(m.back)}`
     };
-    return dirs.map((k) => dirMap[k]).filter(Boolean).join(' · ') + ' mm';
+    return dirs.map((k) => dirMap[k]).filter(Boolean).join(' · ') + ' cm';
   }
 
   function drawRoundedRect(ctx, x, y, w, h, r) {
@@ -3291,9 +3358,9 @@
         const cardFs = Math.max(13, Math.round(Math.min(cv.width, cv.height) * 0.023));
         const lineH = Math.round(cardFs * 1.55);
         const cardPad = Math.round(cardFs * 0.95);
-        const headerText = '남는 공간 여백 (단위: mm)';
+        const headerText = '남는 공간 (cm)';
         const rows = targetMargins.slice(0, 8).map((m) => ({
-          name: `${m.name} (${m.compW}×${m.compD}×${m.compH})`,
+          name: `${m.name} (${window.Units.cm(m.compW)}×${window.Units.cm(m.compD)}×${window.Units.cm(m.compH)})`,
           vals: formatMarginLine(m, marginDirs)
         }));
 
@@ -3609,8 +3676,8 @@
     panD: { fig: 'pd', tips: ['옆 선반이 있는 벽을 봐요.', '안쪽 벽부터 입구 문틀까지 재요.'] },
     panH: { fig: 'h', tips: ['바닥에서 맨 위 선반 판 위까지 재요.', '천장까지가 아니에요. 선반이 끝나는 곳까지예요.'] },
     panDepth: { fig: 'pdep', tips: ['벽에 줄자 끝을 대요.', '선반 판 앞 끝까지 재요.', '앞에 기둥이 있으면 기둥 앞면까지 재요.'] },
-    panCols: { fig: 'count', tips: ['세로 기둥 사이 칸을 세요.', '가운데 기둥이 1개면 2열이에요.'] },
-    panLevels: { fig: 'count', tips: ['한 열의 선반 판을 세요.', '판이 5개면 바닥 칸까지 6단이에요.'] },
+    panCols: { fig: 'count', tips: ['세로 기둥 사이 칸을 세요.', '가운데 기둥이 1개면 2칸이에요.'] },
+    panLevels: { fig: 'count', tips: ['기둥 사이 한 칸의 선반 판을 세요.', '판이 5개면 바닥까지 6층이에요.'] },
     frW: { fig: 'w', tips: ['문을 닫은 채로 재요.', '냉장고 왼쪽 옆면에서 오른쪽 옆면까지 재요.', '문 손잡이는 빼고 몸통 폭만 재요.'] },
     frH: { fig: 'h', tips: ['바닥에 줄자 끝을 대요.', '냉장고 맨 윗면까지 재요.', '위에 올려 둔 물건은 빼고 재요.'] },
     frD: { fig: 'd', tips: ['냉장고 옆에 서서 재요.', '문 앞면에서 냉장고 뒷면까지 재요.', '뒤가 벽에 붙어 있으면 문 앞면에서 벽까지 재고 5cm를 빼요.'] },
@@ -3835,7 +3902,7 @@
       const f = state.spaceConfig.fridge;
       const capOptions = Object.keys(FRIDGE_CAPACITIES).map(Number).sort((a, b) => b - a).map((cap) => {
         const d = FRIDGE_CAPACITIES[cap];
-        return { value: cap, label: `${cap}L`, sub: `${d.w} × ${d.d} × ${d.h} mm${cap === 650 ? ' (추정)' : ''}` };
+        return { value: cap, label: `${cap}L`, sub: `${window.Units.dims(d.w, d.d, d.h)}${cap === 650 ? ' (추정)' : ''}` };
       });
       const sizeStep = (title, key, min, max, hint, measure) => num({
         title, min, max, step: 10, hint, measure,
@@ -3870,9 +3937,9 @@
           get: () => f.capacity,
           set: (v) => { snapFridgeComps(); f.capacity = Number(v); Object.assign(f, FRIDGE_CAPACITIES[v]); clampFridgeBoxes(); }
         },
-        sizeStep('냉장고 가로는<br>몇 mm인가요?', 'w', 500, 1300, () => '용량을 골랐다면 이미 맞춰져 있어요. 다르면 재서 고쳐요.', WIZ_MEASURE.frW),
-        sizeStep('냉장고 높이는<br>몇 mm인가요?', 'h', 1000, 2200, () => '바닥에서 냉장고 맨 위까지예요.', WIZ_MEASURE.frH),
-        sizeStep('냉장고 깊이는<br>몇 mm인가요?', 'd', 500, 1100, () => '문 앞면에서 뒷면까지예요. 손잡이는 빼요.', WIZ_MEASURE.frD),
+        sizeStep('냉장고 가로는<br>몇 cm인가요?', 'w', 500, 1300, () => '용량을 골랐다면 이미 맞춰져 있어요. 다르면 재서 고쳐요.', WIZ_MEASURE.frW),
+        sizeStep('냉장고 높이는<br>몇 cm인가요?', 'h', 1000, 2200, () => '바닥에서 냉장고 맨 위까지예요.', WIZ_MEASURE.frH),
+        sizeStep('냉장고 깊이는<br>몇 cm인가요?', 'd', 500, 1100, () => '문 앞면에서 뒷면까지예요. 손잡이는 빼요.', WIZ_MEASURE.frD),
         num({
           title: '냉장실 선반은<br>몇 개인가요?',
           measure: WIZ_MEASURE.frShelfR,
@@ -3909,7 +3976,7 @@
           set: (v) => { p.doorSide = v; }
         },
         num({
-          title: '안쪽 벽은<br>몇 mm인가요?',
+          title: '안쪽 벽은<br>몇 cm인가요?',
           measure: WIZ_MEASURE.panW,
           caption: '방 가로 (뒤 벽 길이)',
           hint: () => '입구에서 보이는 맞은편 벽 끝에서 끝까지 재요.',
@@ -3918,7 +3985,7 @@
           set: (v) => { p.roomW = v; setPantryCols('A', bayCount('A')); }
         }),
         num({
-          title: '옆 벽은<br>몇 mm인가요?',
+          title: '옆 벽은<br>몇 cm인가요?',
           measure: WIZ_MEASURE.panD,
           caption: '방 깊이 (오른쪽 벽 길이)',
           hint: () => '안쪽 벽에서 입구까지 재요.',
@@ -3941,33 +4008,33 @@
           hint: () => {
             const w = window.PackerEngine.getPantryWalkway(state.spaceConfig);
             return w.ok
-              ? `걷는 길은 ${w.min} mm 남아요.`
-              : `걷는 길이 ${w.min} mm로 좁아요. 600 mm는 남겨 두는 게 좋아요.`;
+              ? `걷는 길은 ${window.Units.len(w.min)} 남아요.`
+              : `걷는 길이 ${window.Units.len(w.min)}로 좁아요. 60 cm는 남겨 두는 게 좋아요.`;
           },
           min: 150, max: 800, step: 10,
           get: () => p.depthA,
           set: (v) => { p.depthA = v; p.depthB = v; }
         }),
         num({
-          title: '안쪽 벽은<br>몇 열로 나뉘나요?',
+          title: '안쪽 벽은 기둥으로<br>몇 칸이 나뉘나요?',
           measure: WIZ_MEASURE.panCols,
-          unit: '열', step: 1, min: 1, max: 6,
+          unit: '칸', step: 1, min: 1, max: 6,
           hint: () => `세로 기둥이 ${Math.max(0, bayCount('A') - 1)}개예요. 기둥 위치는 3D 화면에서 바꿀 수 있어요.`,
           get: () => bayCount('A'),
           set: (v) => setPantryCols('A', v)
         }),
         num({
-          title: '옆 벽은<br>몇 열로 나뉘나요?',
+          title: '옆 벽은 기둥으로<br>몇 칸이 나뉘나요?',
           measure: WIZ_MEASURE.panCols,
-          unit: '열', step: 1, min: 0, max: 6,
+          unit: '칸', step: 1, min: 0, max: 6,
           hint: () => (p.wallB === false ? '옆 벽에는 선반이 없어요.' : `세로 기둥이 ${Math.max(0, bayCount('B') - 1)}개예요.`),
           get: () => (p.wallB === false ? 0 : bayCount('B')),
           set: (v) => { if (v <= 0) { p.wallB = false; } else { p.wallB = true; setPantryCols('B', v); } }
         }),
         num({
-          title: '선반은 몇 단인가요?',
+          title: '선반은 몇 층인가요?',
           measure: WIZ_MEASURE.panLevels,
-          unit: '단', step: 1, min: 1, max: 9,
+          unit: '층', step: 1, min: 1, max: 9,
           hint: () => '모든 열이 같은 높이로 나뉘어요. 열마다 높이는 3D 화면에서 바꿔요.',
           get: () => pantryShelfCount() + 1,
           set: (v) => setPantryLevels(v - 1)
@@ -4015,7 +4082,7 @@
           caption: '왼쪽 · 오른쪽 문틀 폭',
           hint: () => {
             const k = window.PackerEngine.getCabinetConstraints(state.spaceConfig);
-            return `문으로 넣을 수 있는 폭은 ${k.doorClearW} mm예요.`;
+            return `문으로 넣을 수 있는 폭은 ${window.Units.len(k.doorClearW)}예요.`;
           },
           min: 0, max: 150, step: 5,
           get: () => c.leftFrameW,
@@ -4055,7 +4122,7 @@
           measure: WIZ_MEASURE.drwExposed,
         hint: () => {
           const hidden = Math.max(0, d.d - d.exposedD);
-          return hidden > 0 ? `안쪽 ${hidden} mm는 다 빼도 가려져요.` : '서랍 안이 전부 보여요.';
+          return hidden > 0 ? `안쪽 ${window.Units.len(hidden)}는 다 빼도 가려져요.` : '서랍 안이 전부 보여요.';
         },
         min: 50, max: 900,
         get: () => d.exposedD,
@@ -4090,11 +4157,27 @@
     ];
   }
 
-  function finishWizard() {
+  async function finishWizard() {
+    const plan = getActivePlan();
+    const previewCount = state.wizPreview ? plan.boxes.length : 0;
     state.wizFromBuild = false;
     state.wizPreview = false;
     setMobileStep('build');
     setActiveMobileTab('none');
+    // 첫 설정 때 보여 준 예시 상자: 비울지 물어봐요
+    if (previewCount > 0) {
+      const clear = await confirmDialog({
+        title: '예시 상자를 비울까요?',
+        message: `설정하면서 보여 드린 예시 상자 ${previewCount}개가 들어 있어요. 비우면 빈 칸에서 시작해요.`,
+        ok: '비우고 시작',
+        cancel: '그대로 두기'
+      });
+      if (clear) {
+        plan.boxes = [];
+        state.selectedBoxIds = [];
+        refreshAll();
+      }
+    }
   }
 
   // ===== 3D 화면 안 '장 설정' 작은 창 (첫 설정과 같은 값, 한 줄씩) =====
@@ -4105,7 +4188,7 @@
     const names = state.spaceConfig.type === 'fridge'
       ? ['가구 종류', '도어 유형', '용량', '가로', '높이', '깊이', '냉장실 선반', '냉동실 선반']
       : state.spaceConfig.type === 'pantry'
-      ? ['가구 종류', '입구 쪽', '안쪽 벽', '옆 벽', '전체 높이', '선반 깊이', '안쪽 벽 열', '옆 벽 열', '단 수']
+      ? ['가구 종류', '입구 쪽', '안쪽 벽', '옆 벽', '전체 높이', '선반 깊이', '안쪽 벽 칸', '옆 벽 칸', '선반 층']
       : state.spaceConfig.type === 'cabinet'
       ? ['가구 종류', '가로', '깊이', '높이', '문 여는 쪽', '문틀 폭', '선반 개수']
       : ['가구 종류', '가로', '깊이', '보이는 깊이', '넣을 수 있는 높이', '서랍 칸 수'];
@@ -4143,8 +4226,8 @@
         ctl.className = 'sp-stepper';
         ctl.innerHTML = `
           <button type="button" class="sp-step" data-d="-1" aria-label="줄이기">${minusSvg}</button>
-          <input type="number" inputmode="numeric" class="sp-input" value="${step.get()}" />
-          <span class="sp-unit">${step.unit}</span>
+          <input type="number" inputmode="numeric" class="sp-input" ${step.unit === 'mm' ? 'data-unit="mm"' : ''} value="${step.get()}" />
+          <span class="sp-unit">${step.unit === 'mm' ? 'cm' : step.unit}</span>
           <button type="button" class="sp-step" data-d="1" aria-label="늘리기">${plusSvg}</button>`;
         const input = ctl.querySelector('.sp-input');
         const hint = document.createElement('div');
@@ -4248,8 +4331,8 @@
         <div class="wiz-stepper">
           <button type="button" class="wiz-step-btn" data-d="-1" aria-label="줄이기">${minusSvg}</button>
           <div class="wiz-value">
-            <input class="wiz-value-input" type="number" inputmode="numeric" value="${step.get()}" />
-            <span class="wiz-value-unit">${step.unit}</span>
+            <input class="wiz-value-input" type="number" inputmode="numeric" ${step.unit === 'mm' ? 'data-unit="mm"' : ''} value="${step.get()}" />
+            <span class="wiz-value-unit">${step.unit === 'mm' ? 'cm' : step.unit}</span>
           </div>
           <button type="button" class="wiz-step-btn" data-d="1" aria-label="늘리기">${plusSvg}</button>
         </div>
@@ -4857,10 +4940,10 @@
         const diffW = modA.wTop - modB.wTop;
         const diffD = modA.dTop - modB.dTop;
         const diffH = modA.h - modB.h;
-        const fmt = (v) => (v > 0 ? `+${v}mm` : `${v}mm`);
+        const fmt = (v) => (v > 0 ? `+${window.Units.len(v)}` : `${window.Units.len(v)}`);
         document.getElementById('cmp-diff-summary').innerHTML = `
-          <div><span class="legend-dot" style="background:#b86b43"></span><strong>A (${modA.brand} - ${modA.name}):</strong> 상단 ${modA.wTop}×${modA.dTop} / 하단 ${modA.wBot}×${modA.dBot} / 높이 ${modA.h}mm</div>
-          <div><span class="legend-dot" style="background:#3b8a64"></span><strong>B (${modB.brand} - ${modB.name}):</strong> 상단 ${modB.wTop}×${modB.dTop} / 하단 ${modB.wBot}×${modB.dBot} / 높이 ${modB.h}mm</div>
+          <div><span class="legend-dot" style="background:#b86b43"></span><strong>A (${modA.brand} - ${modA.name}):</strong> 위 ${window.Units.cm(modA.wTop)}×${window.Units.cm(modA.dTop)} / 아래 ${window.Units.cm(modA.wBot)}×${window.Units.cm(modA.dBot)} / 높이 ${window.Units.len(modA.h)}</div>
+          <div><span class="legend-dot" style="background:#3b8a64"></span><strong>B (${modB.brand} - ${modB.name}):</strong> 위 ${window.Units.cm(modB.wTop)}×${window.Units.cm(modB.dTop)} / 아래 ${window.Units.cm(modB.wBot)}×${window.Units.cm(modB.dBot)} / 높이 ${window.Units.len(modB.h)}</div>
           <div style="margin-top:4px;color:var(--text-main);"><strong>크기 차이 (A - B):</strong> 가로 <strong>${fmt(diffW)}</strong> / 깊이 <strong>${fmt(diffD)}</strong> / 높이 <strong>${fmt(diffH)}</strong></div>
         `;
       }
@@ -4895,6 +4978,7 @@
 
     // 11. 3D 배치 링크 공유 버튼
     document.getElementById('btn-share-plan-link')?.addEventListener('click', shareCurrentPlanLink);
+    document.getElementById('btn-export-share')?.addEventListener('click', shareCurrentPlanLink);
   }
 
   window.addEventListener('DOMContentLoaded', () => {
@@ -5034,7 +5118,7 @@
       const { show, dirs } = getSelectedMarginDirs();
       if (!show) {
         previewEl.style.display = 'block';
-        previewEl.innerHTML = `<div class="emp-empty">표시할 방향(상·좌·우·전·후)을 하나 이상 체크해 주세요.</div>`;
+        previewEl.innerHTML = `<div class="emp-empty">표시할 방향을 하나 이상 골라 주세요.</div>`;
         return;
       }
       const activePlan = getActivePlan();
@@ -5046,8 +5130,8 @@
       previewEl.style.display = 'block';
       previewEl.innerHTML = targets.map((m) => `
         <div class="emp-row">
-          <span class="emp-name">${m.name}</span>
-          <span class="emp-vals">${formatMarginLine(m, dirs)}</span>
+          <span class="emp-name">${m.name} <span class="emp-unit">남는 공간 (cm)</span></span>
+          <span class="emp-cells">${dirs.map((k) => `<span class="emp-cell"><span>${{ top: '위', left: '왼쪽', right: '오른쪽', front: '앞', back: '뒤' }[k]}</span><b>${window.Units.cm(m[k])}</b></span>`).join('')}</span>
         </div>
       `).join('');
     }
@@ -5084,7 +5168,7 @@
       if (linksListEl) {
         linksListEl.innerHTML = '';
         if (boxes.length === 0) {
-          linksListEl.innerHTML = `<div style="font-size:13px;color:#6B7280;padding:4px 0;">아직 배치한 수납함이 없어요.</div>`;
+          linksListEl.innerHTML = `<div style="font-size:13px;color:#6B7280;padding:4px 0;">아직 놓은 상자가 없어요.</div>`;
         } else {
           // 브랜드별로 고유 모델과 수량 집계
           const brandMap = new Map();

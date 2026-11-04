@@ -1817,6 +1817,9 @@ body.mobile-shelf-sheet-open .mobile-shelf-sheet { display: flex; }
 .pick-row-size {
   font-size: 0.72rem;
   color: var(--text-sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pick-row-qty {
@@ -3666,14 +3669,14 @@ body.ui-wide .drag-guide-card { max-width: 360px; }
 body.space-pantry #mobile-shelf-buttons .msab-num { display: none !important; }
 body.space-pantry #mobile-shelf-buttons .mobile-shelf-add-btn {
   /* 팬트리는 칸이 많아서 ＋만, 크기는 60% */
-  min-width: 26px !important;
-  width: 26px !important;
-  height: 26px !important;
+  min-width: 32px !important;
+  width: 32px !important;
+  height: 32px !important;
   padding: 0 !important;
-  border-radius: 13px !important;
+  border-radius: 16px !important;
   box-shadow: 0 2px 6px rgba(43, 38, 33, 0.16) !important;
 }
-body.space-pantry #mobile-shelf-buttons .msab-plus { font-size: 0.85rem !important; margin-top: 0 !important; line-height: 1; }
+body.space-pantry #mobile-shelf-buttons .msab-plus { font-size: 1rem !important; margin-top: 0 !important; line-height: 1; }
 /* 팬트리는 선반이 있어서 '기둥·선반' 버튼을 보여줌 */
 body.ui-mode-mobile.mobile-step-build.space-pantry .mobile-shelfh-btn { display: inline-flex; }
 
@@ -4192,6 +4195,18 @@ body.ui-mode-mobile .sheet-action-btn { margin: 0 !important; }
   transition: opacity 0.2s, transform 0.2s;
 }
 .app-toast.show { opacity: 1; transform: translate(-50%, 0); }
+.app-toast { display: flex; align-items: center; gap: 6px; }
+.app-toast-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-toast.has-actions { pointer-events: auto; padding: 6px 8px 6px 16px; }
+.app-toast.has-actions.show { pointer-events: auto; }
+.app-toast:not(.show) { pointer-events: none !important; }
+.app-toast-btn {
+  flex-shrink: 0; white-space: nowrap; min-height: 34px; padding: 0 10px;
+  border: 0; border-radius: 8px; background: rgba(255, 255, 255, 0.14);
+  color: #f6dfb4; font-size: 0.82rem; font-weight: 700; cursor: pointer;
+}
+.app-toast-btn:active { background: rgba(255, 255, 255, 0.26); }
+.app-toast.warn { background: rgba(150, 52, 34, 0.95); }
 
 /* 확인 창 (다 비우기 등) */
 .app-confirm {
@@ -4510,6 +4525,7 @@ body.ui-mode-mobile .ui-mode-switch .mode-switch-btn,
   padding: 4px 10px !important;
   border-radius: 999px;
 }
+#btn-export { white-space: nowrap; flex-shrink: 0; }
 #btn-export:hover {
   background: #faf7f2 !important;
   color: var(--text-main) !important;
@@ -5005,13 +5021,32 @@ body.ui-mode-mobile.mobile-step-build.mobile-setup-open .mobile-shelfh-btn { z-i
 /* ---------- 냉장고: 칸이 많아서 ＋ 버튼은 팬트리처럼 작게, 선반 높이 버튼은 숨김 (선반 수는 '장 설정'에서) ---------- */
 body.space-fridge #mobile-shelf-buttons .msab-num { display: none !important; }
 body.space-fridge #mobile-shelf-buttons .mobile-shelf-add-btn {
-  min-width: 26px !important;
-  width: 26px !important;
-  height: 26px !important;
+  min-width: 32px !important;
+  width: 32px !important;
+  height: 32px !important;
   padding: 0 !important;
-  border-radius: 13px !important;
+  border-radius: 16px !important;
   box-shadow: 0 2px 6px rgba(43, 38, 33, 0.16) !important;
 }
-body.space-fridge #mobile-shelf-buttons .msab-plus { font-size: 0.85rem !important; margin-top: 0 !important; line-height: 1; }
-body.ui-wide.space-fridge #mobile-shelf-buttons .mobile-shelf-add-btn { width: 30px !important; min-width: 30px !important; height: 30px !important; border-radius: 15px !important; }
+body.space-fridge #mobile-shelf-buttons .msab-plus { font-size: 1rem !important; margin-top: 0 !important; line-height: 1; }
+body.ui-wide.space-fridge #mobile-shelf-buttons .mobile-shelf-add-btn { width: 36px !important; min-width: 36px !important; height: 36px !important; border-radius: 18px !important; }
 body.ui-mode-mobile.mobile-step-build.space-fridge .mobile-shelfh-btn { display: none; }
+
+/* 팬트리·냉장고 작은 ＋ 버튼(32px): 손가락으로 누르는 범위는 둘레 6px 더 넓게 */
+body.space-pantry #mobile-shelf-buttons .mobile-shelf-add-btn::after,
+body.space-fridge #mobile-shelf-buttons .mobile-shelf-add-btn::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; }
+
+/* 사진 저장: 방향 고르기 5칸을 한 줄로 (체크 표시는 색으로) */
+.export-margin-dirs { display: grid !important; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+.export-dir-chip { position: relative; justify-content: center; padding: 7px 2px !important; white-space: nowrap; min-height: 34px; }
+.export-dir-chip input[type="checkbox"] { position: absolute; opacity: 0; width: 1px !important; height: 1px !important; pointer-events: none; }
+.export-dir-chip:has(input:focus-visible) { outline: 2px solid var(--accent, #7d6244); outline-offset: 1px; }
+.export-dir-chip:not(:has(input:checked)) { color: #9a9086; background: #faf7f2; }
+/* 남는 공간 미리보기: 칸 이름 아래 방향별 숫자 칸 */
+.emp-row { flex-direction: column; align-items: stretch; gap: 4px; }
+.emp-unit { font-weight: 500; color: #8a7f72; font-size: 0.7rem; }
+.emp-cells { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; }
+.export-margin-preview { max-height: 190px !important; }
+.emp-cell { display: flex; flex-direction: column; align-items: center; padding: 3px 0; border-radius: 6px; background: #faf7f2; white-space: nowrap; }
+.emp-cell span { font-size: 0.68rem; color: #6f665c; }
+.emp-cell b { font-size: 0.82rem; color: #1a1714; }

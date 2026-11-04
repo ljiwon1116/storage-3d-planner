@@ -697,7 +697,7 @@ window.Scene3DManager = (function () {
       g.fillStyle = '#3f5f80';
       g.font = '600 40px Pretendard, sans-serif';
       g.textBaseline = 'middle';
-      g.fillText('손 닿는 높이 1800', 20, 48);
+      g.fillText('손 닿는 높이 180cm', 20, 48);
       const tex = new THREE.CanvasTexture(cv);
       const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
       label.scale.set(360, 68, 1);

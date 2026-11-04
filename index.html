@@ -6,7 +6,7 @@
   <title>수납 공간 꾸미기 - 옷장·서랍 3D로 짜보기</title>
   <meta name="theme-color" content="#f7f3ec" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <link rel="stylesheet" href="styles.css?v=1104t" />
+  <link rel="stylesheet" href="styles.css?v=1104v" />
   <script>
     // 실제로 보이는 화면 높이를 --vh 로 넣어요 (주소창·툴바가 생기고 없어질 때마다).
     // 브라우저마다 100vh 가 툴바를 포함해서 위아래가 잘리는 문제를 막아요.
@@ -38,7 +38,7 @@
   <header class="app-header">
     <div class="brand-title">
       <span>수납 공간 꾸미기</span>
-      <button id="btn-export" type="button" class="mode-switch-btn" title="내보내기">내보내기</button>
+      <button id="btn-export" type="button" class="mode-switch-btn" title="저장·구매">저장·구매</button>
     </div>
 
     <!-- 상단 바 가운데: 만든 사람 -->
@@ -193,20 +193,20 @@
         <div id="cabinet-config-section">
           <div class="sub-block">
             <div class="sub-block-title">
-              <span>장 안쪽 크기 (mm)</span>
+              <span>장 안쪽 크기 (cm)</span>
             </div>
             <div class="form-grid-3">
               <div class="form-group">
                 <label>가로</label>
-                <input id="cab-w" type="number" class="input-box" value="800" step="10" />
+                <input id="cab-w" data-unit="mm" type="number" class="input-box" value="800" step="10" />
               </div>
               <div class="form-group">
                 <label>세로(깊이)</label>
-                <input id="cab-d" type="number" class="input-box" value="450" step="10" />
+                <input id="cab-d" data-unit="mm" type="number" class="input-box" value="450" step="10" />
               </div>
               <div class="form-group">
                 <label>높이</label>
-                <input id="cab-h" type="number" class="input-box" value="1450" step="10" />
+                <input id="cab-h" data-unit="mm" type="number" class="input-box" value="1450" step="10" />
               </div>
             </div>
           </div>
@@ -219,19 +219,19 @@
             <div class="form-grid-2">
               <div class="form-group">
                 <label>왼쪽 문틀</label>
-                <input id="cab-left-frame" type="number" class="input-box" value="35" step="5" />
+                <input id="cab-left-frame" data-unit="mm" type="number" class="input-box" value="35" step="5" />
               </div>
               <div class="form-group">
                 <label>오른쪽 문틀</label>
-                <input id="cab-right-frame" type="number" class="input-box" value="35" step="5" />
+                <input id="cab-right-frame" data-unit="mm" type="number" class="input-box" value="35" step="5" />
               </div>
               <div class="form-group">
                 <label>위 문틀</label>
-                <input id="cab-top-frame" type="number" class="input-box" value="30" step="5" />
+                <input id="cab-top-frame" data-unit="mm" type="number" class="input-box" value="30" step="5" />
               </div>
               <div class="form-group">
                 <label>아래 문틀</label>
-                <input id="cab-bot-frame" type="number" class="input-box" value="0" step="5" />
+                <input id="cab-bot-frame" data-unit="mm" type="number" class="input-box" value="0" step="5" />
               </div>
             </div>
             <div class="form-grid-2">
@@ -245,8 +245,8 @@
                 </select>
               </div>
               <div class="form-group">
-                <label>문 걸리는 폭(mm)</label>
-                <input id="cab-hinge-w" type="number" class="input-box" value="22" step="2" />
+                <label>문 경첩 때문에 줄어드는 폭(cm)</label>
+                <input id="cab-hinge-w" data-unit="mm" type="number" class="input-box" value="22" step="2" />
               </div>
             </div>
 
@@ -280,7 +280,7 @@
         <!-- 하위 항목 (슬라이딩 서랍 선택 시: 서랍 치수 + 노출 깊이) -->
         <div id="drawer-config-section" style="display:none;">
           <div class="sub-block">
-            <div class="sub-block-title">서랍 크기와 보이는 깊이 (mm)</div>
+            <div class="sub-block-title">서랍 크기와 보이는 깊이 (cm)</div>
             <div class="form-group" style="margin-bottom:8px;">
               <label>서랍 칸 수 (1~6)</label>
               <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
@@ -293,25 +293,25 @@
             <div class="form-grid-2">
               <div class="form-group">
                 <label>서랍 가로</label>
-                <input id="drw-w" type="number" class="input-box" value="720" step="10" />
+                <input id="drw-w" data-unit="mm" type="number" class="input-box" value="720" step="10" />
               </div>
               <div class="form-group">
                 <label>진짜 깊이</label>
-                <input id="drw-d" type="number" class="input-box" value="480" step="10" />
+                <input id="drw-d" data-unit="mm" type="number" class="input-box" value="480" step="10" />
               </div>
             </div>
             <div class="form-group">
               <label>다 뺐을 때 보이는 깊이</label>
-              <input id="drw-exposed-d" type="number" class="input-box" value="350" step="10" />
+              <input id="drw-exposed-d" data-unit="mm" type="number" class="input-box" value="350" step="10" />
             </div>
             <div class="form-grid-2">
               <div class="form-group">
                 <label>서랍 옆벽 높이</label>
-                <input id="drw-h" type="number" class="input-box" value="140" step="5" />
+                <input id="drw-h" data-unit="mm" type="number" class="input-box" value="140" step="5" />
               </div>
               <div class="form-group">
                 <label>넣을 수 있는 높이</label>
-                <input id="drw-clearance-h" type="number" class="input-box" value="175" step="5" />
+                <input id="drw-clearance-h" data-unit="mm" type="number" class="input-box" value="175" step="5" />
               </div>
             </div>
             <div id="drw-exposure-summary" class="hint-text" style="margin-top:4px;"></div>
@@ -332,7 +332,7 @@
 
       <div class="accordion-body">
         <div class="sub-block-title">
-          <span>선반 높이 (바닥에서 mm)</span>
+          <span>선반 높이 (바닥에서 cm)</span>
           <button id="btn-add-shelf" class="btn btn-primary btn-sm">+ 선반 넣기</button>
         </div>
         <div id="shelf-list" class="shelf-list"></div>
@@ -353,7 +353,7 @@
         <button id="btn-bundle-up" class="btn btn-sm">위 선반으로</button>
         <button id="btn-bundle-down" class="btn btn-sm">아래 선반으로</button>
         <button id="btn-bundle-rot" class="btn btn-sm">통째로 돌리기</button>
-        <button id="btn-bundle-del" class="btn btn-danger btn-sm">빼기</button>
+        <button id="btn-bundle-del" class="btn btn-danger btn-sm">치우기</button>
       </div>
     </div>
 
@@ -367,7 +367,7 @@
           <button id="btn-box-rot-ccw" class="btn btn-primary btn-sm" aria-label="왼쪽으로 돌리기">↺ 왼쪽</button>
           <button id="btn-box-rot" class="btn btn-primary btn-sm" title="단축키: R" aria-label="오른쪽으로 돌리기">↻ 오른쪽</button>
           <button id="btn-box-fine" class="btn btn-sm sel-fine-btn" type="button" aria-expanded="false" aria-controls="box-fine-pad">상세 조정</button>
-          <button id="btn-box-del" class="btn btn-danger btn-sm">빼기</button>
+          <button id="btn-box-del" class="btn btn-danger btn-sm">치우기</button>
         </div>
         <!-- 상세 조정: ㅗ 모양 방향키 (밖을 누르면 닫힘) -->
         <div id="box-fine-pad" class="box-fine-pad" hidden>
@@ -488,8 +488,8 @@
       <div id="picker-cards-grid" class="picker-grid"></div>
 
       <div id="picker-cart-bar" class="picker-cart-bar">
-        <span id="picker-cart-count">담은 상자 0개</span>
-        <button id="btn-picker-cart-add" class="btn btn-primary" disabled>담기</button>
+        <span id="picker-cart-count">고른 상자 0개</span>
+        <button id="btn-picker-cart-add" class="btn btn-primary" disabled>칸에 넣기</button>
       </div>
     </div>
   </div>
@@ -499,9 +499,9 @@
     <div class="drag-guide-card" role="dialog" aria-modal="true" aria-labelledby="filter-guide-title">
       <h3 id="filter-guide-title" class="drag-guide-title">필터 사용법</h3>
       <ul class="drag-guide-list">
-        <li><b>수납함 형태</b>서랍형·바구니형·뚜껑형 중 보고 싶은 것만 체크해요. 여러 개를 같이 고를 수 있어요.</li>
-        <li><b>적층 가능 여부</b>위로 쌓을 상자를 찾을 때는 '적층 가능'만 체크해요.</li>
-        <li><b>찾는 사이즈</b>가로·세로·높이를 최소~최대 mm로 적어요. '현재 칸 이하로'를 누르면 지금 칸에 들어가는 상자만 보여요.</li>
+        <li><b>상자 모양</b>서랍형·바구니형·뚜껑형 중 보고 싶은 것만 체크해요. 여러 개를 같이 고를 수 있어요.</li>
+        <li><b>위에 쌓기</b>위로 쌓을 상자를 찾을 때는 '쌓을 수 있어요'만 체크해요.</li>
+        <li><b>찾는 사이즈</b>가로·세로·높이를 최소~최대 cm로 적어요. '현재 칸 이하로'를 누르면 지금 칸에 들어가는 상자만 보여요.</li>
         <li><b>투명 · 반투명 여부</b>안이 보이는 상자만 보고 싶을 때 써요.</li>
         <li><b>필터 옆 숫자</b>조건에 맞는 상자 개수예요. '모두 체크'를 누르면 처음처럼 전부 보여요.</li>
       </ul>
@@ -557,13 +557,13 @@
         </div>
 
         <div class="ab-field">
-          <span class="ab-label">크기 <span class="ab-opt">mm · 바깥 크기</span></span>
+          <span class="ab-label">크기 <span class="ab-opt">cm · 바깥 크기</span></span>
           <div class="ab-dims">
-            <label class="ab-dim"><span>가로</span><input id="ab-w" class="ab-input" type="number" inputmode="numeric" min="20" max="2000" placeholder="260" /></label>
-            <label class="ab-dim"><span>깊이</span><input id="ab-d" class="ab-input" type="number" inputmode="numeric" min="20" max="2000" placeholder="360" /></label>
-            <label class="ab-dim"><span>높이</span><input id="ab-h" class="ab-input" type="number" inputmode="numeric" min="20" max="2000" placeholder="150" /></label>
+            <label class="ab-dim"><span>가로</span><input id="ab-w" data-unit="mm" class="ab-input" type="number" inputmode="numeric" min="20" max="2000" placeholder="260" /></label>
+            <label class="ab-dim"><span>깊이</span><input id="ab-d" data-unit="mm" class="ab-input" type="number" inputmode="numeric" min="20" max="2000" placeholder="360" /></label>
+            <label class="ab-dim"><span>높이</span><input id="ab-h" data-unit="mm" class="ab-input" type="number" inputmode="numeric" min="20" max="2000" placeholder="150" /></label>
           </div>
-          <span id="ab-dim-err" class="ab-err" hidden>가로·깊이·높이를 20~2000 mm로 적어 주세요.</span>
+          <span id="ab-dim-err" class="ab-err" hidden>가로·깊이·높이를 2~200 cm로 적어 주세요.</span>
           <span class="ab-hint">가로는 앞에서 본 폭, 깊이는 앞에서 뒤까지예요. cm이면 10을 곱해요.</span>
         </div>
 
@@ -619,27 +619,27 @@
 
       <div class="form-grid-3">
         <div class="form-group">
-          <label>위쪽 가로(mm)</label>
-          <input id="new-box-wtop" type="number" class="input-box" value="260" />
+          <label>위쪽 가로(cm)</label>
+          <input id="new-box-wtop" data-unit="mm" type="number" class="input-box" value="260" />
         </div>
         <div class="form-group">
-          <label>위쪽 깊이(mm)</label>
-          <input id="new-box-dtop" type="number" class="input-box" value="360" />
+          <label>위쪽 깊이(cm)</label>
+          <input id="new-box-dtop" data-unit="mm" type="number" class="input-box" value="360" />
         </div>
         <div class="form-group">
-          <label>높이(mm)</label>
-          <input id="new-box-h" type="number" class="input-box" value="150" />
+          <label>높이(cm)</label>
+          <input id="new-box-h" data-unit="mm" type="number" class="input-box" value="150" />
         </div>
       </div>
 
       <div id="tapered-bot-inputs" class="form-grid-2" style="display:none;">
         <div class="form-group">
-          <label>아래쪽 가로(mm)</label>
-          <input id="new-box-wbot" type="number" class="input-box" value="235" />
+          <label>아래쪽 가로(cm)</label>
+          <input id="new-box-wbot" data-unit="mm" type="number" class="input-box" value="235" />
         </div>
         <div class="form-group">
-          <label>아래쪽 깊이(mm)</label>
-          <input id="new-box-dbot" type="number" class="input-box" value="335" />
+          <label>아래쪽 깊이(cm)</label>
+          <input id="new-box-dbot" data-unit="mm" type="number" class="input-box" value="335" />
         </div>
       </div>
 
@@ -706,7 +706,7 @@
             <th>계획 이름</th>
             <th>상자 개수</th>
             <th>공간 채운 정도</th>
-            <th>남는 틈(mm)</th>
+            <th>남는 틈(cm)</th>
             <th>걸림 여부</th>
           </tr>
         </thead>
@@ -720,8 +720,15 @@
   <div id="modal-export" class="modal-backdrop" style="backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);">
     <div class="modal-box" style="max-width:480px;width:calc(100% - 32px);max-height:90vh;overflow-y:auto;border-radius:16px;">
       <div class="modal-header" style="position:sticky;top:0;background:inherit;z-index:1;">
-        <span style="font-size:17px;font-weight:600;">내보내기</span>
+        <span style="font-size:17px;font-weight:600;">저장·구매</span>
         <button id="btn-close-export" class="btn btn-sm" type="button">✕</button>
+      </div>
+
+      <!-- 0. 링크로 보내기 -->
+      <div class="export-section">
+        <div class="export-section-title">링크로 보내기</div>
+        <p class="export-section-desc">카톡·문자로 보내면 받은 사람도 똑같은 3D 화면을 볼 수 있어요.</p>
+        <button id="btn-export-share" class="btn btn-primary" type="button" style="width:100%;height:48px;border-radius:10px;margin-top:6px;">링크로 보내기</button>
       </div>
 
       <!-- 1. 사진 저장 -->
@@ -731,14 +738,14 @@
         <div class="export-margin-opt-box">
           <label class="export-margin-main-toggle">
             <input type="checkbox" id="chk-export-show-margins" checked />
-            <span>남는 공간(상·좌·우·전·후 여백) 함께 표시하기</span>
+            <span>남는 공간도 같이 표시하기</span>
           </label>
           <div id="export-margin-dirs" class="export-margin-dirs">
-            <label class="export-dir-chip"><input type="checkbox" value="top" checked /><span>상(위)</span></label>
-            <label class="export-dir-chip"><input type="checkbox" value="left" checked /><span>좌(왼쪽)</span></label>
-            <label class="export-dir-chip"><input type="checkbox" value="right" checked /><span>우(오른쪽)</span></label>
-            <label class="export-dir-chip"><input type="checkbox" value="front" checked /><span>전(앞)</span></label>
-            <label class="export-dir-chip"><input type="checkbox" value="back" checked /><span>후(뒤)</span></label>
+            <label class="export-dir-chip"><input type="checkbox" value="top" checked /><span>위</span></label>
+            <label class="export-dir-chip"><input type="checkbox" value="left" checked /><span>왼쪽</span></label>
+            <label class="export-dir-chip"><input type="checkbox" value="right" checked /><span>오른쪽</span></label>
+            <label class="export-dir-chip"><input type="checkbox" value="front" checked /><span>앞</span></label>
+            <label class="export-dir-chip"><input type="checkbox" value="back" checked /><span>뒤</span></label>
           </div>
           <div id="export-margin-preview" class="export-margin-preview"></div>
         </div>
@@ -756,7 +763,7 @@
       <!-- 3. 구매 링크 모음 -->
       <div class="export-section">
         <div class="export-section-title">구매 링크 모음</div>
-        <p class="export-section-desc">배치한 수납함을 브랜드별로 묶었어요. 제품을 누르면 구매 링크로 이동해요.</p>
+        <p class="export-section-desc">놓은 상자를 브랜드별로 묶었어요. 제품을 누르면 구매 링크로 이동해요.</p>
         <div id="export-links-list" class="export-links-list"></div>
       </div>
     </div>
@@ -769,11 +776,12 @@
   </div>
 
   <!-- 애플리케이션 스크립트 로드 -->
-  <script src="js/presets.js?v=1104t"></script>
-  <script src="js/items.js?v=1104t"></script>
-  <script src="js/packer.js?v=1104t"></script>
-  <script src="js/scene3d.js?v=1104t"></script>
-  <script src="js/app.js?v=1104t"></script>
+  <script src="js/units.js?v=1104v"></script>
+  <script src="js/presets.js?v=1104v"></script>
+  <script src="js/items.js?v=1104v"></script>
+  <script src="js/packer.js?v=1104v"></script>
+  <script src="js/scene3d.js?v=1104v"></script>
+  <script src="js/app.js?v=1104v"></script>
 
   <!-- 보관함 자세히 보기: 뒤는 흐리게, 고른 보관함만 크게 + 물건 넣기 -->
   <div id="box-detail" class="box-detail" aria-hidden="true">
@@ -799,6 +807,6 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="js/boxdetail.js?v=1104t"></script>
+  <script src="js/boxdetail.js?v=1104v"></script>
 </body>
 </html>

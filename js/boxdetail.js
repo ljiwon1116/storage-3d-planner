@@ -329,9 +329,9 @@
     tip.setAttribute('role', 'dialog');
     const round = ROUND.includes(it.itemShape) && it.wTop === it.dTop;
     tip.innerHTML = `<div class="bd-tip-name">${it.name}</div>` + (round
-      ? `<div class="bd-tip-row"><span>지름</span><b>${it.wTop} mm</b></div>`
-      : `<div class="bd-tip-row"><span>가로</span><b>${it.wTop} mm</b></div><div class="bd-tip-row"><span>깊이</span><b>${it.dTop} mm</b></div>`) +
-      `<div class="bd-tip-row"><span>높이</span><b>${it.h} mm</b></div>`;
+      ? `<div class="bd-tip-row"><span>지름</span><b>${window.Units.len(it.wTop)}</b></div>`
+      : `<div class="bd-tip-row"><span>가로</span><b>${window.Units.len(it.wTop)}</b></div><div class="bd-tip-row"><span>깊이</span><b>${window.Units.len(it.dTop)}</b></div>`) +
+      `<div class="bd-tip-row"><span>높이</span><b>${window.Units.len(it.h)}</b></div>`;
     sheet.appendChild(tip);
     const sr = sheet.getBoundingClientRect(), br = btn.getBoundingClientRect();
     let left = br.left - sr.left - 8;
@@ -436,7 +436,7 @@
     const desc = (picks ? `모두 ${total}개 · 채운 정도 ${res.fill}%` : '여러 개 골라도 돼요. 큰 것부터 알아서 채워요') +
       (res.left.length ? ` · <b class="bd-left">${res.left.map((m) => m.name).join(', ')}: 자리가 없어요</b>` : '');
     document.getElementById('box-detail-summary').innerHTML =
-      `<div class="bd-sum-size">안쪽 ${Math.round(inner.w)}x${Math.round(inner.d)}x${Math.round(inner.h)} mm</div>` +
+      `<div class="bd-sum-size">안쪽 가로 ${window.Units.cm(inner.w)} · 깊이 ${window.Units.cm(inner.d)} · 높이 ${window.Units.len(inner.h)}</div>` +
       `<div class="bd-sum-desc">${desc}</div>` +
       (names ? `<div class="bd-got-list">${names}</div>` : '');
   }
@@ -465,7 +465,7 @@
               <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 5.6v5.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="10" cy="14" r="1.1" fill="currentColor"/></svg>
             </button>
           </span>
-          ${tooBig ? '<span class="bd-row-size">이 보관함엔 안 들어가요</span>' : ''}
+          ${tooBig ? '<span class="bd-row-size">이 상자엔 안 들어가요</span>' : ''}
         </span>
         <span class="bd-num">${on && n ? n + '개' : ''}</span>`;
       const img = row.querySelector('.bd-thumb img');
