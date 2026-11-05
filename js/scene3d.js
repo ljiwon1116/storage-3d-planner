@@ -1507,7 +1507,7 @@ window.Scene3DManager = (function () {
       const overlapZ = o.z < b.z + dims.d - STACK_EDGE_MARGIN && o.z + od.d > b.z + STACK_EDGE_MARGIN;
       if (!overlapX || !overlapZ) return;
       // 같은 적층형 모델이면 홈(stackingOffset)만큼 맞물려 낮게 얹힘
-      const offset = (om.id === m.id && m.stackable) ? (m.stackingOffset || 0) : 0;
+      const offset = window.PackerEngine.stackOffsetBetween(m, om);
       const topY = (b.y || 0) + dims.h;
       const oy = o.y || 0;
       if (oy >= topY - offset - STACK_TOUCH_TOL && oy <= topY + STACK_TOUCH_TOL) result.push(o);

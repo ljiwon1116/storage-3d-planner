@@ -2397,11 +2397,12 @@
           const od = window.PackerEngine.getOrientedDims(om, o.rot || 0);
           const overlap = b.x < o.x + od.w - 4 && b.x + d.w > o.x + 4 && b.z < o.z + od.d - 4 && b.z + d.d > o.z + 4;
           if (!overlap) return;
-          const offset = (om.id === m.id && om.stackable) ? (om.stackingOffset || 0) : 0;
+          // 같은 상자·같은 시리즈(루틴랩 3L·6L·9L 등)는 홈만큼 맞물려 낮게 얹힘 (쌓을 때와 같은 규칙)
+          const offset = window.PackerEngine.stackOffsetBetween(om, m);
           const top = (o.y || 0) + od.h - offset;
-          if (top <= (b.y || 0) + 1 && top > support) support = top;
+          if (top <= (b.y || 0) + 3 && top > support) support = top;
         });
-        if (support < (b.y || 0)) b.y = Math.round(support);
+        if (support < (b.y || 0) - 3) b.y = Math.round(support);   // 2~3mm 차이는 그대로 둠 (떨어진 게 아님)
         settled.push(b);
       });
     });
