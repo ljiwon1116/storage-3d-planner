@@ -23,7 +23,8 @@ window.createSafeRenderer = window.createSafeRenderer || function (opts) {
 const FURN_PALETTE_DEFAULT = {
   wood: 0xc6c4c1, back: 0xe4e3e1, edge: 0x8d8984, shelf: 0xc9c7c4, frame: 0xb9b6b2,
   door: 0xd6d4d1, doorEdge: 0x85817b, handle: 0x57534e,
-  chest: 0xbebcb9, chestLight: 0xbab8b5, chestEdge: 0x85817b, drawerIn: 0xdcdad7, drawerEdge: 0x8d8984, chestHandle: 0x57534e
+  chest: 0xbebcb9, chestLight: 0xbab8b5, chestEdge: 0x85817b, drawerIn: 0xdcdad7, drawerEdge: 0x8d8984, chestHandle: 0x57534e,
+  plinth: 0x56524d   // 장 아래 받침: 진회색
 };
 const FP = (k) => { const o = window.FURNITURE_PALETTE; return (o && o[k] != null) ? o[k] : FURN_PALETTE_DEFAULT[k]; };
 
@@ -616,7 +617,7 @@ window.Scene3DManager = (function () {
       const plinthH = 28;
       const plinthGeom = new THREE.BoxGeometry(W + 36, plinthH, D + 10);
       const plinthMat = new THREE.MeshStandardMaterial({
-        color: 0xc8a279,
+        color: FP('plinth'),
         roughness: 0.65
       });
       const plinthMesh = new THREE.Mesh(plinthGeom, plinthMat);
