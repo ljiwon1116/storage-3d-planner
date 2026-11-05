@@ -540,9 +540,11 @@ window.DEFAULT_STORAGE_MODELS = [
   {
     id: 'routinelab-drawer-3l',
     brand: '루틴랩',
+    groupBuy: true,   // 공동구매 상품: 목록·구매 링크에 '공구' 표시, 맨 위에
     lineup: '투명 서랍형 수납함',
     name: '루틴랩 투명 서랍 3L (12.6×34×H11cm)',
     wTop: 127.5, dTop: 340, h: 110,   // 3L 두 개를 나란히 놓으면 6L 한 개 너비(255)와 딱 같음
+    labelW: 126,                      // 화면에 보이는 가로는 상세페이지 값 12.6cm
     wBot: 127.5, dBot: 340,
     shapeType: 'box',
     accessType: 'front_drawer',
@@ -557,6 +559,7 @@ window.DEFAULT_STORAGE_MODELS = [
   {
     id: 'routinelab-drawer-6l',
     brand: '루틴랩',
+    groupBuy: true,   // 공동구매 상품: 목록·구매 링크에 '공구' 표시, 맨 위에
     lineup: '투명 서랍형 수납함',
     name: '루틴랩 투명 서랍 6L (25.5×34×H11cm)',
     wTop: 255, dTop: 340, h: 110,
@@ -574,6 +577,7 @@ window.DEFAULT_STORAGE_MODELS = [
   {
     id: 'routinelab-drawer-9l',
     brand: '루틴랩',
+    groupBuy: true,   // 공동구매 상품: 목록·구매 링크에 '공구' 표시, 맨 위에
     lineup: '투명 서랍형 수납함',
     name: '루틴랩 투명 서랍 9L (17×34×H22cm)',
     wTop: 170, dTop: 340, h: 220,

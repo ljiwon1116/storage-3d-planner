@@ -712,7 +712,7 @@ window.Scene3DManager = (function () {
     if (p.wallB !== false) [startB + postW / 2, ...postsB, p.roomD - postW / 2].forEach((s) => postAt('B', s));
     if (p.wallB !== false && isU) [startB + postW / 2, ...postsC, p.roomD - postW / 2].forEach((s) => postAt('C', s));
 
-    // 구석 (옆 선반에 막혀 꺼내기 힘든 곳): 빨간색으로 옅게 (ㄷ자는 양쪽)
+    // 구석 (옆 선반에 막혀 손 닿기 힘든 곳): 빨간색으로 옅게 (ㄷ자는 양쪽)
     if (showDeadzones) window.PackerEngine.getPantryCorners(spaceConfig).forEach((corner) => {
       const cw = corner.s1 - corner.s0;
       const cornerVol = new THREE.Mesh(
@@ -1947,6 +1947,21 @@ window.Scene3DManager = (function () {
     const lowerH = currentSpaceConfig.type === 'drawer' ? drawerLowerBodyH(currentSpaceConfig) : 0;
     const maxDim = Math.max(W, D, H + lowerH * 0.85, 600);
 
+    // 세로로 긴 화면(폰)은 가로로 보이는 폭이 좁아서 조금 더 뒤로 물러나서 봄
+    const portraitK = camera.aspect < 0.85 ? Math.min(1.6, Math.pow(0.85 / camera.aspect, 0.85)) : 1;
+    const pullBack = () => {
+      const t = controls.target;
+      camera.position.set(t.x + (camera.position.x - t.x) * portraitK, t.y + (camera.position.y - t.y) * portraitK, t.z + (camera.position.z - t.z) * portraitK);
+    };
+
+    if (currentSpaceConfig.type === 'pantry' && (viewType === 'front' || viewType === 'top')) {
+      controls.target.set(0, H * 0.45, 0);
+      if (viewType === 'top') camera.position.set(0, H + maxDim * 1.7, 60);
+      else camera.position.set(0, H * 0.5, D / 2 + maxDim * 1.9);
+      controls.update();
+      return;
+    }
+
     if (currentSpaceConfig.type === 'pantry') {
       // 팬트리: 입구(왼쪽 앞)에서 안쪽 구석을 비스듬히 내려다봄
       // ㄷ자: 가운데 입구에서 살짝 비껴 정면을 봄
@@ -1963,6 +1978,7 @@ window.Scene3DManager = (function () {
       controls.target.set(0, H * 0.47, 0);
       if (viewType === 'front') camera.position.set(0, H * 0.5, D / 2 + maxDim * 2.3);
       else camera.position.set(W * 0.55, H * 0.95, D / 2 + maxDim * 2.2);
+      pullBack();
       controls.update();
       return;
     }
@@ -1979,6 +1995,7 @@ window.Scene3DManager = (function () {
     } else {
       camera.position.set(maxDim * 0.72, maxDim * 0.85, maxDim * 1.85);
     }
+    pullBack();
     controls.update();
   }
 

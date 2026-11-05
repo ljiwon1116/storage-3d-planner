@@ -99,6 +99,7 @@
     wizStep: 0,                   // 첫 설정 질문 번호
     wizFromBuild: false,          // 3D 화면에서 '장 설정'으로 들어왔는지
     wizPreview: true,             // 첫 설정 중 3D 예시를 자동으로 채우는지
+    wizAsk: {},                   // 첫 설정의 '있어요/없어요' 답 (예: 문틀)
     previewSeed: Math.floor(Math.random() * 1e9),
     mobileSheetCollapsed: false,  // 모바일 하단 패널 접힘 여부
     rightSubTab: 'placed', // 'placed' | 'combos'
@@ -727,6 +728,23 @@
     return picked.length ? picked : models;
   }
 
+  // 화면에 보이는 치수: 상세페이지 값이 따로 있으면 그 값 (예: 루틴랩 3L 계산은 12.75cm, 표시는 12.6cm)
+  function shownLen(m, v) {
+    return (m && m.labelW && Math.abs(v - m.wTop) < 0.01) ? m.labelW : v;
+  }
+  // 상자 고르기 목록용 짧은 이름: 이름 속 치수 표기는 뺌 (치수는 아래 줄에 따로 있음)
+  function shortModelName(m) {
+    const name = String((m && m.name) || '');
+    const DIM = '\\d+(?:\\.\\d+)?\\s*[xX×*]\\s*H?\\d+(?:\\.\\d+)?(?:\\s*[xX×*]\\s*H?\\d+(?:\\.\\d+)?)?\\s*(?:cm|CM|c)?';
+    let s = name
+      .replace(new RegExp('\\s*\\((?:약\\s*)?' + DIM + '[^)]*\\)', 'g'), ' ')
+      .replace(new RegExp('\\s+' + DIM + '(?=\\s*(?:\\(|$))'), ' ')
+      .replace(/\s+/g, ' ').trim();
+    return s || name;
+  }
+  // 공동구매 상품 표시
+  const groupBuyBadge = (m) => (m && m.groupBuy ? '<span class="gb-badge">공구</span>' : '');
+
   // 앞으로 꺼내는 상자(서랍형 · 앞 손잡이 바구니)는 돌리지 않음 → 여는 쪽이 항상 문을 봄
   function opensFromFront(m) {
     return m.accessType === 'front_drawer' || m.accessType === 'front_open';
@@ -787,6 +805,13 @@
     return window.PackerEngine.getPantryCorners(state.spaceConfig)
       .map((c) => [c.s0 - (comp.s0 || 0), c.s1 - (comp.s0 || 0)])
       .filter(([a, b]) => b > 0 && a < comp.w);
+  }
+
+  // 자동 채우기 상자 번호: 여러 칸을 같은 순간에 채워도 번호가 겹치지 않게 (겹치면 고르기·지우기·경고가 섞임)
+  let boxIdBase = Date.now();
+  function nextBoxIdBase() {
+    boxIdBase = Math.max(boxIdBase + 10000, Date.now());
+    return boxIdBase;
   }
 
   // ===== 크기가 서로 맞물리는 서랍형 채우기 (예: 루틴랩 3L×2 = 6L, 9L×3 = 6L×2, 9L 높이 = 3L·6L 두 단) =====
@@ -850,7 +875,7 @@
   // (3L 두 개 위에 6L, 9L 세 개 위에 6L 두 개, 3L·6L 두 단 옆 9L 위로도 이어서)
   function stackDrawersUp(boxes, layer, compIdx, comp, pool, capH, rng) {
     const P = window.PackerEngine;
-    let id = Date.now() + 5000;
+    let id = nextBoxIdBase();
     const mm = state.modelsMap;
     let tops = layer.slice();
     for (let round = 0; round < 8 && tops.length; round++) {
@@ -891,7 +916,7 @@
     const pool = usable.filter((m) => m.dTop >= maxD * 0.85);   // 칸 깊이를 비슷하게 채우는 상자끼리
     const boxes = [];
     const layer = [];
-    let id = Date.now();
+    let id = nextBoxIdBase();
     freeIntervals(o.xStart, o.xEnd, o.blocked).forEach(([a, b]) => {
       spreadInRow(bestWidthCombo(pool, b - a, (m) => m.wTop, rng), a, b).forEach(({ m, x }) => {
         const z = o.atBack ? 0 : comp.d - m.dTop;
@@ -912,7 +937,7 @@
   function fillDrawerBasketMix(compIdx, comp, drawers, baskets, rng, o) {
     const P = window.PackerEngine;
     const boxes = [];
-    let id = Date.now();
+    let id = nextBoxIdBase();
     const add = (m, x, y, z, rot) => boxes.push({ id: 'box-' + (++id), modelId: m.id, compartmentIndex: compIdx, x: Math.round(x), y: Math.round(y), z: Math.round(z), rot });
     const xStart = o.xStart || 0;
     const xEnd = o.xEnd != null ? o.xEnd : comp.w;
@@ -1103,7 +1128,7 @@
       groups.push(fits);
     }
 
-    let id = Date.now();
+    let id = nextBoxIdBase();
     let rowFront = zEnd;
     let groupIdx = Math.floor(rng() * Math.ceil(groups.length / 2));
     let anyFrontDrawerPlaced = false;
@@ -1243,7 +1268,7 @@
     const capH = comp.clearH * FRIDGE_STACK_RATIO;
     const k = kind || 'mix';
     const boxes = [];
-    let id = Date.now();
+    let id = nextBoxIdBase();
     const layersFor = (m, allowStack) => {
       if (!allowStack || !canStackInFill(m)) return 1;
       const stepH = Math.max(10, m.h - (m.stackingOffset || 0));
@@ -1341,6 +1366,10 @@
     } else {
       plan.boxes = randomFillCompartment(0, typeFillPool(), rng, { stack: false, multiRow: true, levelRows: true });
     }
+    // 예시 상자는 경고 없는 자리만 (기본값으로 진행했는데 '문제 알림'이 뜨지 않게)
+    const v = window.PackerEngine.validatePlan(state.spaceConfig, plan.boxes, state.modelsMap);
+    plan.boxes = plan.boxes.filter((b) => (v.boxStatuses[b.id] || {}).severity === 'ok');
+    settleBoxes(plan.boxes, [...new Set(plan.boxes.map((b) => b.compartmentIndex))]);
     state.selectedBoxIds = [];
   }
 
@@ -1448,7 +1477,8 @@
     const pool = state.spaceConfig.type === 'fridge'
       ? fridgeFillPool(comp, 'mix')
       : typeFillPool(isPan ? 'mix' : undefined).filter((m) => m.h <= comp.clearH);
-    const brands = [...new Set(pool.map((m) => m.brand))];
+    const isGB = (br) => pool.some((m) => m.brand === br && m.groupBuy);
+    const brands = [...new Set(pool.map((m) => m.brand))].sort((a, b) => (isGB(b) ? 1 : 0) - (isGB(a) ? 1 : 0));
 
     body.innerHTML = '';
     const head = document.createElement('div');
@@ -1472,11 +1502,13 @@
     } else if (mode === 'brand') {
       brands.forEach((br) => {
         const cnt = pool.filter((m) => m.brand === br).length;
-        body.appendChild(sheetBtn(br, `${cnt}가지 상자`, '', () => fillAndClose(br)));
+        const btn = sheetBtn(br, `상품 ${cnt}개${isGB(br) ? ' · 공동구매 상품' : ''}`, '', () => fillAndClose(br));
+        if (isGB(br)) btn.querySelector('.sheet-btn-text > span')?.insertAdjacentHTML('afterbegin', '<span class="gb-badge">공구</span>');
+        body.appendChild(btn);
       });
     } else {
-      body.appendChild(sheetBtn('브랜드 상관없이', `${pool.length}가지 상자를 섞어서 채워요`, 'primary', () => fillAndClose(null)));
-      body.appendChild(sheetBtn('특정 브랜드만', `${brands.length}개 브랜드 중에서 골라요`, '', () => renderAutofillChoice(compIdx, 'brand')));
+      body.appendChild(sheetBtn('브랜드 상관없이', `상품 ${pool.length}개 중에서 섞어서 채워요`, 'primary', () => fillAndClose(null)));
+      body.appendChild(sheetBtn('특정 브랜드만', `브랜드 ${brands.length}곳 중에서 골라요`, '', () => renderAutofillChoice(compIdx, 'brand')));
     }
 
     body.appendChild(sheetBtn('뒤로', '', 'ghost', () => {
@@ -1512,7 +1544,7 @@
     ];
     rows.forEach(([k, label, sub]) => {
       const n = sizeFilterPool(basePool, k).length;
-      const b = sheetBtn(label, n ? `${sub} · ${n}가지` : '이 칸에 맞는 상자가 없어요', k === 'mix' ? 'primary' : '', () => go(k));
+      const b = sheetBtn(label, n ? `${sub} · 상품 ${n}개` : '이 칸에 맞는 상자가 없어요', k === 'mix' ? 'primary' : '', () => go(k));
       if (!n) b.disabled = true;
       body.appendChild(b);
     });
@@ -1551,9 +1583,10 @@
   function openShelfSheet(compIdx) {
     const prevIdx = state.activeCompartmentIdx;
     state.activeCompartmentIdx = compIdx;
-    if (state.spaceConfig.type === 'drawer' && prevIdx !== compIdx) {
-      refreshAll();
-    }
+    if (prevIdx !== compIdx) refreshAll();   // 3D에서 고른 칸 바닥 표시를 그 칸으로
+    document.querySelectorAll('#mobile-shelf-buttons .mobile-shelf-add-btn').forEach((b) => {
+      b.classList.toggle('is-current', Number(b.dataset.idx) === compIdx);
+    });
     const compartments = window.PackerEngine.getCompartments(state.spaceConfig);
     const comp = compartments[compIdx] || compartments[0];
     const activePlan = getActivePlan();
@@ -1592,10 +1625,16 @@
       document.getElementById('modal-box-picker').classList.add('open');
     }, '전에 저장해 둔 상자 묶음을 그대로 넣어요'));
 
-    // 3. 한 번에 채우기 → 브랜드 상관없이 / 특정 브랜드만
+    // 3. 한 번에 채우기: 누르면 바로 기본 조합으로 / 골라서 채우기: 브랜드 → 종류 → 크기
     body.appendChild(makeBtn('', '한 번에 채우기', '', () => {
+      if (comp.reserved) { showToast('맨 아래 칸은 비워두기로 했어요. "기둥·선반"에서 바꿀 수 있어요', { duration: 3500 }); return; }
+      const t = state.spaceConfig.type;
+      const quickKind = (t === 'pantry' || t === 'fridge') ? 'mix' : undefined;
+      runAutofillWithUndo(compIdx, null, quickKind, () => showToast('이 칸에 들어가는 상자가 없어요', { type: 'warn', duration: 3000 }), 'mix');
+    }, '누르면 바로 알아서 채워요. 마음에 안 들면 \'다른 조합\''));
+    body.appendChild(makeBtn('', '골라서 채우기', '', () => {
       renderAutofillChoice(compIdx);
-    }, '이 칸에 맞는 상자로 알아서 채워 줘요'));
+    }, '브랜드, 상자 종류, 크기를 골라서 채워요'));
 
     // 4. 지금 놓은 것: 같은 상자는 한 줄로 묶고 개수로 보여 줘요
     if (compBoxes.length > 0) {
@@ -1662,6 +1701,7 @@
 
   function closeShelfSheet() {
     document.body.classList.remove('mobile-shelf-sheet-open');
+    document.querySelectorAll('#mobile-shelf-buttons .is-current').forEach((b) => b.classList.remove('is-current'));
   }
 
   // 3D 화면 위 '선반 높이' 팝업 내용 그리기
@@ -2547,7 +2587,7 @@
       const ratioPct = Math.round((drwConst.exposedD / drwConst.totalD) * 100);
       document.getElementById('drw-exposure-summary').innerHTML =
         `보이는 곳: <strong style="color:#3b8a64">${window.Units.len(drwConst.exposedD)} (${ratioPct}%)</strong> / ` +
-        `꺼내기 힘든 곳: <strong style="color:#d97706">${window.Units.len(drwConst.unexposedD)} (${100 - ratioPct}%)</strong>`;
+        `손 닿기 힘든 곳: <strong style="color:#d97706">${window.Units.len(drwConst.unexposedD)} (${100 - ratioPct}%)</strong>`;
     }
   }
 
@@ -2697,7 +2737,7 @@
 
               <label class="checkbox-row">
                 <input type="checkbox" class="exp-chk-deadzone" ${state.autofillAvoidDeadzone ? 'checked' : ''} />
-                <span>${state.spaceConfig.type === 'cabinet' ? '문에 걸리는 곳은 비우기' : '꺼내기 힘든 곳은 비우기'}</span>
+                <span>${state.spaceConfig.type === 'cabinet' ? '문에 걸리는 곳은 비우기' : '손 닿기 힘든 곳은 비우기'}</span>
               </label>
               <label class="checkbox-row">
                 <input type="checkbox" class="exp-chk-rotate" ${state.autofillRotate ? 'checked' : ''} />
@@ -3014,7 +3054,7 @@
             <circle cx="7" cy="15" r="2.1" fill="var(--pf-knob-bg, #fff)" stroke="currentColor" stroke-width="1.6"/>
           </svg>
           <span>필터</span>
-          <span class="picker-filter-count">${count}</span>
+          <span class="picker-filter-count">상품 ${count}개</span>
         `;
         const popLabel = document.querySelector('#modal-box-picker .pfp-pop-label');
         if (popLabel) popLabel.textContent = `상자 ${count}개 보기`;
@@ -3299,15 +3339,18 @@
         return;
       }
 
-      filtered.forEach((model) => {
-        const fitInfo = window.PackerEngine.checkModelFitForCompartment(state.spaceConfig, compIdx, model);
+      // 이 칸에 들어가는 상품을 먼저 (같은 묶음 안에서는 원래 순서 그대로)
+      const fitOf = new Map(filtered.map((m) => [m.id, window.PackerEngine.checkModelFitForCompartment(state.spaceConfig, compIdx, m)]));
+      const sortedModels = [...filtered.filter((m) => fitOf.get(m.id).ok), ...filtered.filter((m) => !fitOf.get(m.id).ok)];
+      sortedModels.forEach((model) => {
+        const fitInfo = fitOf.get(model.id);
         const svgHtml = window.getProductThumbnailSVG ? window.getProductThumbnailSVG(model) : '';
         const qty = state.pickerCart[model.id] || 0;
 
         const card = document.createElement('div');
-        card.className = 'picker-card pick-slide-card pick-row-card';
+        card.className = 'picker-card pick-slide-card pick-row-card' + (fitInfo.ok ? '' : ' pick-unfit');
         card.dataset.modelId = model.id;
-        const sizeLine = `${window.Units.cm(model.wTop)}×${window.Units.cm(model.dTop)}×${window.Units.cm(model.h)}`;
+        const sizeLine = `${window.Units.cm(shownLen(model, model.wTop))}×${window.Units.cm(model.dTop)}×${window.Units.cm(model.h)}`;
         card.innerHTML = `
           <div class="pick-row-thumb">
             ${svgHtml}
@@ -3315,10 +3358,10 @@
           </div>
           <div class="pick-row-main">
             <div class="pick-row-top">
-              <span class="pick-row-brand">${model.brand}${model.price ? ` · ${Number(model.price).toLocaleString('ko-KR')}원${model.packQty > 1 ? ` (${model.packQty}개 묶음)` : ''}` : ''}</span>
+              <span class="pick-row-brand">${groupBuyBadge(model)}${model.brand}${model.price ? ` · ${Number(model.price).toLocaleString('ko-KR')}원${model.packQty > 1 ? ` (${model.packQty}개 묶음)` : ''}` : ''}</span>
               <span class="picker-fit-badge ${fitInfo.ok ? 'fit-ok' : 'fit-warn'}">${fitInfo.reason}</span>
             </div>
-            <div class="pick-row-name">${model.name}</div>
+            <div class="pick-row-name" title="${model.name}">${shortModelName(model)}</div>
             <div class="pick-row-size" title="가로×깊이×높이">${sizeLine} cm</div>
           </div>
           <div class="pick-row-qty">
@@ -3493,7 +3536,7 @@
       const yInfo = (box.y || 0) > 0 ? ` · 바닥에서 ${window.Units.len(box.y)} 위` : '';
       document.getElementById('sel-box-title').innerHTML =
         `<strong>[${model.brand}] ${model.name}</strong> ` +
-        `<span class="sel-box-meta">${window.Units.dims(dims.w, dims.d, dims.h)}${box.rot ? ' · 돌려 놓음' : ''}${yInfo}</span>`;
+        `<span class="sel-box-meta">${window.Units.dims(shownLen(model, dims.w), shownLen(model, dims.d), dims.h)}${box.rot ? ' · 돌려 놓음' : ''}${yInfo}</span>`;
     } else {
       saveComboBtn.style.display = 'inline-flex';
       document.getElementById('sel-box-title').innerHTML =
@@ -3783,6 +3826,26 @@
     });
   }
 
+  // 숫자 칸: 범위를 넘으면 맞추고 알려 줌. cm 칸에 mm로 넣은 것 같으면 바로 고칠 수 있게
+  function clampStepValue(step, raw, reapply) {
+    const n = Math.round(Number(raw) || 0);
+    const val = Math.max(step.min, Math.min(step.max, n));
+    if (n !== val && String(raw).trim() !== '') {
+      const isLen = step.unit === 'mm' || !step.unit;
+      const fmt = (x) => (isLen ? window.Units.len(x) : `${x}${step.unit}`);
+      const tenth = Math.round(n / 10);
+      if (isLen && n > step.max && tenth >= step.min && tenth <= step.max && reapply) {
+        showToast(`${fmt(n)}는 너무 커요. mm로 넣으셨나요?`, {
+          type: 'warn', duration: 4000,
+          actions: [{ label: `${fmt(tenth)}로 넣기`, onClick: () => reapply(tenth) }]
+        });
+      } else {
+        showToast(`${fmt(step.min)}~${fmt(step.max)} 사이로 넣어 주세요. ${fmt(val)}로 맞췄어요`, { type: 'warn', duration: 3500 });
+      }
+    }
+    return val;
+  }
+
   // ---------- 짧은 알림 · 확인 창 ----------
   let toastTimer = null;
   // 짧은 알림. opts: { type: 'warn', duration(ms), actions: [{ label, onClick }] }
@@ -3821,7 +3884,8 @@
     toastTimer = setTimeout(() => el.classList.remove('show'), opts.duration || (actions.length ? 6000 : 1800));
   }
   // 되돌리기 힘든 동작 전에 한 번 묻기. 결과: true(진행) / false(취소)
-  function confirmDialog({ title, message, ok, cancel }) {
+  // tone: 'neutral' 이면 확인 버튼을 기본 갈색으로 (되돌릴 수 없는 지우기만 빨강)
+  function confirmDialog({ title, message, ok, cancel, tone }) {
     return new Promise((resolve) => {
       const wrap = document.createElement('div');
       wrap.className = 'app-confirm';
@@ -3831,7 +3895,7 @@
           ${message ? `<div class="app-confirm-m">${message}</div>` : ''}
           <div class="app-confirm-btns">
             <button type="button" class="app-confirm-no">${cancel || '취소'}</button>
-            <button type="button" class="app-confirm-yes">${ok || '확인'}</button>
+            <button type="button" class="app-confirm-yes${tone === 'neutral' ? ' is-neutral' : ''}">${ok || '확인'}</button>
           </div>
         </div>`;
       const done = (v) => { wrap.remove(); document.removeEventListener('keydown', onKey); resolve(v); };
@@ -4283,7 +4347,7 @@
     if (step === 'build') {
       state.setupDone = true;
       saveLocalSoon();
-      setTimeout(maybeShowDragGuide, 350);
+      setTimeout(() => { if (!state.holdDragGuide) maybeShowDragGuide(); }, 350);
     }
     setTimeout(() => {
       window.Scene3DManager.resize();
@@ -4308,6 +4372,7 @@
     panDepth: { fig: 'pdep', tips: ['벽에 줄자 끝을 대요.', '선반 판 앞 끝까지 재요.', '앞에 기둥이 있으면 기둥 앞면까지 재요.'] },
     panCols: { fig: 'count', tips: ['세로 기둥 사이 칸을 세요.', '가운데 기둥이 1개면 2칸이에요.'] },
     panLevels: { fig: 'count', tips: ['기둥 사이 한 칸의 선반 판을 세요.', '판이 5개면 바닥까지 6층이에요.'] },
+    drwTiers: { fig: 'count', tips: ['서랍장 앞에 서서 서랍 개수를 세요.', '위아래로 몇 칸인지만 세면 돼요.'] },
     frW: { fig: 'w', tips: ['문을 닫은 채로 재요.', '냉장고 왼쪽 옆면에서 오른쪽 옆면까지 재요.', '문 손잡이는 빼고 몸통 폭만 재요.'] },
     frH: { fig: 'h', tips: ['바닥에 줄자 끝을 대요.', '냉장고 맨 윗면까지 재요.', '위에 올려 둔 물건은 빼고 재요.'] },
     frD: { fig: 'd', tips: ['냉장고 옆에 서서 재요.', '문 앞면에서 냉장고 뒷면까지 재요.', '뒤가 벽에 붙어 있으면 문 앞면에서 벽까지 재고 5cm를 빼요.'] },
@@ -4513,11 +4578,12 @@
       kind: 'choice',
       title: '어떤 가구를<br>정리할까요?',
       hint: () => '나중에 언제든 바꿀 수 있어요.',
+      grid: true,
       options: [
-        { value: 'cabinet', label: '문 달린 장', sub: '옷장, 벽장, 주방장' },
-        { value: 'drawer', label: '빼는 서랍', sub: '앞으로 당겨 여는 서랍장' },
-        { value: 'pantry', label: '팬트리', sub: 'ㄱ자, ㄷ자로 걸어 들어가는 방' },
-        { value: 'fridge', label: '냉장고', sub: '양문형, 4도어, 2도어' }
+        { value: 'cabinet', label: '문 달린 장', sub: '옷장·벽장·주방장' },
+        { value: 'drawer', label: '빼는 서랍', sub: '당겨 여는 서랍장' },
+        { value: 'pantry', label: '팬트리', sub: 'ㄱ자·ㄷ자 수납방' },
+        { value: 'fridge', label: '냉장고', sub: '양문형·4도어' }
       ],
       get: () => state.spaceConfig.type,
       set: (v) => {
@@ -4713,7 +4779,8 @@
           set: (v) => { c.doorType = v; }
         },
         num({
-          title: '문틀이 있나요?',
+          title: '문을 열면 양옆에<br>막는 기둥(문틀)이 있나요?',
+          askFirst: { key: 'frame', yes: '있어요', yesSub: '옆으로 튀어나온 기둥 폭을 재요', no: '없어요', noSub: '문을 열면 안쪽 벽까지 막힌 데가 없어요', defaultYes: 35 },
           measure: WIZ_MEASURE.cabFrame,
           caption: '왼쪽 · 오른쪽 문틀 폭',
           hint: () => {
@@ -4754,7 +4821,7 @@
         set: (v) => { d.d = v; if (d.exposedD > v) d.exposedD = v; }
       }),
       num({
-        title: '끝까지 빼면<br>얼마나 보이나요?',
+        title: '서랍을 끝까지 빼면<br>밖으로 얼마나 나오나요?',
           measure: WIZ_MEASURE.drwExposed,
         hint: () => {
           const hidden = Math.max(0, d.d - d.exposedD);
@@ -4774,7 +4841,7 @@
       }),
       num({
         title: '서랍은 모두<br>몇 칸인가요?',
-        measure: WIZ_MEASURE.panLevels,
+        measure: WIZ_MEASURE.drwTiers,
         unit: '칸', step: 1, min: 1, max: 6,
         hint: () => {
           const t = Math.min(6, Math.max(1, Math.round(Number(d.tiers) || 2)));
@@ -4798,6 +4865,7 @@
     const previewCount = state.wizPreview ? plan.boxes.length : 0;
     state.wizFromBuild = false;
     state.wizPreview = false;
+    state.holdDragGuide = previewCount > 0;   // 묻는 창이 먼저, 3D 사용법은 그다음에
     setMobileStep('build');
     setActiveMobileTab('none');
     // 첫 설정 때 보여 준 예시 상자: 비울지 물어봐요
@@ -4806,13 +4874,16 @@
         title: '예시 상자를 비울까요?',
         message: `설정 중에 넣은 예시 상자 ${previewCount}개가 있어요.`,
         ok: '비우고 시작',
-        cancel: '그대로 두기'
+        cancel: '그대로 두기',
+        tone: 'neutral'
       });
       if (clear) {
         plan.boxes = [];
         state.selectedBoxIds = [];
         refreshAll();
       }
+      state.holdDragGuide = false;
+      setTimeout(maybeShowDragGuide, 250);
     }
   }
 
@@ -4826,7 +4897,7 @@
       : state.spaceConfig.type === 'pantry'
       ? ['가구 종류', '입구 쪽', '안쪽 벽', '옆 벽', '전체 높이', '선반 깊이', '안쪽 벽 칸', '옆 벽 칸', '선반 층']
       : state.spaceConfig.type === 'cabinet'
-      ? ['가구 종류', '가로', '깊이', '높이', '문 여는 쪽', '문틀 폭', '선반 개수']
+      ? ['가구 종류', '가로', '깊이', '높이', '문 여는 쪽', '문틀(옆 기둥) 폭', '선반 개수']
       : ['가구 종류', '가로', '깊이', '보이는 깊이', '넣을 수 있는 높이', '서랍 칸 수'];
 
     body.innerHTML = '';
@@ -4870,7 +4941,7 @@
         hint.className = 'sp-hint';
         const showHint = () => { hint.textContent = step.hint ? step.hint() : ''; };
         const apply = (v) => {
-          const val = Math.max(step.min, Math.min(step.max, Math.round(Number(v) || 0)));
+          const val = clampStepValue(step, v, (x) => apply(x));
           step.set(val);
           input.value = step.get();
           refreshAll();
@@ -4940,7 +5011,7 @@
 
     if (step.kind === 'choice') {
       const list = document.createElement('div');
-      list.className = 'wiz-options';
+      list.className = 'wiz-options' + (step.grid ? ' wiz-options-grid' : '');
       step.options.forEach((opt) => {
         const b = document.createElement('button');
         b.type = 'button';
@@ -4960,9 +5031,39 @@
         list.appendChild(b);
       });
       ctrl.appendChild(list);
+    } else if (step.askFirst && state.wizAsk[step.askFirst.key] !== 'yes') {
+      // 먼저 있어요 / 없어요 → '있어요'일 때만 숫자를 넣어요
+      const af = step.askFirst;
+      const list = document.createElement('div');
+      list.className = 'wiz-options';
+      [['yes', af.yes, af.yesSub], ['no', af.no, af.noSub]].forEach(([k, label, sub]) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'wiz-option';
+        b.innerHTML = `<span class="wiz-option-text"><span class="wiz-option-label">${label}</span><span class="wiz-option-sub">${sub}</span></span><span class="wiz-check"></span>`;
+        b.addEventListener('click', () => {
+          if (k === 'yes') {
+            state.wizAsk[af.key] = 'yes';
+            if (!(Number(step.get()) > 0)) step.set(af.defaultYes);
+            afterChange();
+            renderWizard();
+          } else {
+            state.wizAsk[af.key] = 'no';
+            step.onSkip();
+            if (state.wizPreview) applyPreviewFill();
+            refreshAll();
+            if (isLast) { finishWizard(); return; }
+            state.wizStep += 1;
+            renderWizard();
+          }
+        });
+        list.appendChild(b);
+      });
+      ctrl.appendChild(list);
     } else {
       const minusSvg = '<svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg>';
       const plusSvg = '<svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+      const openMeasure = window.innerHeight >= 720;   // 작은 화면에서는 '이렇게 재요'를 접어 둠
       ctrl.innerHTML = `
         <div class="wiz-stepper">
           <button type="button" class="wiz-step-btn" data-d="-1" aria-label="줄이기">${minusSvg}</button>
@@ -4974,17 +5075,19 @@
         </div>
         ${step.caption ? `<div class="wiz-value-caption">${step.caption}</div>` : ''}
         ${step.measure ? `
-        <div class="wiz-measure">
-          ${measureFigSvg(step.measure.fig)}
-          <div class="wiz-measure-text">
-            <div class="wiz-measure-h">이렇게 재요</div>
-            <ol class="wiz-measure-list">${step.measure.tips.map((tip) => `<li>${tip}</li>`).join('')}</ol>
+        <details class="wiz-measure-box"${openMeasure ? ' open' : ''}>
+          <summary class="wiz-measure-sum">이렇게 재요</summary>
+          <div class="wiz-measure">
+            ${measureFigSvg(step.measure.fig)}
+            <div class="wiz-measure-text">
+              <ol class="wiz-measure-list">${step.measure.tips.map((tip) => `<li>${tip}</li>`).join('')}</ol>
+            </div>
           </div>
-        </div>` : ''}
+        </details>` : ''}
       `;
       const input = ctrl.querySelector('.wiz-value-input');
       const apply = (v) => {
-        const val = Math.max(step.min, Math.min(step.max, Math.round(Number(v) || 0)));
+        const val = clampStepValue(step, v, (x) => apply(x));
         step.set(val);
         input.value = step.get();
         wizSparkle(ctrl.querySelector('.wiz-value'));
@@ -4997,7 +5100,16 @@
     }
 
     const skipBtn = document.getElementById('wiz-skip');
-    if (step.skipLabel) {
+    const asking = step.askFirst && state.wizAsk[step.askFirst.key] !== 'yes';
+    document.getElementById('wiz-next').style.display = asking ? 'none' : '';
+    if (step.askFirst && !asking) {
+      // '있어요'를 골랐다가 마음이 바뀌면 다시 고를 수 있게
+      skipBtn.style.display = '';
+      skipBtn.textContent = '다시 고르기';
+      skipBtn.onclick = () => { state.wizAsk[step.askFirst.key] = null; renderWizard(); };
+    } else if (asking) {
+      skipBtn.style.display = 'none';
+    } else if (step.skipLabel) {
       skipBtn.style.display = '';
       skipBtn.textContent = step.skipLabel;
       skipBtn.onclick = () => {
@@ -5164,7 +5276,9 @@
     const touchBtn = document.getElementById('btn-touch-multiselect');
     touchBtn.addEventListener('click', () => {
       state.touchMultiSelectMode = !state.touchMultiSelectMode;
-      touchBtn.textContent = state.touchMultiSelectMode ? '여러 개 고르기: 켜짐' : '여러 개 고르기: 꺼짐';
+      touchBtn.textContent = '여러 개 고르기';
+      touchBtn.classList.toggle('is-on', !!state.touchMultiSelectMode);
+      touchBtn.setAttribute('aria-pressed', state.touchMultiSelectMode ? 'true' : 'false');
       touchBtn.classList.toggle('is-on', !!state.touchMultiSelectMode);
       touchBtn.classList.toggle('btn-warning', state.touchMultiSelectMode);
       refreshAll();
@@ -5377,7 +5491,7 @@
         has = !!window.PackerEngine.getPantryCorner(sc);
       }
       // 화면에 바로 보이는 변화는 알림 없이, 아무 표시도 안 생길 때만 알려 줌
-      if (state.showDeadzones && !has) showToast('이 가구에는 꺼내기 힘든 곳이 없어요');
+      if (state.showDeadzones && !has) showToast('이 가구에는 손 닿기 힘든 곳이 없어요');
     });
 
     // 5. 시안(Plan) 추가 / 비우기 / 비교표 모달
@@ -5704,6 +5818,15 @@
       if (e.target.id === 'box-guide') closeBoxGuide();
     });
     document.getElementById('btn-save-photo')?.addEventListener('click', savePhoto);
+    // 보는 방향: 비스듬히 → 앞에서 → 위에서 (누를 때마다 바뀜)
+    const VIEWS = [['iso', '비스듬히 보기'], ['front', '앞에서 보기'], ['top', '위에서 보기']];
+    let viewIdx = 0;
+    document.getElementById('btn-view')?.addEventListener('click', (e) => {
+      viewIdx = (viewIdx + 1) % VIEWS.length;
+      window.Scene3DManager.setCameraView(VIEWS[viewIdx][0]);
+      e.currentTarget.setAttribute('aria-label', `보는 방향 바꾸기: 지금 ${VIEWS[viewIdx][1]}`);
+      showToast(VIEWS[viewIdx][1], { duration: 1600 });
+    });
     document.getElementById('drag-guide')?.addEventListener('click', (e) => {
       if (e.target.id === 'drag-guide') closeDragGuide();
     });
@@ -5925,6 +6048,18 @@
         note.style.display = hasPack ? '' : 'none';
       }
 
+      // 링크 카드 가격 줄: 개당(또는 묶음당) 가격 · 수량 · 소계
+      function priceLineOf(model, count) {
+        const price = Number(model.price) || 0;
+        if (!price) return `${count}개 · 가격 준비 중`;
+        const pack = Math.max(1, Number(model.packQty) || 1);
+        if (pack > 1) {
+          const packs = Math.ceil(count / pack);
+          return `${pack}개 묶음 ${price.toLocaleString('ko-KR')}원 × ${packs}<br><b>${(price * packs).toLocaleString('ko-KR')}원</b>`;
+        }
+        return `${price.toLocaleString('ko-KR')}원 × ${count}개<br><b>${(price * count).toLocaleString('ko-KR')}원</b>`;
+      }
+
       // 2) 브랜드별 구매 링크 모음 (중복 모델 제거, 3열 썸네일)
       if (linksListEl) {
         linksListEl.innerHTML = '';
@@ -5945,14 +6080,17 @@
             modelGroup.get(m.id).count += 1;
           });
 
-          brandMap.forEach((modelGroup, brand) => {
+          // 공동구매 브랜드를 맨 위에
+          const gbBrand = (br) => [...brandMap.get(br).values()].some(({ model }) => model.groupBuy);
+          [...brandMap.keys()].sort((a, b) => (gbBrand(b) ? 1 : 0) - (gbBrand(a) ? 1 : 0)).forEach((brand) => {
+            const modelGroup = brandMap.get(brand);
             const groupEl = document.createElement('div');
             groupEl.className = 'export-brand-group';
 
             const headerEl = document.createElement('div');
             headerEl.className = 'export-brand-name open';
             headerEl.innerHTML = `
-              <span>${brand} (${modelGroup.size}종)</span>
+              <span>${gbBrand(brand) ? '<span class="gb-badge">공구</span>' : ''}${brand} (${modelGroup.size}종)</span>
               <span class="toggle-arrow">▾</span>
             `;
 
@@ -5975,7 +6113,8 @@
                   ${thumbHtml}
                   ${count > 1 ? `<span class="export-qty-badge">${count}개</span>` : ''}
                 </div>
-                <div class="export-item-name">${model.name}</div>
+                <div class="export-item-name">${shortModelName(model)}</div>
+                <div class="export-item-price">${priceLineOf(model, count)}</div>
               `;
               card.addEventListener('click', () => {
                 if (model.url) {
@@ -6020,6 +6159,8 @@
     });
 
     function openExportModal() {
+      clearTimeout(toastTimer);
+      document.getElementById('app-toast')?.classList.remove('show');   // 금액을 가리지 않게
       renderExportModal();
       if (exportModal) {
         exportModal.classList.add('open');

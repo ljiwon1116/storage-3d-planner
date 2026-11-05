@@ -17,7 +17,7 @@
   <meta property="og:image:alt" content="수납공간 시뮬레이터: 팬트리 선반에 서랍형·바구니형 정리함을 3D로 넣어 본 화면" />
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <link rel="stylesheet" href="styles.css?v=1105l" />
+  <link rel="stylesheet" href="styles.css?v=1105m" />
   <script>
     // 실제로 보이는 화면 높이를 --vh 로 넣어요 (주소창·툴바가 생기고 없어질 때마다).
     // 브라우저마다 100vh 가 툴바를 포함해서 위아래가 잘리는 문제를 막아요.
@@ -139,6 +139,7 @@
     <!-- 왼쪽 위 '크기·설정' 옆: 도움말 · 문제 알림 -->
     <div id="corner-tools" class="corner-tools">
       <button id="btn-help" class="ct-btn" type="button" aria-label="도움말"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6"/><path d="M12 17.2v.1"/></svg></button>
+      <button id="btn-view" class="ct-btn" type="button" aria-label="보는 방향 바꾸기: 지금 비스듬히"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></svg></button>
       <button id="btn-issues" class="ct-btn" type="button" aria-label="문제 없음" aria-expanded="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l9 16H3l9-16z"/><path d="M12 10v4M12 17.2v.1"/></svg><span id="ct-issue-badge" class="ct-badge" hidden></span></button>
     </div>
 
@@ -184,7 +185,7 @@
         </div>
         <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:0.73rem;padding-top:4px;border-top:1px solid var(--border);">
           <span><i class="legend-dot" style="background:#dc2626;"></i>문에 걸림 / 문제</span>
-          <span><i class="legend-dot" style="background:#f59e0b;"></i>여러 개 고름 / 꺼내기 힘든 곳</span>
+          <span><i class="legend-dot" style="background:#f59e0b;"></i>여러 개 고름 / 손 닿기 힘든 곳</span>
           <span><i class="legend-dot" style="background:#3b8a64;"></i>서랍 다 보이는 곳</span>
         </div>
       </div>
@@ -430,12 +431,12 @@
       <!-- 시점 전환 & 모바일 묶음선택 토글 캡슐 바 -->
       <div class="hud-pill-bar">
         <button id="btn-touch-multiselect" class="btn btn-sm" title="폰·태블릿에서 상자 여러 개를 손가락으로 한 번에 고르기">
-          여러 개 고르기: 꺼짐
+          여러 개 고르기
         </button>
         <button id="btn-open-ctrl" class="btn btn-sm" type="button" style="display:none;" aria-expanded="false" aria-controls="open-ctrl-pop">문 열기</button>
         <label class="checkbox-row" style="margin:0;">
           <input id="chk-show-deadzones" type="checkbox" checked />
-          <span style="font-size:0.72rem;">꺼내기 힘든 곳</span>
+          <span>손 닿기 힘든 곳</span>
         </label>
         <button id="btn-clear-plan" class="btn btn-danger btn-sm">다 비우기</button>
       </div>
@@ -451,7 +452,7 @@
         <button id="btn-issues-close" class="issues-close" type="button" aria-label="문제 알림 닫기">✕</button>
       </div>
       <div class="error-code-body">
-        <div class="issue-legend"><span><i class="legend-dot" style="background:#dc2626;"></i>빨강: 문에 걸림·문제</span><span><i class="legend-dot" style="background:#f59e0b;"></i>주황: 꺼내기 힘든 곳</span></div>
+        <div class="issue-legend"><span><i class="legend-dot" style="background:#dc2626;"></i>빨강: 문에 걸림·문제</span><span><i class="legend-dot" style="background:#f59e0b;"></i>주황: 손 닿기 힘든 곳</span></div>
         <div id="warnings-list" style="display:flex;flex-direction:column;gap:5px;"></div>
       </div>
     </div>
@@ -499,7 +500,7 @@
           <div class="help-cat-body">
             <div class="help-topic"><h3 class="help-topic-title">화면 돌려 보기</h3><p>한 손가락으로 끌면 가구를 이리저리 돌려 봐요. 두 손가락을 벌리거나 모으면 크게, 작게 봐요. 컴퓨터에서는 마우스로 끌고, 휠로 크게 작게 봐요.</p></div>
             <div class="help-topic"><h3 class="help-topic-title">문 열기, 서랍 열기</h3><p>아래 '문 열기'를 누르고 막대를 밀면 문이 열리는 정도를 바꿔요. 상자가 문에 걸리는지 볼 수 있어요. '문 열기'를 한 번 더 누르면 창이 닫혀요.</p></div>
-            <div class="help-topic"><h3 class="help-topic-title">꺼내기 힘든 곳</h3><p>아래 '꺼내기 힘든 곳'을 켜면 문틀 뒤, 팬트리 구석, 서랍을 다 열어도 가려지는 안쪽처럼 손이 잘 안 닿는 곳을 빨갛게 보여 줘요.</p></div>
+            <div class="help-topic"><h3 class="help-topic-title">손 닿기 힘든 곳</h3><p>아래 '손 닿기 힘든 곳'을 켜면 문틀 뒤, 팬트리 구석, 서랍을 다 열어도 가려지는 안쪽처럼 손이 잘 안 닿는 곳을 빨갛게 보여 줘요.</p></div>
             <div class="help-topic"><h3 class="help-topic-title">상자 안 채워 보기</h3><p>고른 상자를 한 번 더 누르면 상자 안에 물건을 채운 모습으로 볼 수 있어요.</p></div>
           </div>
         </details>
@@ -526,7 +527,7 @@
         </details>
         <details class="help-item help-cat"><summary><span>문제 확인·저장</span><svg class="help-chev" aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary>
           <div class="help-cat-body">
-            <div class="help-topic"><h3 class="help-topic-title">문제 알림</h3><p>왼쪽 위 세모 아이콘에 숫자가 뜨면 걸리는 곳이 있다는 뜻이에요. 누르면 목록이 나오고, 줄을 누르면 그 상자가 골라져요. 빨강은 문에 걸림이나 문제, 주황은 꺼내기 힘든 곳이에요.</p></div>
+            <div class="help-topic"><h3 class="help-topic-title">문제 알림</h3><p>왼쪽 위 세모 아이콘에 숫자가 뜨면 걸리는 곳이 있다는 뜻이에요. 누르면 목록이 나오고, 줄을 누르면 그 상자가 골라져요. 빨강은 문에 걸림이나 문제, 주황은 손 닿기 힘든 곳이에요.</p></div>
             <div class="help-topic"><h3 class="help-topic-title">저장, 링크, 구매</h3><p>위 '저장·구매'에서 링크로 보내기, 사진 저장, 총 구매비용, 구매 링크를 볼 수 있어요. 지금 짠 것은 이 기기에 저절로 저장돼요. 제품 치수는 상품 상세페이지 기준이라 실제와 조금 다를 수 있어요.</p></div>
             <div class="help-topic"><h3 class="help-topic-title">완전히 처음으로 되돌리기</h3><p>짠 것은 이 기기에 남아 있어서, 다시 들어와도 하던 화면이 그대로 떠요. 아래 버튼을 누르면 가구 설정, 넣은 상자, 저장한 묶음과 내 상자, 사용법을 본 기록까지 모두 지우고 맨 처음 화면으로 돌아가요. 지운 것은 되살릴 수 없으니, 남겨 두고 싶으면 먼저 '저장·구매'에서 링크로 보내 두세요.</p>
               <button id="btn-reset-all" type="button" class="help-reset-btn">모두 지우고 처음부터</button></div>
@@ -799,6 +800,26 @@
         <button id="btn-close-export" class="btn btn-sm" type="button">✕</button>
       </div>
 
+      <!-- 2. 총 구매비용 -->
+      <div class="export-section">
+        <div class="export-section-title">총 구매비용</div>
+        <div class="export-cost-row">
+          <div id="export-cost-total" class="export-cost-total">계산 중...</div>
+          <button id="btn-export-cost-view" class="btn export-cost-view" type="button">칸별 금액 보기</button>
+        </div>
+      </div>
+
+      <!-- 3. 구매 링크 모음 -->
+      <div class="export-section" id="export-links-section">
+        <div class="export-section-title">구매 링크 모음</div>
+        <p class="export-section-desc">제품을 누르면 구매 페이지로 가요.</p>
+        <div class="export-section-desc export-partner-note">
+          <p>제품 치수는 상품 상세페이지에 나온 값을 기준으로 했어요. 제품 모양이나 상태에 따라 실제와 조금 다를 수 있어요.</p>
+          <p>파트너스 활동의 일환으로 이에 따른 일정액의 수수료를 지급받습니다.</p>
+        </div>
+        <div id="export-links-list" class="export-links-list"></div>
+      </div>
+
       <!-- 0. 링크로 보내기 -->
       <div class="export-section">
         <div class="export-section-title">링크로 보내기</div>
@@ -830,26 +851,6 @@
         <button id="btn-export-photo" class="btn btn-primary" type="button" style="width:100%;height:48px;border-radius:10px;margin-top:10px;">사진 저장</button>
       </div>
 
-      <!-- 2. 총 구매비용 -->
-      <div class="export-section">
-        <div class="export-section-title">총 구매비용</div>
-        <div class="export-cost-row">
-          <div id="export-cost-total" class="export-cost-total">계산 중...</div>
-          <button id="btn-export-cost-view" class="btn export-cost-view" type="button">칸별 금액 보기</button>
-        </div>
-      </div>
-
-      <!-- 3. 구매 링크 모음 -->
-      <div class="export-section" id="export-links-section">
-        <div class="export-section-title">구매 링크 모음</div>
-        <p class="export-section-desc">제품을 누르면 구매 페이지로 가요.</p>
-        <div class="export-section-desc export-partner-note">
-          <p>제품 치수는 상품 상세페이지에 나온 값을 기준으로 했어요. 제품 모양이나 상태에 따라 실제와 조금 다를 수 있어요.</p>
-          <p>파트너스 활동의 일환으로 이에 따른 일정액의 수수료를 지급받습니다.</p>
-        </div>
-        <div id="export-links-list" class="export-links-list"></div>
-      </div>
-
       <!-- 아래에 구매 링크가 있다는 표시: 링크가 화면에 보이면 숨김 -->
       <div id="export-more-hint" class="export-more-hint" hidden>
         <button id="btn-export-more" type="button">아래에 구매 링크가 있어요 <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
@@ -862,10 +863,10 @@
     <div class="drag-guide-card" role="dialog" aria-modal="true" aria-labelledby="export-guide-title">
       <h3 id="export-guide-title" class="drag-guide-title">저장·구매 사용법</h3>
       <ul class="drag-guide-list">
+        <li><b>총 구매비용</b>넣은 상자 값을 모두 더했어요. '칸별 금액 보기'를 누르면 칸마다 얼마인지 보여요.</li>
+        <li><b>구매 링크 모음</b>제품을 누르면 구매 페이지로 가요. '공구'는 공동구매 상품이에요.</li>
         <li><b>링크로 보내기</b>받은 사람도 지금과 똑같은 3D 화면을 봐요.</li>
         <li><b>사진 저장</b>3D 화면을 사진으로 저장해요. 칸마다 남는 공간도 같이 적을 수 있어요.</li>
-        <li><b>총 구매비용</b>넣은 상자 값을 모두 더했어요. '칸별 금액 보기'를 누르면 칸마다 얼마인지 보여요.</li>
-        <li><b>구매 링크 모음</b>아래로 내리면 있어요. 제품을 누르면 구매 페이지로 가요.</li>
         <li><b>치수 안내</b>제품 치수는 상품 상세페이지 기준이라, 제품 모양이나 상태에 따라 실제와 조금 다를 수 있어요.</li>
       </ul>
       <button id="export-guide-ok" class="drag-guide-ok" type="button">알겠어요</button>
@@ -879,12 +880,12 @@
   </div>
 
   <!-- 애플리케이션 스크립트 로드 -->
-  <script src="js/units.js?v=1105l"></script>
-  <script src="js/presets.js?v=1105l"></script>
-  <script src="js/items.js?v=1105l"></script>
-  <script src="js/packer.js?v=1105l"></script>
-  <script src="js/scene3d.js?v=1105l"></script>
-  <script src="js/app.js?v=1105l"></script>
+  <script src="js/units.js?v=1105m"></script>
+  <script src="js/presets.js?v=1105m"></script>
+  <script src="js/items.js?v=1105m"></script>
+  <script src="js/packer.js?v=1105m"></script>
+  <script src="js/scene3d.js?v=1105m"></script>
+  <script src="js/app.js?v=1105m"></script>
 
   <!-- 보관함 자세히 보기: 뒤는 흐리게, 고른 보관함만 크게 + 물건 넣기 -->
   <div id="box-detail" class="box-detail" aria-hidden="true">
@@ -910,6 +911,6 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="js/boxdetail.js?v=1105l"></script>
+  <script src="js/boxdetail.js?v=1105m"></script>
 </body>
 </html>

@@ -5586,3 +5586,51 @@ body.ui-mode-mobile.mobile-step-build[data-active-mtab="errors"] #error-code-doc
 .help-reset-btn { display: block; margin: var(--sp-3) 0 0 var(--sp-3); min-height: var(--tap); padding: 0 var(--sp-4); border: 1px solid var(--red-81); border-radius: 12px; background: var(--red-97); color: var(--danger); font-family: inherit; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
 @media (hover: hover) { .help-reset-btn:hover { filter: brightness(0.97); } }
 .help-reset-btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* 1105m · 사용자 피드백 반영 */
+/* 확인 창: 지우기가 아닌 확인은 기본 갈색 */
+.app-confirm-yes.is-neutral { background: var(--accent); }
+.app-confirm-yes.is-neutral:hover { background: var(--accent-hover); filter: none; }
+/* 공동구매 표시 */
+.gb-badge { display: inline-flex; align-items: center; height: 18px; padding: 0 var(--sp-1-5); margin-right: var(--sp-1); border-radius: 6px; background: var(--accent); color: var(--white); font-size: 0.7rem; font-weight: 700; line-height: 1; vertical-align: 1px; }
+/* 상자 고르기: 안 맞는 상품은 흐리게, 이름은 두 줄까지 */
+.pick-row-card.pick-unfit { opacity: 0.55; }
+.pick-row-card .pick-row-name { white-space: normal !important; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: clip; word-break: keep-all; overflow-wrap: anywhere; }
+/* 구매 링크 카드: 가격 줄 */
+.export-item-price { margin-top: 2px; font-size: 0.72rem; line-height: 1.35; color: var(--text-meta); }
+.export-item-price b { color: var(--text-title); font-weight: 700; }
+
+/* 11. 첫 화면 가구 고르기: 2×2 로 한 화면에 */
+.wiz-options.wiz-options-grid { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--sp-2) !important; }
+.wiz-options-grid .wiz-option { position: relative; flex-direction: column; align-items: flex-start; justify-content: flex-start; padding: var(--sp-3-5, 14px) var(--sp-3) !important; min-height: 76px; }
+.wiz-options-grid .wiz-option .wiz-check { position: absolute; top: var(--sp-2-5); right: var(--sp-2-5); width: 20px; height: 20px; }
+.wiz-options-grid .wiz-option-text { padding-right: 22px; }
+.wiz-options-grid .wiz-option-sub { word-break: keep-all; }
+/* 14. '이렇게 재요' 접기·펼치기 */
+.wiz-measure-box { margin-top: var(--sp-3); border-radius: 12px; background: var(--surface-1); text-align: left; }
+.wiz-measure-box > .wiz-measure { margin-top: 0; padding-top: 0; background: transparent; }
+.wiz-measure-sum { display: flex; align-items: center; justify-content: space-between; min-height: var(--tap, 44px); padding: 0 var(--sp-3); font-size: 0.8125rem; font-weight: 600; color: var(--accent); cursor: pointer; list-style: none; }
+.wiz-measure-sum::-webkit-details-marker { display: none; }
+.wiz-measure-sum::after { content: ''; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translateY(-2px); transition: transform 0.15s; }
+.wiz-measure-box[open] > .wiz-measure-sum::after { transform: rotate(-135deg) translateY(-2px); }
+.wiz-measure-sum:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 12px; }
+/* 13. 3D 아래 도구: 누르기 쉽게 44px, 글씨 키움 */
+body .hud-pill-bar > #btn-touch-multiselect, body .hud-pill-bar > #btn-open-ctrl, body .hud-pill-bar > #btn-clear-plan,
+body .hud-pill-bar > .checkbox-row { min-height: 44px !important; font-size: 0.875rem !important; }
+body .hud-pill-bar > .checkbox-row span { font-size: 0.875rem !important; }
+body .hud-pill-bar > #btn-touch-multiselect.is-on { background: var(--accent) !important; color: var(--white) !important; }
+@media (max-width: 360px) {
+  body .hud-pill-bar > #btn-touch-multiselect, body .hud-pill-bar > #btn-open-ctrl, body .hud-pill-bar > #btn-clear-plan,
+  body .hud-pill-bar > .checkbox-row, body .hud-pill-bar > .checkbox-row span { font-size: 0.8125rem !important; }
+}
+body.ui-mode-mobile .brand-nav-arrow { min-width: 44px !important; width: 44px !important; height: 44px !important; }
+/* 18. 지금 고른 칸의 ＋: 번호를 보여 주고 강조 */
+#mobile-shelf-buttons .mobile-shelf-add-btn.is-current { background: var(--accent) !important; color: var(--white) !important; padding: 0 var(--sp-3) !important; gap: var(--sp-1); }
+#mobile-shelf-buttons .mobile-shelf-add-btn.is-current .msab-num { display: inline !important; color: var(--white) !important; font-size: 0.8125rem !important; }
+/* 2. 폰에서는 알림을 위쪽에 (아래 칸 상자와 ＋를 가리지 않게) */
+body.ui-mode-mobile .app-toast { top: calc(env(safe-area-inset-top) + 116px); bottom: auto; transform: translate(-50%, -8px); }
+body.ui-mode-mobile .app-toast.show { transform: translate(-50%, 0); }
+/* 작은 화면(SE): 가구 고르기 칸 설명은 숨겨 네 개가 한 화면에 */
+@media (max-width: 360px) { .wiz-options-grid .wiz-option-sub { display: none; } .wiz-options-grid .wiz-option { min-height: 56px; } }
+/* '손 닿기 힘든 곳' 체크도 누르는 높이 44px */
+body .hud-pill-bar > label.checkbox-row { min-height: 44px !important; height: 44px !important; display: inline-flex !important; align-items: center; }

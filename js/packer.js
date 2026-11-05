@@ -243,7 +243,7 @@ window.PackerEngine = (function () {
       const topY = Math.min(c.h, Math.max(currentY + 20, shelf.bottomY));
       compartments.push({
         index: idx,
-        name: `${idx + 1}번째 칸`,
+        name: idx === 0 ? '맨 아래 칸' : `아래에서 ${idx + 1}번째 칸`,
         yStart: currentY,
         yEnd: topY,
         clearH: Math.max(0, topY - currentY),
@@ -255,7 +255,7 @@ window.PackerEngine = (function () {
 
     compartments.push({
       index: sortedShelves.length,
-      name: `${sortedShelves.length + 1}번째 칸 (맨 위)`,
+      name: sortedShelves.length === 0 ? '장 안' : '맨 위 칸',
       yStart: currentY,
       yEnd: c.h,
       clearH: Math.max(0, c.h - currentY),
@@ -346,13 +346,16 @@ window.PackerEngine = (function () {
     const comp = compartments[compIdx] || compartments[0];
 
     if (model.h > comp.clearH) {
-      return { ok: false, reason: `너무 높아요 (칸 높이 ${window.Units.len(comp.clearH)})` };
+      return { ok: false, reason: `높이 ${window.Units.cm(model.h - comp.clearH)}cm 넘쳐요` };
     }
     const fitsNormal = model.wTop <= comp.w && model.dTop <= comp.d;
     // 서랍형은 서랍 면이 항상 앞을 봐야 해서 돌려 넣지 않음
     const fitsRotated = model.accessType !== 'front_drawer' && model.dTop <= comp.w && model.wTop <= comp.d;
     if (!fitsNormal && !fitsRotated) {
-      return { ok: false, reason: `바닥에 안 들어가요` };
+      if (model.dTop > comp.d && (model.accessType === 'front_drawer' || model.wTop > comp.d)) {
+        return { ok: false, reason: `깊이 ${window.Units.cm(Math.min(model.dTop, model.accessType === 'front_drawer' ? model.dTop : model.wTop) - comp.d)}cm 넘쳐요` };
+      }
+      return { ok: false, reason: `가로 ${window.Units.cm(Math.min(model.wTop, model.accessType === 'front_drawer' ? model.wTop : model.dTop) - comp.w)}cm 넘쳐요` };
     }
     if (spaceConfig.type === 'cabinet') {
       const cabConst = getCabinetConstraints(spaceConfig);
@@ -482,10 +485,10 @@ window.PackerEngine = (function () {
           const hiddenDepth = Math.min(dims.d, drwConst.unexposedD - zMin);
           if (model.accessType === 'top_open' || model.accessType === 'top_lid') {
             setSeverity('warn');
-            issues.push(`[꺼내기 힘든 곳 주의] '${model.name}' 상자의 안쪽 ${window.Units.len(hiddenDepth)}가 서랍을 다 열어도 가려져서 위로 꺼내기 불편해요.`);
+            issues.push(`[손 닿기 힘든 곳 주의] '${model.name}' 상자의 안쪽 ${window.Units.len(hiddenDepth)}가 서랍을 다 열어도 가려져서 위로 꺼내기 불편해요.`);
           } else {
             setSeverity('warn');
-            issues.push(`[꺼내기 힘든 곳] '${model.name}' 상자의 일부(${window.Units.len(hiddenDepth)})가 서랍 안쪽 꺼내기 힘든 곳에 있어요.`);
+            issues.push(`[손 닿기 힘든 곳] '${model.name}' 상자의 일부(${window.Units.len(hiddenDepth)})가 서랍 안쪽 손 닿기 힘든 곳에 있어요.`);
           }
         }
       }
