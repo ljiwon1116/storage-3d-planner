@@ -368,6 +368,14 @@ window.PackerEngine = (function () {
 
   // 7. 자동 적층(Auto-Stacking) Y 좌표 계산:
   // 수납함을 (x, z)로 이동하거나 새로 추가할 때, 그 아래에 다른 수납함이 있으면 자동으로 그 위로 올라감!
+  // 아래 상자 위에 올렸을 때 홈이 맞물려 낮아지는 정도: 같은 상자, 또는 같은 브랜드의 같은 시리즈(예: 루틴랩 3L·6L·9L)
+  function stackOffsetBetween(lower, upper) {
+    if (!lower || !upper || !lower.stackable) return 0;
+    const sameFamily = lower.id === upper.id ||
+      (lower.brand && lower.brand === upper.brand && lower.lineup && lower.lineup === upper.lineup);
+    return sameFamily ? (lower.stackingOffset || 0) : 0;
+  }
+
   function computeStackingY(spaceConfig, placedBoxes, targetBox, modelsMap, ignoreIds) {
     const model = modelsMap[targetBox.modelId];
     if (!model) return 0;
@@ -388,8 +396,8 @@ window.PackerEngine = (function () {
       const overlapZ = targetBox.z < other.z + otherDims.d - margin && targetBox.z + dims.d > other.z + margin;
 
       if (overlapX && overlapZ) {
-        // 같은 모델이고 적층 홈(stackingOffset)이 있으면 그만큼 맞물려 낮아짐
-        const offset = (otherModel.id === model.id && otherModel.stackable) ? (otherModel.stackingOffset || 0) : 0;
+        // 같은 상자·같은 시리즈이고 적층 홈(stackingOffset)이 있으면 그만큼 맞물려 낮아짐
+        const offset = stackOffsetBetween(otherModel, model);
         const candidateY = (other.y || 0) + otherDims.h - offset;
         if (candidateY > baseY) {
           baseY = candidateY;
@@ -910,6 +918,7 @@ window.PackerEngine = (function () {
     checkModelFitForCompartment,
     validatePlan,
     computeStackingY,
+    stackOffsetBetween,
     autoFill,
     getCompartmentMargins,
     calculatePlanMetrics

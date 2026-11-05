@@ -5581,3 +5581,8 @@ body.ui-mode-mobile.mobile-step-build[data-active-mtab="errors"] #error-code-doc
 @media (max-width: 340px) {
   .header-maker svg { display: none !important; }
 }
+
+/* 1105j · 도움말 › 완전히 처음으로 되돌리기 버튼 */
+.help-reset-btn { display: block; margin: var(--sp-3) 0 0 var(--sp-3); min-height: var(--tap); padding: 0 var(--sp-4); border: 1px solid var(--red-81); border-radius: 12px; background: var(--red-97); color: var(--danger); font-family: inherit; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+@media (hover: hover) { .help-reset-btn:hover { filter: brightness(0.97); } }
+.help-reset-btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }

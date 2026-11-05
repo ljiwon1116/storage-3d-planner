@@ -542,8 +542,8 @@ window.DEFAULT_STORAGE_MODELS = [
     brand: '루틴랩',
     lineup: '투명 서랍형 수납함',
     name: '루틴랩 투명 서랍 3L (12.6×34×H11cm)',
-    wTop: 126, dTop: 340, h: 110,
-    wBot: 126, dBot: 340,
+    wTop: 127.5, dTop: 340, h: 110,   // 3L 두 개를 나란히 놓으면 6L 한 개 너비(255)와 딱 같음
+    wBot: 127.5, dBot: 340,
     shapeType: 'box',
     accessType: 'front_drawer',
     stackable: true,

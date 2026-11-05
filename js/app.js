@@ -732,12 +732,176 @@
     return m.accessType === 'front_drawer' || m.accessType === 'front_open';
   }
 
+  // 얇고 위로 긴 바구니 (바닥 짧은 쪽 16cm 이하, 높이가 그 0.9배 이상): 쌓으면 넘어지기 쉬워 자동 채우기에서 쌓지 않음
+  function isThinTallBasket(m) {
+    if (!m || m.accessType === 'front_drawer') return false;
+    const narrow = Math.min(m.wTop, m.dTop);
+    return narrow <= 160 && m.h >= narrow * 0.9;
+  }
+  const canStackInFill = (m) => !!m.stackable && !isThinTallBasket(m);
+
+  // 자동 채우기 뒤: 바닥에 놓인 바구니 줄을 낮은 줄이 앞, 높은 줄이 뒤로 오게 자리 바꿈
+  // (줄이 차지하던 앞뒤 구간은 그대로 → 서랍 앞 여유도 그대로)
+  function lowBasketRowsFront(boxes) {
+    const P = window.PackerEngine;
+    const mm = state.modelsMap;
+    const stacks = {};
+    boxes.forEach((b) => {
+      const m = mm[b.modelId];
+      if (!m || m.accessType === 'front_drawer') return;
+      const key = `${b.compartmentIndex}|${b.x}|${b.z}|${b.rot || 0}`;
+      (stacks[key] = stacks[key] || []).push(b);
+    });
+    const rowsByComp = {};
+    Object.values(stacks).forEach((list) => {
+      if (Math.min(...list.map((b) => b.y || 0)) > 5) return;          // 서랍 위에 올린 바구니는 그대로
+      const b0 = list[0];
+      const d = P.getOrientedDims(mm[b0.modelId], b0.rot || 0);
+      const top = Math.max(...list.map((b) => (b.y || 0) + P.getOrientedDims(mm[b.modelId], b.rot || 0).h));
+      const front = b0.z + d.d;
+      const rows = (rowsByComp[b0.compartmentIndex] = rowsByComp[b0.compartmentIndex] || []);
+      let row = rows.find((r) => Math.abs(r.front - front) <= 3);
+      if (!row) rows.push(row = { front, depth: 0, h: 0, stacks: [] });
+      row.depth = Math.max(row.depth, d.d);
+      row.h = Math.max(row.h, top);
+      row.stacks.push(list);
+    });
+    Object.values(rowsByComp).forEach((rows) => {
+      if (rows.length < 2) return;
+      rows.sort((a, b) => b.front - a.front);                           // 지금 앞 → 뒤
+      const span = rows.map((r) => r.front);
+      const ordered = [...rows].sort((a, b) => a.h - b.h);              // 낮은 줄부터 앞에
+      let f = span[0];
+      ordered.forEach((r) => {
+        const dz = f - r.front;
+        r.stacks.forEach((list) => list.forEach((b) => { b.z = Math.round(b.z + dz); }));
+        f -= r.depth + 2;
+      });
+    });
+    return boxes;
+  }
+
   // 팬트리 안쪽 벽 칸에서 옆 선반에 가려진 구석 구간 (칸 안 x). 서랍형은 앞이 막혀 못 여니 여기 넣지 않음
   function pantryBlockedX(comp) {
     if (state.spaceConfig.type !== 'pantry' || !comp || comp.wall !== 'A') return [];
     return window.PackerEngine.getPantryCorners(state.spaceConfig)
       .map((c) => [c.s0 - (comp.s0 || 0), c.s1 - (comp.s0 || 0)])
       .filter(([a, b]) => b > 0 && a < comp.w);
+  }
+
+  // ===== 크기가 서로 맞물리는 서랍형 채우기 (예: 루틴랩 3L×2 = 6L, 9L×3 = 6L×2, 9L 높이 = 3L·6L 두 단) =====
+  // 정해진 너비 안을 가장 꽉 채우는 상자 조합 (0.5mm 단위로 계산 → 127.5 같은 치수도 정확히)
+  // valueOf: 상자 하나의 값 (바닥 줄은 너비, 위로 쌓을 때는 너비×높이)
+  function bestWidthCombo(models, width, valueOf, rng) {
+    const U = 2;
+    const cap = Math.floor(width * U + 0.001);
+    const items = models.map((m) => ({ m, wt: Math.ceil(m.wTop * U - 0.001), v: valueOf(m) }))
+      .filter((it) => it.wt > 0 && it.wt <= cap);
+    if (!items.length) return [];
+    for (let i = items.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [items[i], items[j]] = [items[j], items[i]]; }
+    const best = new Float64Array(cap + 1);
+    const pick = new Int16Array(cap + 1).fill(-1);
+    for (let c = 1; c <= cap; c++) {
+      best[c] = best[c - 1];
+      pick[c] = -1;
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        if (it.wt > c) continue;
+        const v = best[c - it.wt] + it.v;
+        if (v > best[c] + 1e-6) { best[c] = v; pick[c] = i; }
+      }
+    }
+    const out = [];
+    let c = cap;
+    while (c > 0) {
+      if (pick[c] < 0) { c -= 1; continue; }
+      out.push(items[pick[c]].m);
+      c -= items[pick[c]].wt;
+    }
+    // 같은 상자끼리 모아서, 묶음 순서는 무작위로
+    const groups = {};
+    out.forEach((m) => (groups[m.id] = groups[m.id] || []).push(m));
+    const keys = Object.keys(groups);
+    for (let i = keys.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [keys[i], keys[j]] = [keys[j], keys[i]]; }
+    return keys.flatMap((k) => groups[k]);
+  }
+
+  // 반올림한 x가 칸 끝을 넘지 않게 (127.5 같은 치수 때문에 0.5mm 넘치는 것 방지)
+  const fitX = (x, w, limit) => Math.max(0, Math.min(Math.round(x), Math.floor(limit - w + 1e-6)));
+
+  // 고른 상자를 [x0, x1] 구간에 나란히 놓을 x 위치들 (남는 폭이 있으면 사이를 최대 2mm씩 띄움)
+  function spreadInRow(list, x0, x1) {
+    const used = list.reduce((s, m) => s + m.wTop, 0);
+    const gap = list.length > 1 ? Math.min(2, Math.max(0, (x1 - x0 - used) / (list.length - 1))) : 0;
+    let x = x0;
+    return list.map((m) => { const at = x; x += m.wTop + gap; return { m, x: at }; });
+  }
+
+  // [a, b] 구간에서 막힌 곳(팬트리 구석 등)을 뺀 빈 구간들
+  function freeIntervals(a, b, blocked) {
+    let parts = [[a, b]];
+    (blocked || []).forEach(([s, e]) => {
+      parts = parts.flatMap(([p, q]) => (e <= p || s >= q) ? [[p, q]] : [[p, Math.min(q, s)], [Math.max(p, e), q]]);
+    });
+    return parts.filter(([p, q]) => q - p > 20);
+  }
+
+  // 이미 놓인 서랍형 줄 위로, 윗면 높이가 같은 상자들을 이어서 그 너비에 꽉 맞는 조합을 계속 쌓음
+  // (3L 두 개 위에 6L, 9L 세 개 위에 6L 두 개, 3L·6L 두 단 옆 9L 위로도 이어서)
+  function stackDrawersUp(boxes, layer, compIdx, comp, pool, capH, rng) {
+    const P = window.PackerEngine;
+    let id = Date.now() + 5000;
+    const mm = state.modelsMap;
+    let tops = layer.slice();
+    for (let round = 0; round < 8 && tops.length; round++) {
+      const segs = [];
+      tops.filter((t) => t.m.stackable).sort((a, b) => a.x - b.x).forEach((t) => {
+        const top = t.y + t.m.h;
+        const front = t.z + t.m.dTop;
+        const s = segs[segs.length - 1];
+        if (s && Math.abs(s.top - top) <= 3 && t.x - s.x1 <= 6 && Math.abs(s.front - front) <= 3 && Math.abs(s.d - t.m.dTop) <= 5) {
+          s.x1 = t.x + t.m.wTop; s.top = Math.max(s.top, top); s.d = Math.min(s.d, t.m.dTop); s.under.push(t.m);
+        } else {
+          segs.push({ x0: t.x, x1: t.x + t.m.wTop, top, front, d: t.m.dTop, under: [t.m] });
+        }
+      });
+      const next = [];
+      segs.forEach((s) => {
+        const offset = Math.max(...s.under.map((u) => u.stackingOffset || 0));
+        const room = capH - s.top + offset;
+        const cands = pool.filter((m) => m.stackable && m.h <= room && m.dTop <= s.d + 1 && m.dTop >= s.d * 0.85);
+        const list = bestWidthCombo(cands, s.x1 - s.x0, (m) => m.wTop * m.h, rng);
+        spreadInRow(list, s.x0, s.x1).forEach(({ m, x }) => {
+          const b = { id: 'box-' + (++id), modelId: m.id, compartmentIndex: compIdx, x: fitX(x, m.wTop, Math.min(comp.w, s.x1 + 1)), y: 0, z: Math.round(s.front - m.dTop), rot: 0 };
+          b.y = P.computeStackingY(state.spaceConfig, boxes, b, mm, [b.id]);
+          if (b.y + m.h > capH + 0.5 || b.y < s.top - offset - 3) return;   // 높이 한도를 넘거나 바닥이 안 맞으면 안 올림
+          boxes.push(b);
+          next.push({ m, x: b.x, y: b.y, z: b.z });
+        });
+      });
+      tops = next;
+    }
+  }
+
+  // 서랍형만으로 채우기: 바닥 줄은 칸 너비를 가장 꽉 채우는 조합, 그 위로는 윗면이 같은 상자끼리 이어서 쌓기
+  function fillDrawersModular(compIdx, comp, fits, rng, o) {
+    const usable = fits.filter((m) => m.dTop <= comp.d && m.h <= o.capH);
+    if (!usable.length) return [];
+    const maxD = Math.max(...usable.map((m) => m.dTop));
+    const pool = usable.filter((m) => m.dTop >= maxD * 0.85);   // 칸 깊이를 비슷하게 채우는 상자끼리
+    const boxes = [];
+    const layer = [];
+    let id = Date.now();
+    freeIntervals(o.xStart, o.xEnd, o.blocked).forEach(([a, b]) => {
+      spreadInRow(bestWidthCombo(pool, b - a, (m) => m.wTop, rng), a, b).forEach(({ m, x }) => {
+        const z = o.atBack ? 0 : comp.d - m.dTop;
+        const bx = fitX(x, m.wTop, b);
+        boxes.push({ id: 'box-' + (++id), modelId: m.id, compartmentIndex: compIdx, x: bx, y: 0, z: Math.round(z), rot: 0 });
+        layer.push({ m, x: bx, y: 0, z: Math.round(z) });
+      });
+    });
+    if (o.stack) stackDrawersUp(boxes, layer, compIdx, comp, pool, o.capH, rng);
+    return boxes;
   }
 
   // 서랍형 + 바구니형 섞어 채우기 (팬트리·냉장고)
@@ -757,7 +921,7 @@
     const capH = o.capH;
     const bRots = (m) => (!opensFromFront(m) && m.wTop !== m.dTop) ? [0, 90] : [0];
     const stepOf = (m) => Math.max(10, m.h - (m.stackingOffset || 0));
-    const layersUpTo = (m, limitH, allow) => (allow && m.stackable) ? Math.max(1, 1 + Math.floor((limitH - m.h) / stepOf(m))) : 1;
+    const layersUpTo = (m, limitH, allow) => (allow && canStackInFill(m)) ? Math.max(1, 1 + Math.floor((limitH - m.h) / stepOf(m))) : 1;
     const pickOf = (list, ratio, n) => {
       list.sort((a, b) => b.score - a.score);
       const top = list.filter((c) => c.score >= list[0].score * ratio).slice(0, n);
@@ -777,9 +941,31 @@
     const refD = atBack ? roomyD : comp.d;
     const fullStack = rng() < 0.35;   // 서랍을 끝까지 쌓을지, 서랍 위에 바구니를 올릴지
 
-    // 1) 서랍 한 줄 (앞을 보게, 구석은 건너뜀)
+    // 1) 서랍 한 줄 (앞을 보게, 구석은 건너뜀) — 칸 너비를 가장 꽉 채우는 조합으로
     const cols = [];
     let x = xStart, safety = 0, rowD = 0;
+    {
+      const maxD = Math.max(...rowPool.map((m) => m.dTop));
+      const rowSet = rowPool.filter((m) => m.dTop >= maxD * 0.85);
+      freeIntervals(xStart, xEnd, blocked).forEach(([a, b]) => {
+        spreadInRow(bestWidthCombo(rowSet, b - a, (m) => m.wTop, rng), a, b).forEach(({ m, x: rx }) => {
+          const cx = fitX(rx, m.wTop, b);
+          const z = atBack ? 0 : comp.d - m.dTop;
+          add(m, cx, 0, z, 0);
+          cols.push({ m, x: cx, z, top: m.h });
+          rowD = Math.max(rowD, m.dTop);
+        });
+      });
+      if (cols.length && fullStack && o.stackDrawers) {
+        // 서랍을 끝까지 쌓을 때: 윗면이 같은 서랍끼리 이어서 꽉 맞게 쌓음
+        stackDrawersUp(boxes, cols.map((c) => ({ m: c.m, x: Math.round(c.x), y: 0, z: Math.round(c.z) })), compIdx, comp, rowSet, capH, rng);
+        cols.forEach((c) => {
+          c.top = Math.max(...boxes.filter((b) => b.x < c.x + c.m.wTop - 2 && b.x + (state.modelsMap[b.modelId]?.wTop || 0) > c.x + 2)
+            .map((b) => b.y + (state.modelsMap[b.modelId]?.h || 0)));
+        });
+      }
+      x = xEnd;   // 아래 예전 방식은 건너뜀
+    }
     while (x < xEnd - 15 && safety++ < 40) {
       const remW = xEnd - x;
       const cands = [];
@@ -898,6 +1084,12 @@
       if (mixed && mixed.length) return mixed;
     }
 
+    // 서랍형만 채울 때: 크기가 맞물리는 조합으로 바닥을 꽉, 위로도 윗면 높이를 맞춰 쌓기
+    if (fits.length && fits.every((m) => m.accessType === 'front_drawer') && state.spaceConfig.type !== 'drawer') {
+      const modular = fillDrawersModular(compIdx, comp, fits, rng, { xStart, xEnd, blocked, capH: comp.clearH, stack: opts.stack });
+      if (modular.length) return modular;
+    }
+
     // 서랍형(front_drawer)이 주력인 경우, 높이가 제각각인 그룹으로 쪼개서 얕은 소형 서랍이 뽑히지 않도록 바닥 채움 우선
     const hasDrawer = fits.some((m) => m.accessType === 'front_drawer');
     const groups = [];
@@ -974,7 +1166,7 @@
           if (x + dim.w > xEnd) break;
           if (m.accessType === 'front_drawer' && blockedAt(x, x + dim.w)) break;
           const stepH = Math.max(10, m.h - (m.stackingOffset || 0));
-          const layers = (opts.stack && m.stackable)
+          const layers = (opts.stack && canStackInFill(m))
             ? Math.max(1, 1 + Math.floor((comp.clearH - m.h) / stepH))
             : 1;
           for (let l = 0; l < layers; l++) {
@@ -1053,7 +1245,7 @@
     const boxes = [];
     let id = Date.now();
     const layersFor = (m, allowStack) => {
-      if (!allowStack || !m.stackable) return 1;
+      if (!allowStack || !canStackInFill(m)) return 1;
       const stepH = Math.max(10, m.h - (m.stackingOffset || 0));
       return Math.max(1, 1 + Math.floor((capH - m.h) / stepH));
     };
@@ -1198,6 +1390,7 @@
         ? fridgeFillCompartment(compIdx, kind, brand, rng, size)
         : randomFillCompartment(compIdx, pool, rng, opts);
       if (!cand.length) continue;
+      lowBasketRowsFront(cand);
       const rate = fillRate(cand);
       const same = sig(cand) === prevSig;
       if (!same && rate >= TARGET) { best = cand; bestRate = rate; break; }
@@ -1907,100 +2100,94 @@
     refreshAll();
   }
 
-  // 새 수납함 추가 시: 빈 바닥 공간이 있으면 바닥에 놓고, 다른 수납함이 이미 깔려 있으면 자동으로 그 위에 적층!
+  // 새 상자를 넣을 자리 찾기
+  // - 다른 상자 모서리에 딱 붙는 자리까지 모두 살펴봄 (3L 옆 3L, 9L 세 개 사이처럼 빈틈 없이)
+  // - 바닥이 차면 윗면 높이가 같은 상자들 위에 걸쳐 올림 (3L 두 개 위에 6L 등). 바닥의 60% 이상이 받쳐져야 함
+  // - 서랍형은 앞이 막히는 자리(구석, 다른 상자 바로 앞)는 피하고, 다른 서랍형 바로 앞도 막지 않음
+  // 고르는 순서: 낮은 층 → 앞쪽 → 왼쪽
+  function findPlacementSpot(compIdx, model, rot) {
+    const P = window.PackerEngine;
+    const comp = P.getCompartments(state.spaceConfig)[compIdx];
+    if (!comp) return null;
+    const dims = P.getOrientedDims(model, rot);
+    const boxes = getActivePlan().boxes.filter((b) => b.compartmentIndex === compIdx);
+    const info = boxes.map((b) => {
+      const m = state.modelsMap[b.modelId];
+      return m ? { b, m, d: P.getOrientedDims(m, b.rot || 0), y: b.y || 0 } : null;
+    }).filter(Boolean);
+    const isDrawer = opensFromFront(model);
+
+    let xLo = 0, xHi = comp.w, zLo = 0;
+    if (state.spaceConfig.type === 'cabinet') {
+      const k = P.getCabinetConstraints(state.spaceConfig);
+      xLo = k.leftDeadW; xHi = comp.w - k.rightDeadW;
+    } else if (state.spaceConfig.type === 'drawer') {
+      zLo = P.getDrawerConstraints(state.spaceConfig).unexposedD;
+    }
+    const blocked = pantryBlockedX(comp);
+
+    const xsRaw = [0, xLo, xHi - dims.w, comp.w - dims.w];
+    const zsRaw = [0, zLo, comp.d - dims.d];
+    info.forEach(({ b, d }) => {
+      xsRaw.push(b.x, b.x + d.w, b.x + d.w + 2, b.x - dims.w, b.x - dims.w - 2, b.x + d.w - dims.w);
+      zsRaw.push(b.z, b.z + d.d, b.z + d.d + 2, b.z - dims.d, b.z - dims.d - 2, b.z + d.d - dims.d);
+    });
+    blocked.forEach(([a, e]) => { xsRaw.push(e, a - dims.w); });
+    const uniq = (arr, lo, hi) => [...new Set(arr.map((v) => Math.round(v * 2) / 2))].filter((v) => v >= lo - 0.01 && v <= hi + 0.01);
+
+    const tryPass = (strict) => {
+      const x0 = strict ? xLo : 0, x1 = strict ? xHi : comp.w, z0 = strict ? zLo : 0;
+      const xs = uniq(xsRaw, x0, x1 - dims.w);
+      const zs = uniq(zsRaw, z0, comp.d - dims.d);
+      let best = null;
+      xs.forEach((x) => {
+        if ((strict || isDrawer) && blocked.some(([a, e]) => x + dims.w > a + 0.5 && x < e - 0.5)) return;
+        zs.forEach((z) => {
+          const test = { id: '__probe', modelId: model.id, compartmentIndex: compIdx, x, z, rot };
+          const y = P.computeStackingY(state.spaceConfig, boxes, test, state.modelsMap, ['__probe']);
+          if (y + dims.h > comp.clearH + 0.5) return;
+          if (best && (y > best.y + 0.5 || (Math.abs(y - best.y) <= 0.5 && (z < best.z - 0.5 || (Math.abs(z - best.z) <= 0.5 && x >= best.x))))) return;
+          let supported = 0;
+          for (const o of info) {
+            const ox = Math.min(x + dims.w, o.b.x + o.d.w) - Math.max(x, o.b.x);
+            const oz = Math.min(z + dims.d, o.b.z + o.d.d) - Math.max(z, o.b.z);
+            const top = o.y + o.d.h - P.stackOffsetBetween(o.m, model);
+            const oy = Math.min(y + dims.h, o.y + o.d.h) - Math.max(y, o.y);
+            if (ox > 2 && oz > 2 && oy > 6) return;                          // 겹침
+            if (y > 0 && ox > 0 && oz > 0 && o.m.stackable && Math.abs(top - y) <= 4) supported += ox * oz;
+            // 서랍 앞이 막히는지 (서랍 깊이의 절반은 열 수 있어야 함)
+            if (ox > 2 && oy > 6) {
+              if (isDrawer && o.b.z >= z + dims.d - 4 && o.b.z - (z + dims.d) < dims.d * 0.5 - 2) return;
+              if (opensFromFront(o.m) && o.m.accessType === 'front_drawer' && z >= o.b.z + o.d.d - 4 && z - (o.b.z + o.d.d) < o.d.d * 0.5 - 2) return;
+            }
+          }
+          if (y > 0 && supported < dims.w * dims.d * 0.6) return;            // 받쳐지는 바닥이 모자람
+          best = { x, y, z };
+        });
+      });
+      return best;
+    };
+    return tryPass(true) || (isDrawer ? null : tryPass(false));
+  }
+
+  // 새 수납함 추가: 들어갈 자리를 찾아서 넣고, 자리가 없으면 false
   function addBoxToActiveSpace(modelId, initialRot = 0) {
     const model = state.modelsMap[modelId];
     if (!model) return;
-
-    const activePlan = getActivePlan();
     const compartments = window.PackerEngine.getCompartments(state.spaceConfig);
     const compIdx = Math.min(compartments.length - 1, Math.max(0, state.activeCompartmentIdx || 0));
-    const comp = compartments[compIdx] || compartments[0];
-    const dims = window.PackerEngine.getOrientedDims(model, initialRot);
-
-    let xMinBound = 0;
-    if (state.spaceConfig.type === 'cabinet') {
-      const cabConst = window.PackerEngine.getCabinetConstraints(state.spaceConfig);
-      xMinBound = cabConst.leftDeadW;
-    }
-
-    let bestX = xMinBound;
-    let bestZ = Math.max(0, comp.d - dims.d);
-    let foundFloorSpot = false;
-
-    // 1) 먼저 1층 바닥(y = 0)에 빈 자리가 있는지 탐색
-    const step = 15;
-    for (let z = comp.d - dims.d; z >= 0 && !foundFloorSpot; z -= step) {
-      for (let x = xMinBound; x <= comp.w - dims.w && !foundFloorSpot; x += step) {
-        const overlaps = activePlan.boxes.some((b) => {
-          if (b.compartmentIndex !== compIdx) return false;
-          const bm = state.modelsMap[b.modelId];
-          if (!bm) return false;
-          const bd = window.PackerEngine.getOrientedDims(bm, b.rot || 0);
-          return x < b.x + bd.w - 4 && x + dims.w > b.x + 4 &&
-                 z < b.z + bd.d - 4 && z + dims.d > b.z + 4;
-        });
-        if (!overlaps) {
-          bestX = x;
-          bestZ = z;
-          foundFloorSpot = true;
-        }
-      }
-    }
-
-    // 2) 만약 바닥에 빈 자리가 없다면, 현재 칸에 있는 기존 수납함(같은 모델 우선, 그다음 가장 낮은 층)의 좌표를 찾아 그 위에 자동으로 쌓음!
-    if (!foundFloorSpot) {
-      const compBoxes = activePlan.boxes.filter((b) => b.compartmentIndex === compIdx);
-      if (compBoxes.length > 0) {
-        // 각 기존 박스 위치(x, z)에 쌓았을 때의 예상 높이를 계산하여 선반 높이를 넘지 않는 가장 낮은 곳 선택
-        const candidates = compBoxes.map((b) => {
-          const testBox = {
-            id: 'temp',
-            modelId: model.id,
-            compartmentIndex: compIdx,
-            x: b.x,
-            z: b.z,
-            rot: initialRot
-          };
-          const stackedY = window.PackerEngine.computeStackingY(
-            state.spaceConfig,
-            activePlan.boxes,
-            testBox,
-            state.modelsMap,
-            ['temp']
-          );
-          const sameModelBonus = b.modelId === model.id ? -500 : 0;
-          const fitsHeightBonus = (stackedY + dims.h <= comp.clearH) ? -2000 : 0;
-          return { x: b.x, z: b.z, stackedY, score: stackedY + sameModelBonus + fitsHeightBonus };
-        });
-        candidates.sort((a, b) => a.score - b.score);
-        // 바닥도 꽉 차고 위에 쌓아도 천장을 넘으면 넣지 않음 (칸 밖으로 튀어나오지 않게)
-        if (candidates[0].stackedY + dims.h > comp.clearH + 1) return false;
-        bestX = Math.max(0, Math.min(comp.w - dims.w, candidates[0].x));
-        bestZ = Math.max(0, Math.min(comp.d - dims.d, candidates[0].z));
-      }
-    }
-
+    const spot = findPlacementSpot(compIdx, model, initialRot);
+    if (!spot) return false;
     const newBox = {
       id: 'box-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
       modelId: model.id,
       compartmentIndex: compIdx,
-      x: Math.max(0, Math.min(comp.w - dims.w, bestX)),
-      y: 0,
-      z: Math.max(0, Math.min(comp.d - dims.d, bestZ)),
+      x: spot.x,
+      y: Math.round(spot.y),
+      z: spot.z,
       rot: initialRot
     };
-
-    // 해당 (x, z) 아래에 다른 수납함이 있으면 자동으로 그 위로 올라감!
-    newBox.y = window.PackerEngine.computeStackingY(
-      state.spaceConfig,
-      activePlan.boxes,
-      newBox,
-      state.modelsMap,
-      [newBox.id]
-    );
-
-    activePlan.boxes.push(newBox);
+    getActivePlan().boxes.push(newBox);
     state.selectedBoxIds = [newBox.id];
     refreshAll();
     return true;
@@ -4020,7 +4207,9 @@
   // ---------- 내 설정 저장 (다음에 링크를 다시 열어도 그대로) ----------
   const STORAGE_KEY_STATE = 'storagefit_state_v1';
   let saveTimer = null;
+  let resettingAll = false; // 모두 지우는 중에는 다시 저장하지 않음
   function saveLocalNow() {
+    if (resettingAll) return;
     try {
       const payload = {
         v: 1,
@@ -5478,6 +5667,23 @@
       if (!b.getAttribute('aria-label') && b.textContent.trim() === '✕') b.setAttribute('aria-label', '닫기');
     });
     window.addEventListener('pagehide', saveLocalNow);
+    // 도움말 › 완전히 처음으로 되돌리기: 이 기기에 남은 기록을 모두 지우고 맨 처음 화면으로
+    document.getElementById('btn-reset-all')?.addEventListener('click', async () => {
+      const yes = await confirmDialog({
+        title: '모두 지우고 처음부터 할까요?',
+        message: '가구 설정, 넣은 상자, 저장한 묶음과 내 상자가 모두 지워져요. 지운 것은 되살릴 수 없어요.',
+        ok: '모두 지우기',
+        cancel: '그만두기'
+      });
+      if (!yes) return;
+      resettingAll = true;
+      clearTimeout(saveTimer);
+      try {
+        Object.keys(localStorage).filter((k) => k.startsWith('storagefit_')).forEach((k) => localStorage.removeItem(k));
+      } catch (e) {}
+      try { sessionStorage.clear(); } catch (e) {}
+      window.location.replace(window.location.pathname); // 공유 링크 주소였어도 맨 처음 화면으로
+    });
     document.addEventListener('visibilitychange', () => { if (document.hidden) saveLocalNow(); });
     document.getElementById('drag-guide-ok')?.addEventListener('click', closeDragGuide);
     document.getElementById('box-guide-ok')?.addEventListener('click', closeBoxGuide);
