@@ -5557,3 +5557,27 @@ body.ui-mode-mobile.mobile-step-build[data-active-mtab="errors"] #error-code-doc
 /* 저장·구매: 파트너스 안내 */
 .export-partner-note { margin-top: calc(-1 * var(--sp-1)); word-break: keep-all; }
 #export-cost-note { margin: var(--sp-2) 0 0; word-break: keep-all; }
+
+/* 1105h · 도움말: 주제별로 접고 펼침, 펼치면 기능 이름 + 설명이 차례로 */
+.help-cat-body { display: flex; flex-direction: column; gap: var(--sp-3); padding: 0 var(--sp-1) var(--sp-4); }
+.help-topic-title { margin: 0 0 var(--sp-1); font-size: 0.9rem; font-weight: 700; color: var(--text-title); }
+.help-topic p { margin: 0; padding: 0 0 0 var(--sp-3); font-size: 0.9rem; line-height: 1.6; color: var(--text-body); word-break: keep-all; overflow-wrap: break-word; }
+/* 저장·구매: 파트너스 안내는 위 설명과 구분 (선 위 작은 안내) */
+.export-partner-note {
+  margin: var(--sp-3) 0 var(--sp-3) !important;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 12px !important;
+  line-height: 1.5;
+  word-break: keep-all;
+}
+
+/* 1105h · 저장·구매 안내 칸: 치수 안내 + 파트너스 안내 */
+.export-partner-note { display: flex; flex-direction: column; gap: var(--sp-1-5); }
+.export-partner-note p { margin: 0; }
+
+/* 1105h · 아주 좁은 화면(340px 이하)에서 제목이 가운데 인스타 버튼에 닿지 않게 */
+@media (max-width: 340px) {
+  .header-maker svg { display: none !important; }
+}

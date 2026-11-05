@@ -5787,6 +5787,30 @@
       }
     }
 
+    // '저장·구매'를 처음 열었을 때 한 번만 사용법
+    const STORAGE_KEY_EXPORT_GUIDE_SEEN = 'storagefit_export_guide_seen_v1';
+    function maybeShowExportGuide() {
+      let seen = false;
+      try { seen = localStorage.getItem(STORAGE_KEY_EXPORT_GUIDE_SEEN) === '1'; } catch (e) {}
+      const el = document.getElementById('export-guide');
+      if (!el || seen) return;
+      el.hidden = false;
+      document.getElementById('export-guide-ok')?.focus();
+    }
+    function closeExportGuide() {
+      const el = document.getElementById('export-guide');
+      if (el) el.hidden = true;
+      try { localStorage.setItem(STORAGE_KEY_EXPORT_GUIDE_SEEN, '1'); } catch (e) {}
+    }
+    document.getElementById('export-guide-ok')?.addEventListener('click', closeExportGuide);
+    document.getElementById('export-guide')?.addEventListener('click', (e) => {
+      if (e.target.id === 'export-guide') closeExportGuide(); // 바깥을 눌러도 닫힘
+    });
+    document.addEventListener('keydown', (e) => {
+      const el = document.getElementById('export-guide');
+      if (e.key === 'Escape' && el && !el.hidden) closeExportGuide();
+    });
+
     function openExportModal() {
       renderExportModal();
       if (exportModal) {
@@ -5797,6 +5821,7 @@
         // 창이 그려진 뒤에 구매 링크가 화면 안에 있는지 다시 봄 (열리는 움직임이 끝난 뒤에도 한 번 더)
         requestAnimationFrame(updateExportMoreHint);
         setTimeout(updateExportMoreHint, 420);
+        maybeShowExportGuide();
       }
     }
 
