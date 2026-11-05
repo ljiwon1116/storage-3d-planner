@@ -464,14 +464,25 @@
     if (btn) { btn.classList.toggle('active', open); btn.setAttribute('aria-expanded', open ? 'true' : 'false'); }
   }
   let openCtrlRaf = 0;
+  let openCtrlClosedAt = 0;
   function bindOpenCtrl() {
     const btn = document.getElementById('btn-open-ctrl');
     const slider = document.getElementById('ocp-slider');
     const bd = document.getElementById('open-ctrl-backdrop');
     const pop = document.getElementById('open-ctrl-pop');
     if (!btn || !slider || !bd || !pop) return;
-    btn.addEventListener('click', (e) => { e.stopPropagation(); setOpenCtrl(pop.hidden); });
-    bd.addEventListener('pointerdown', (e) => { e.preventDefault(); setOpenCtrl(false); });
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // 창이 열린 채 버튼을 누르면: 바깥 배경이 먼저 닫고, 같은 손가락의 클릭이 버튼에 닿아 다시 열리지 않게
+      if (pop.hidden && Date.now() - openCtrlClosedAt < 450) return;
+      setOpenCtrl(pop.hidden);
+    });
+    bd.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      const r = btn.getBoundingClientRect();
+      if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) openCtrlClosedAt = Date.now();
+      setOpenCtrl(false);
+    });
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !pop.hidden) setOpenCtrl(false); });
     window.addEventListener('resize', () => { if (!pop.hidden) placeOpenCtrlPop(); });
     slider.addEventListener('input', () => {
@@ -490,6 +501,7 @@
   }
 
   function refreshAll() {
+    requestAnimationFrame(placeCornerTools);
     document.body.classList.toggle('space-drawer', state.spaceConfig.type === 'drawer');
     document.body.classList.toggle('space-pantry', state.spaceConfig.type === 'pantry');
     document.body.classList.toggle('space-fridge', state.spaceConfig.type === 'fridge');
@@ -586,10 +598,11 @@
 
   // 3D 가구 선반의 2D 화면 좌표와 우측 선반 콜아웃 카드를 잇는 리더라인(연결선) 그리기
   let lastShelfAnchors = [];
+  let renderCostOverlayRef = null;   // 칸별 금액 표시 (아래 내보내기 부분에서 채움) — 화면을 돌리면 따라 움직이게
   function handleShelfAnchors(anchors) {
     lastShelfAnchors = anchors || [];
-    if (state.costOverlayOpen) {
-      renderCostOverlayLabels(lastShelfAnchors);
+    if (state.costOverlayOpen && renderCostOverlayRef) {
+      renderCostOverlayRef(lastShelfAnchors);
     }
     const svgEl = document.getElementById('shelf-leader-svg');
     const btnLayer = document.getElementById('mobile-shelf-buttons');
@@ -719,6 +732,138 @@
     return m.accessType === 'front_drawer' || m.accessType === 'front_open';
   }
 
+  // 팬트리 안쪽 벽 칸에서 옆 선반에 가려진 구석 구간 (칸 안 x). 서랍형은 앞이 막혀 못 여니 여기 넣지 않음
+  function pantryBlockedX(comp) {
+    if (state.spaceConfig.type !== 'pantry' || !comp || comp.wall !== 'A') return [];
+    return window.PackerEngine.getPantryCorners(state.spaceConfig)
+      .map((c) => [c.s0 - (comp.s0 || 0), c.s1 - (comp.s0 || 0)])
+      .filter(([a, b]) => b > 0 && a < comp.w);
+  }
+
+  // 서랍형 + 바구니형 섞어 채우기 (팬트리·냉장고)
+  // - 서랍형: 돌리지 않음 (여는 쪽이 항상 앞). 앞이 막힌 구석에는 넣지 않음
+  // - 바구니형: 서랍 위에 올리거나, 서랍 앞쪽에 둠 (앞에 둘 땐 서랍이 절반은 열리게 서랍 깊이의 절반을 비움)
+  // - o.capH: 서랍과 그 위 바구니를 합친 높이 한도 (냉장고는 칸 높이의 60%)
+  const DRAWER_OPEN_RATIO = 0.5;
+  function fillDrawerBasketMix(compIdx, comp, drawers, baskets, rng, o) {
+    const P = window.PackerEngine;
+    const boxes = [];
+    let id = Date.now();
+    const add = (m, x, y, z, rot) => boxes.push({ id: 'box-' + (++id), modelId: m.id, compartmentIndex: compIdx, x: Math.round(x), y: Math.round(y), z: Math.round(z), rot });
+    const xStart = o.xStart || 0;
+    const xEnd = o.xEnd != null ? o.xEnd : comp.w;
+    const blocked = o.blocked || [];
+    const blockedAt = (x0, x1) => blocked.some(([a, b]) => x1 > a + 0.5 && x0 < b - 0.5);
+    const capH = o.capH;
+    const bRots = (m) => (!opensFromFront(m) && m.wTop !== m.dTop) ? [0, 90] : [0];
+    const stepOf = (m) => Math.max(10, m.h - (m.stackingOffset || 0));
+    const layersUpTo = (m, limitH, allow) => (allow && m.stackable) ? Math.max(1, 1 + Math.floor((limitH - m.h) / stepOf(m))) : 1;
+    const pickOf = (list, ratio, n) => {
+      list.sort((a, b) => b.score - a.score);
+      const top = list.filter((c) => c.score >= list[0].score * ratio).slice(0, n);
+      return top[Math.floor(rng() * top.length)] || list[0];
+    };
+
+    const dPool = drawers.filter((m) => m.h <= capH && m.wTop <= xEnd - xStart && m.dTop <= comp.d);
+    const bPool = baskets.filter((m) => m.h <= capH);
+    if (!dPool.length) return null;
+
+    // 서랍을 뒤에 붙이고 그 앞에 바구니 한 줄 + 서랍 절반 열림 여유가 들어가는 서랍 깊이
+    const minBD = bPool.reduce((acc, m) => Math.min(acc, ...bRots(m).map((r) => P.getOrientedDims(m, r).d)), Infinity);
+    const roomyD = isFinite(minBD) ? (comp.d - minBD - 2) / (1 + DRAWER_OPEN_RATIO) : 0;
+    const backPool = dPool.filter((m) => m.dTop <= roomyD);
+    const atBack = backPool.length > 0 && rng() < 0.65;
+    const rowPool = atBack ? backPool : dPool;
+    const refD = atBack ? roomyD : comp.d;
+    const fullStack = rng() < 0.35;   // 서랍을 끝까지 쌓을지, 서랍 위에 바구니를 올릴지
+
+    // 1) 서랍 한 줄 (앞을 보게, 구석은 건너뜀)
+    const cols = [];
+    let x = xStart, safety = 0, rowD = 0;
+    while (x < xEnd - 15 && safety++ < 40) {
+      const remW = xEnd - x;
+      const cands = [];
+      rowPool.forEach((m) => {
+        if (m.wTop > remW || blockedAt(x, x + m.wTop)) return;
+        const rep = Math.max(1, Math.floor((remW + 2) / (m.wTop + 2)));
+        cands.push({ m, rep, score: (m.dTop / Math.max(1, refD)) * 0.6 + Math.min(1, (rep * m.wTop) / Math.max(1, remW)) * 0.4 });
+      });
+      if (!cands.length) {
+        const nb = blocked.filter(([, b]) => b > x + 0.5).sort((p, q) => p[1] - q[1])[0];
+        if (nb && nb[0] < xEnd) { x = Math.max(x + 1, nb[1]); continue; }
+        break;
+      }
+      const pick = pickOf(cands, 0.85, 4);
+      const count = pick.rep > 1 && rng() < 0.8 ? pick.rep : 1;
+      for (let r = 0; r < count; r++) {
+        const m = pick.m;
+        if (x + m.wTop > xEnd || blockedAt(x, x + m.wTop)) break;
+        const z = atBack ? 0 : comp.d - m.dTop;
+        const layers = fullStack ? layersUpTo(m, capH, o.stackDrawers) : 1;
+        for (let l = 0; l < layers; l++) add(m, x, l * stepOf(m), z, 0);
+        cols.push({ m, x, z, top: (layers - 1) * stepOf(m) + m.h });
+        x += m.wTop + 2;
+        rowD = Math.max(rowD, m.dTop);
+      }
+    }
+    if (!cols.length) return null;
+
+    // 2) 서랍 위에 바구니 (서랍 윗면 안에 들어가는 것만, 높이 한도 안에서)
+    cols.forEach((c) => {
+      const room = capH - c.top;
+      const cands = [];
+      bPool.forEach((m) => bRots(m).forEach((rot) => {
+        const d = P.getOrientedDims(m, rot);
+        if (d.w > c.m.wTop + 1 || d.d > c.m.dTop + 1 || m.h > room) return;
+        const rep = Math.max(1, Math.floor((c.m.wTop + 2) / (d.w + 2)));
+        cands.push({ m, rot, d, rep, score: (rep * d.w * d.d) / Math.max(1, c.m.wTop * c.m.dTop) });
+      }));
+      if (!cands.length) return;
+      const pk = pickOf(cands, 0.85, 3);
+      let bx = c.x;
+      for (let r = 0; r < pk.rep; r++) {
+        if (bx + pk.d.w > c.x + c.m.wTop + 1) break;
+        const layers = layersUpTo(pk.m, room, o.stackBaskets);
+        for (let l = 0; l < layers; l++) add(pk.m, bx, c.top + l * stepOf(pk.m), c.z + c.m.dTop - pk.d.d, pk.rot);
+        bx += pk.d.w + 2;
+      }
+    });
+
+    // 3) 서랍을 뒤에 붙였으면 앞쪽에 바구니 줄 (서랍 깊이의 절반은 비워 둠)
+    if (atBack) {
+      const backLimit = Math.ceil(rowD * (1 + DRAWER_OPEN_RATIO)) + 2;
+      let front = comp.d;
+      for (let row = 0; row < 10 && front - backLimit > 40; row++) {
+        let bx = xStart, depth = 0, s = 0;
+        const maxD = front - backLimit;
+        while (bx < xEnd - 15 && s++ < 40) {
+          const remW = xEnd - bx;
+          const cands = [];
+          bPool.forEach((m) => bRots(m).forEach((rot) => {
+            const d = P.getOrientedDims(m, rot);
+            if (d.w > remW || d.d > maxD) return;
+            const rep = Math.max(1, Math.floor((remW + 2) / (d.w + 2)));
+            cands.push({ m, rot, d, rep, score: (d.d / Math.max(1, maxD)) * 0.6 + Math.min(1, (rep * d.w) / Math.max(1, remW)) * 0.4 });
+          }));
+          if (!cands.length) break;
+          const pk = pickOf(cands, 0.85, 5);
+          const count = pk.rep > 1 && rng() < 0.8 ? pk.rep : 1;
+          for (let r = 0; r < count; r++) {
+            if (bx + pk.d.w > xEnd) break;
+            const layers = layersUpTo(pk.m, o.frontCapH || capH, o.stackBaskets);
+            for (let l = 0; l < layers; l++) add(pk.m, bx, l * stepOf(pk.m), front - pk.d.d, pk.rot);
+            bx += pk.d.w + 2;
+            depth = Math.max(depth, pk.d.d);
+          }
+        }
+        if (!depth) break;
+        front -= depth + 2;
+        if (!o.multiRow) break;
+      }
+    }
+    return boxes;
+  }
+
   // 한 칸을 고른 상자들로 채움 (선반 바닥 사이즈를 최대한 채우는 크기를 우선 배치, 서랍형 앞뒤 이중 적치 방지)
   function randomFillCompartment(compIdx, pool, rng, opts) {
     const compartments = window.PackerEngine.getCompartments(state.spaceConfig);
@@ -739,6 +884,20 @@
     const boxes = [];
     if (fits.length === 0 || usableW <= 10 || usableD <= 10) return boxes;
 
+    // 팬트리 구석(옆 선반에 앞이 막힌 곳)에는 서랍형을 넣지 않음
+    const blocked = pantryBlockedX(comp);
+    const blockedAt = (x0, x1) => blocked.some(([a, b]) => x1 > a + 0.5 && x0 < b - 0.5);
+
+    // 서랍형 + 바구니형 섞어서: 바구니는 서랍 위 또는 서랍 앞(서랍이 절반은 열리게)
+    const mixDrawers = fits.filter((m) => m.accessType === 'front_drawer');
+    const mixBaskets = fits.filter((m) => m.accessType !== 'front_drawer');
+    if (mixDrawers.length && mixBaskets.length && state.spaceConfig.type !== 'drawer') {
+      const mixed = fillDrawerBasketMix(compIdx, comp, mixDrawers, mixBaskets, rng, {
+        xStart, xEnd, capH: comp.clearH, stackDrawers: opts.stack, stackBaskets: opts.stack, multiRow: opts.multiRow, blocked
+      });
+      if (mixed && mixed.length) return mixed;
+    }
+
     // 서랍형(front_drawer)이 주력인 경우, 높이가 제각각인 그룹으로 쪼개서 얕은 소형 서랍이 뽑히지 않도록 바닥 채움 우선
     const hasDrawer = fits.some((m) => m.accessType === 'front_drawer');
     const groups = [];
@@ -758,7 +917,7 @@
     let anyFrontDrawerPlaced = false;
 
     // 후보 상자+회전이 남은 폭(remW)과 깊이(availD) 바닥을 얼마나 알차게 채우는지 점수화
-    const getFittingCandidates = (rowPool, remW, availD, rowIdx) => {
+    const getFittingCandidates = (rowPool, remW, availD, rowIdx, atX) => {
       const cands = [];
       rowPool.forEach((m) => {
         // 뒷줄(rowIdx > 0)에는 앞으로 여는 서랍형(front_drawer) 절대 배치 금지
@@ -766,6 +925,7 @@
         const rots = (!opensFromFront(m) && m.wTop !== m.dTop) ? [0, 90] : [0];
         rots.forEach((rot) => {
           const dim = window.PackerEngine.getOrientedDims(m, rot);
+          if (m.accessType === 'front_drawer' && blockedAt(atX, atX + dim.w)) return;
           if (dim.w <= remW && dim.d <= availD) {
             const depthRatio = dim.d / Math.max(1, availD);
             const maxRepeat = Math.max(1, Math.floor((remW + 2) / (dim.w + 2)));
@@ -791,8 +951,13 @@
 
       while (x < xEnd - 15 && safety++ < 30) {
         const remW = xEnd - x;
-        const cands = getFittingCandidates(rowPool, remW, availD, rowIdx);
-        if (cands.length === 0) break;
+        const cands = getFittingCandidates(rowPool, remW, availD, rowIdx, x);
+        if (cands.length === 0) {
+          // 구석 때문에 못 넣으면 구석 다음으로 건너뜀
+          const nb = blocked.filter(([, b]) => b > x + 0.5).sort((p, q) => p[1] - q[1])[0];
+          if (nb && nb[0] < xEnd) { x = Math.max(x + 1, nb[1]); continue; }
+          break;
+        }
 
         // 바닥을 가장 잘 채우는 상위 후보군(최고점의 82% 이상, 최대 5개) 중에서 골라 매번 신선하면서도 바닥을 꽉 채움
         const topScore = cands[0].score;
@@ -807,6 +972,7 @@
 
         for (let r = 0; r < repeatCount; r++) {
           if (x + dim.w > xEnd) break;
+          if (m.accessType === 'front_drawer' && blockedAt(x, x + dim.w)) break;
           const stepH = Math.max(10, m.h - (m.stackingOffset || 0));
           const layers = (opts.stack && m.stackable)
             ? Math.max(1, 1 + Math.floor((comp.clearH - m.h) / stepH))
@@ -951,14 +1117,12 @@
       // 낮은 바구니형: 바구니 중 낮은 편(가장 낮은 것의 1.6배 이하)만
       const minH = baskets.reduce((a, m) => Math.min(a, m.h), Infinity);
       const low = baskets.filter((m) => m.h <= Math.max(minH * 1.6, comp.clearH * 0.25));
-      const minLowD = low.reduce((a, m) => Math.min(a, m.dTop, m.wTop), Infinity);
-      // 서랍형은 안쪽(뒤)부터. 앞에 바구니를 두면 서랍이 절반은 열리도록 서랍 깊이의 절반만큼 비워 둠
-      // → 서랍 깊이 × 1.5 + 바구니 깊이가 칸 깊이 안에 들어가는 서랍만
-      const OPEN_RATIO = 0.5;
-      const drawerMaxD = isFinite(minLowD) ? Math.max(0, (comp.d - minLowD - 2) / (1 + OPEN_RATIO)) : comp.d;
-      const dDepth = placeRow(drawers, 'back', 0, drawerMaxD, true);
-      const gapForOpen = dDepth ? Math.ceil(dDepth * (1 + OPEN_RATIO)) + 2 : 0;
-      fillRowsFromFront(low, gapForOpen, false);  // 한 층만 (쌓지 않음)
+      // 서랍형은 앞을 보게. 바구니는 서랍 위(합친 높이가 칸 높이의 60% 안) 또는 서랍 앞(서랍이 절반은 열리게)
+      const mixed = drawers.length
+        ? fillDrawerBasketMix(compIdx, comp, drawers, low, rng, { capH, stackDrawers: true, stackBaskets: false, multiRow: true })
+        : null;
+      if (mixed && mixed.length) boxes.push(...mixed);
+      else fillRowsFromFront(low, 0, false);  // 한 층만 (쌓지 않음)
     }
     return boxes;
   }
@@ -1924,6 +2088,11 @@
     const activePlan = getActivePlan();
     const selBoxes = activePlan.boxes.filter((b) => state.selectedBoxIds.includes(b.id));
     if (selBoxes.length === 0) return;
+    // 서랍형은 서랍이 열리는 쪽이 늘 앞을 보게 고정
+    if (selBoxes.some((b) => state.modelsMap[b.modelId]?.accessType === 'front_drawer')) {
+      showToast('서랍형은 서랍이 앞으로 열리도록 방향이 고정돼 있어요');
+      return;
+    }
 
     const compartments = window.PackerEngine.getCompartments(state.spaceConfig);
     const comp = compartments[selBoxes[0].compartmentIndex] || compartments[0];
@@ -3151,12 +3320,11 @@
     const tabTitle = document.getElementById('error-code-tab-title');
     container.innerHTML = '';
 
-    const mobileErrLabel = document.getElementById('mobile-nav-err-label');
     notifyNewIssues(val.messages);
+    updateIssuesButton(val.messages);
 
     if (val.messages.length === 0) {
       tabTitle.textContent = `문제 알림 (괜찮아요)`;
-      if (mobileErrLabel) mobileErrLabel.textContent = '문제 없음';
       const okDiv = document.createElement('div');
       okDiv.className = 'alert-item alert-ok';
       okDiv.textContent = `걸리는 곳 없이 잘 놓였어요.`;
@@ -3165,7 +3333,6 @@
     }
 
     tabTitle.textContent = `문제 알림 (${val.messages.length})`;
-    if (mobileErrLabel) mobileErrLabel.textContent = `문제 ${val.messages.length}`;
     val.messages.forEach((m) => {
       const div = document.createElement('div');
       div.className = 'alert-item ' + (m.severity === 'error' ? 'alert-error' : 'alert-warn');
@@ -3181,6 +3348,7 @@
       div.addEventListener('click', () => {
         if (m.boxId) {
           state.selectedBoxIds = [m.boxId];
+          if (state.activeMobileTab === 'errors') setActiveMobileTab('none');   // 고른 상자가 보이게 창은 닫음
           refreshAll();
         }
       });
@@ -3188,7 +3356,46 @@
     });
   }
 
-  // 새로 생긴 '문제'만 화면 아래에 3초 동안 잠깐 보여 줘요 (자세한 내용은 '문제' 탭)
+  // 왼쪽 위 문제 알림 아이콘: 개수 표시 (빨강 = 문제, 주황 = 주의만)
+  function updateIssuesButton(messages) {
+    const btn = document.getElementById('btn-issues');
+    const badge = document.getElementById('ct-issue-badge');
+    if (!btn || !badge) return;
+    const n = messages.length;
+    const hasErr = messages.some((m) => m.severity === 'error');
+    btn.classList.toggle('has-error', n > 0 && hasErr);
+    btn.classList.toggle('has-warn', n > 0 && !hasErr);
+    badge.hidden = n === 0;
+    badge.textContent = n > 99 ? '99+' : String(n);
+    btn.setAttribute('aria-label', n ? `문제 알림 ${n}개 보기` : '문제 없음');
+  }
+  // 도움말 · 문제 알림 아이콘은 '크기·설정' 바로 오른쪽에 같은 높이로
+  function placeCornerTools() {
+    const tools = document.getElementById('corner-tools');
+    const setup = document.getElementById('btn-mobile-edit-setup');
+    if (!tools || !setup || setup.offsetParent === null) return;
+    tools.style.left = `${setup.offsetLeft + setup.offsetWidth + 8}px`;
+    tools.style.top = `${setup.offsetTop}px`;
+    tools.style.setProperty('--ct-size', `${Math.max(40, setup.offsetHeight)}px`);
+  }
+
+  // '여러 개 고르기'를 처음 켰을 때 한 번만 사용법
+  const STORAGE_KEY_MULTI_GUIDE_SEEN = 'storagefit_multi_guide_seen_v1';
+  function maybeShowMultiGuide() {
+    let seen = false;
+    try { seen = localStorage.getItem(STORAGE_KEY_MULTI_GUIDE_SEEN) === '1'; } catch (e) {}
+    const el = document.getElementById('multi-guide');
+    if (!el || seen) return;
+    el.hidden = false;
+    document.getElementById('multi-guide-ok')?.focus();
+  }
+  function closeMultiGuide() {
+    const el = document.getElementById('multi-guide');
+    if (el) el.hidden = true;
+    try { localStorage.setItem(STORAGE_KEY_MULTI_GUIDE_SEEN, '1'); } catch (e) {}
+  }
+
+  // 새로 생긴 '문제'만 화면 아래에 3초 동안 잠깐 보여 줘요 (자세한 내용은 왼쪽 위 문제 알림)
   let lastIssueKeys = null;
   function notifyNewIssues(messages) {
     const errors = messages.filter((m) => m.severity === 'error');
@@ -4628,9 +4835,8 @@
     state.activeMobileTab = tabKey;
     document.body.setAttribute('data-active-mtab', tabKey);
 
-    document.querySelectorAll('.mobile-nav-tab[data-mtab]').forEach((t) => {
-      t.classList.toggle('active', t.dataset.mtab === tabKey);
-    });
+    const ib = document.getElementById('btn-issues');
+    if (ib) { ib.classList.toggle('is-active', tabKey === 'errors'); ib.setAttribute('aria-expanded', tabKey === 'errors' ? 'true' : 'false'); }
 
     renderShelfCalloutCards();
     setTimeout(() => {
@@ -4648,10 +4854,27 @@
     document.getElementById('btn-mode-mobile')?.addEventListener('click', () => setUIMode('mobile'));
     document.getElementById('btn-mode-pc')?.addEventListener('click', () => setUIMode('pc'));
 
-    // 모바일 탭 네비게이션 바 바인딩
-    document.querySelectorAll('.mobile-nav-tab[data-mtab]').forEach((btn) => {
-      btn.addEventListener('click', () => setActiveMobileTab(btn.dataset.mtab));
+    // 왼쪽 위 아이콘: 문제 알림 창 열고 닫기 · 도움말
+    document.getElementById('btn-issues')?.addEventListener('click', () => {
+      setActiveMobileTab(state.activeMobileTab === 'errors' ? 'none' : 'errors');
     });
+    document.getElementById('btn-issues-close')?.addEventListener('click', () => setActiveMobileTab('none'));
+    const helpModal = document.getElementById('modal-help');
+    const closeHelp = () => helpModal?.classList.remove('open');
+    document.getElementById('btn-help')?.addEventListener('click', () => {
+      if (state.activeMobileTab === 'errors') setActiveMobileTab('none');
+      helpModal?.classList.add('open');
+      helpModal?.querySelector('.help-box')?.focus();
+    });
+    document.getElementById('btn-close-help')?.addEventListener('click', closeHelp);
+    helpModal?.addEventListener('click', (e) => { if (e.target === helpModal) closeHelp(); });
+    window.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (helpModal?.classList.contains('open')) closeHelp();
+      else if (state.activeMobileTab === 'errors') setActiveMobileTab('none');
+    });
+    document.getElementById('multi-guide-ok')?.addEventListener('click', closeMultiGuide);
+    window.addEventListener('resize', placeCornerTools);
     document.getElementById('btn-mobile-sheet-toggle')?.addEventListener('click', toggleMobileSheet);
 
     // 모바일 단계 전환 버튼
@@ -4755,6 +4978,7 @@
       touchBtn.classList.toggle('is-on', !!state.touchMultiSelectMode);
       touchBtn.classList.toggle('btn-warning', state.touchMultiSelectMode);
       refreshAll();
+      if (state.touchMultiSelectMode) maybeShowMultiGuide();
     });
 
     // 1. 공간 유형 선택 — 문 달린 장과 서랍장은 따로 정리해요 (각자 상자 배치를 따로 기억)
@@ -5306,11 +5530,17 @@
       const activePlan = getActivePlan();
       const compartments = window.PackerEngine.getCompartments(state.spaceConfig);
       labelsEl.innerHTML = '';
+      // 칸 위치는 3D 영역 기준이라, 화면 전체를 덮는 금액 층에서는 3D 영역 위치만큼 더해 줘요
+      const stageRect = (document.getElementById('canvas-wrapper') || labelsEl).getBoundingClientRect();
+      // 칸이 많으면(팬트리 등) 빈 칸 0원은 빼고 상자 있는 칸만 보여 줘요 (다 보이면 서로 가려서)
+      const crowded = (anchors || []).length > 8;
 
+      const items = [];
       (anchors || []).forEach((anc) => {
         const comp = compartments[anc.index];
         if (!comp) return;
         const compBoxes = activePlan.boxes.filter((b) => b.compartmentIndex === anc.index);
+        if (crowded && compBoxes.length === 0) return;
         const compCost = Math.round(compBoxes.reduce((sum, b) => {
           const m = state.modelsMap[b.modelId];
           return sum + (Number(m?.price) || 0) / Math.max(1, Number(m?.packQty) || 1); // 묶음 상품은 1개 몫
@@ -5323,19 +5553,57 @@
             ? `${compCost.toLocaleString('ko-KR')}원 (${compBoxes.length}개)`
             : `상자 ${compBoxes.length}개 · 가격 준비 중`;
         }
+        items.push({
+          name: comp.name,
+          costText,
+          px: (Number.isFinite(anc.cx) ? anc.cx : anc.x) + stageRect.left,
+          py: (Number.isFinite(anc.cy) ? anc.cy : anc.y) + stageRect.top
+        });
+      });
 
+      if (crowded && items.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'cost-overlay-badge cost-overlay-empty';
+        empty.textContent = '아직 상자를 넣은 칸이 없어요';
+        labelsEl.appendChild(empty);
+        empty.style.left = `${Math.max(8, (window.innerWidth - empty.offsetWidth) / 2)}px`;
+        empty.style.top = `${Math.round(window.innerHeight * 0.45)}px`;
+        return;
+      }
+
+      // 겹치지 않게: 위에서부터 차례로 놓고, 앞서 놓은 표시와 겹치면 그 아래로 내림
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const header = document.querySelector('.app-header, header');
+      const minTop = Math.max(8, header ? header.getBoundingClientRect().bottom + 6 : 8);
+      const closeBtn = document.getElementById('btn-cost-overlay-close');
+      const maxBottom = (closeBtn && closeBtn.offsetParent !== null ? closeBtn.getBoundingClientRect().top : vh) - 6;
+      const GAP = 4;
+      const placed = [];
+      const hits = (l, t, w, h) => placed.find((r) => l < r.l + r.w + GAP && l + w + GAP > r.l && t < r.t + r.h + GAP && t + h + GAP > r.t);
+      items.sort((a, b) => a.py - b.py || a.px - b.px);
+      items.forEach((it) => {
         const badge = document.createElement('div');
         badge.className = 'cost-overlay-badge';
-        // 칸 위치는 3D 영역 기준이라, 화면 전체를 덮는 금액 층에서는 3D 영역 위치만큼 더해 줘요
-        const stageRect = (document.getElementById('canvas-wrapper') || labelsEl).getBoundingClientRect();
-        const px = (Number.isFinite(anc.cx) ? anc.cx : anc.x) + stageRect.left;
-        const py = (Number.isFinite(anc.cy) ? anc.cy : anc.y) + stageRect.top;
-        badge.style.left = `${px.toFixed(1)}px`;
-        badge.style.top = `${py.toFixed(1)}px`;
-        badge.innerHTML = `<span class="cob-name">${comp.name}</span><span class="cob-val">${costText}</span>`;
+        badge.innerHTML = `<span class="cob-name">${it.name}</span><span class="cob-val">${it.costText}</span>`;
         labelsEl.appendChild(badge);
+        const w = badge.offsetWidth, h = badge.offsetHeight;
+        const l = Math.max(8, Math.min(vw - 8 - w, it.px - w / 2));
+        let t = Math.max(minTop, it.py - h / 2);
+        for (let k = 0, r; k < 40 && (r = hits(l, t, w, h)); k++) t = r.t + r.h + GAP;
+        if (t + h > maxBottom) {
+          // 아래로 넘치면 원래 자리에서 위로 올려 봄
+          t = Math.min(maxBottom - h, it.py - h / 2);
+          for (let k = 0, r; k < 40 && (r = hits(l, t, w, h)); k++) t = r.t - h - GAP;
+          t = Math.max(minTop, t);
+        }
+        placed.push({ l, t, w, h });
+        badge.style.left = `${l.toFixed(1)}px`;
+        badge.style.top = `${t.toFixed(1)}px`;
       });
     }
+
+    renderCostOverlayRef = renderCostOverlayLabels;
 
     function openCostOverlay() {
       closeExportModal();
@@ -5442,7 +5710,7 @@
           note = document.createElement('p');
           note.id = 'export-cost-note';
           note.className = 'export-section-desc';
-          costTotalEl.insertAdjacentElement('afterend', note);
+          (costTotalEl.closest('.export-cost-row') || costTotalEl).insertAdjacentElement('afterend', note);
         }
         const hasPack = boxes.some((b) => Number(state.modelsMap[b.modelId]?.packQty) > 1);
         note.textContent = hasPack ? '묶음 상품은 묶음째 사는 값으로 더했어요.' : '';

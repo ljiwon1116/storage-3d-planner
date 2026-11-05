@@ -383,7 +383,25 @@ window.Scene3DManager = (function () {
       }
 
       // 장·서랍: 오른쪽 바깥 / 팬트리: 각 칸 앞쪽 오른편 안
-      const p = window.PackerEngine.localToWorld(comp, isPantry ? comp.w - 36 : comp.w + 18, comp.d);
+      let lx = isPantry ? comp.w - 36 : comp.w + 18;
+      let lz = comp.d;
+      if (currentSpaceConfig.type === 'pantry') {
+        if (comp.wall === 'A') {
+          // 안쪽 벽: 옆 선반에 가려진 구석을 뺀 보이는 구간의 가운데 (옆 벽 버튼과 겹치지 않게)
+          let a0 = 0, a1 = comp.w;
+          (window.PackerEngine.getPantryCorners(currentSpaceConfig) || []).forEach((c) => {
+            const c0 = c.s0 - (comp.s0 || 0), c1 = c.s1 - (comp.s0 || 0);
+            if (c0 <= a0 + 1 && c1 > a0) a0 = Math.min(a1, c1);
+            if (c1 >= a1 - 1 && c0 < a1) a1 = Math.max(a0, c0);
+          });
+          lx = a1 - a0 > 60 ? (a0 + a1) / 2 : comp.w / 2;
+        } else {
+          // 옆 벽: 칸 가운데, 벽에 가깝게 → 왼쪽 벽은 화면 왼쪽, 오른쪽 벽은 화면 오른쪽에 한 줄로
+          lx = comp.w / 2;
+          lz = comp.d * 0.25;
+        }
+      }
+      const p = window.PackerEngine.localToWorld(comp, lx, lz);
       const worldX = p.x;
       const worldY = comp.yStart + Math.min(45, comp.clearH * 0.25);
       const worldZ = p.z;
@@ -394,7 +412,9 @@ window.Scene3DManager = (function () {
       const isFridge = currentSpaceConfig.type === 'fridge';
       const cp = isFridge
         ? window.PackerEngine.localToWorld(comp, comp.w * 0.5, comp.d)
-        : window.PackerEngine.localToWorld(comp, comp.w * 0.5, comp.d * 0.65);
+        : currentSpaceConfig.type === 'pantry'
+          ? window.PackerEngine.localToWorld(comp, lx, comp.wall === 'A' ? comp.d * 0.65 : comp.d * 0.4)
+          : window.PackerEngine.localToWorld(comp, comp.w * 0.5, comp.d * 0.65);
       const cv = new THREE.Vector3(cp.x, comp.yStart + comp.clearH * (isFridge ? 0.5 : 0.4), cp.z);
       cv.project(camera);
       return {

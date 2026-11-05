@@ -4799,7 +4799,7 @@ body.ui-mode-mobile .ui-mode-switch .mode-switch-btn,
 }
 .cost-overlay-badge {
   position: absolute;
-  transform: translate(-50%, -50%);
+  transform: none;
   padding: var(--sp-1-5) var(--sp-3);
   border-radius: 10px;
   background: var(--cream-98-a95b);
@@ -5447,3 +5447,113 @@ body.ui-mode-mobile .btn-danger { color: var(--red-42b); }  /* 치우기: 4.3 �
   background: var(--clay-17); color: var(--white);
   font-size: 0.72rem; font-weight: 700; line-height: 1.3;
 }
+
+/* 1105f · 아래 탭바 없앰: 아래 조작 바를 바닥 가까이 */
+body.ui-mode-mobile .bottom-center-hud { bottom: calc(var(--sp-3) + env(safe-area-inset-bottom)) !important; }
+body.ui-wide .bottom-center-hud { bottom: var(--sp-6) !important; }
+@media (max-width: 760px) {
+  body.ui-wide .bottom-center-hud { bottom: calc(var(--sp-3) + env(safe-area-inset-bottom)) !important; }
+}
+
+/* 1105f · 왼쪽 위 아이콘: 도움말 · 문제 알림 */
+.corner-tools { display: none; }
+body.ui-mode-mobile.mobile-step-build .corner-tools {
+  display: flex; gap: var(--sp-2); position: absolute; top: var(--sp-2); left: 108px; z-index: 26;
+}
+.ct-btn {
+  position: relative; width: var(--ct-size, 44px); height: var(--ct-size, 44px); padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px; border: 1px solid var(--border-strong);
+  background: var(--cream-98-a95); color: var(--text-body); box-shadow: var(--shadow-sm); cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+.ct-btn svg { width: 20px; height: 20px; }
+.ct-btn.has-error { color: var(--danger); }
+.ct-btn.has-warn { color: var(--amber-37); }
+.ct-btn.is-active { background: var(--text-main); border-color: var(--text-main); color: var(--white); }
+.ct-btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.ct-badge {
+  position: absolute; top: calc(-1 * var(--sp-1)); right: calc(-1 * var(--sp-1));
+  min-width: 18px; height: 18px; padding: 0 var(--sp-1-25); border-radius: 999px;
+  background: var(--danger); color: var(--white);
+  font-size: 0.72rem; font-weight: 700; line-height: 18px; text-align: center;
+}
+.ct-badge[hidden] { display: none; }
+.ct-btn.has-warn .ct-badge { background: var(--amber-37); }
+@media (prefers-reduced-motion: reduce) { .ct-btn { transition: none; } }
+
+/* 1105f · 문제 알림: 화면 전체 대신 작은 창 */
+.issues-head { display: none; }
+body.ui-mode-mobile.mobile-step-build[data-active-mtab="errors"] #error-code-dock {
+  display: flex !important; flex-direction: column;
+  top: calc(var(--sp-2) + 52px) !important; left: var(--sp-2-5) !important; right: var(--sp-2-5) !important; bottom: auto !important;
+  width: auto !important; max-width: 440px !important; max-height: calc(100% - 150px) !important;
+  border-radius: 16px !important; border: 1px solid var(--line) !important; box-shadow: var(--shadow-md) !important;
+  overflow: hidden !important; z-index: 46;
+}
+body.ui-mode-mobile.mobile-step-build[data-active-mtab="errors"] #error-code-dock .issues-head {
+  display: flex; align-items: center; justify-content: space-between; flex: 0 0 auto;
+  padding: var(--sp-2) var(--sp-1) 0 var(--sp-4);
+  font-size: 1.06rem; font-weight: 800; color: var(--text-title);
+}
+.issues-close {
+  width: 44px; height: 44px; border: 0; border-radius: 10px; background: transparent;
+  color: var(--text-meta); font: inherit; font-size: 1rem; cursor: pointer;
+}
+.issues-close:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+body.ui-mode-mobile.mobile-step-build[data-active-mtab="errors"] #error-code-dock .error-code-body {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto !important; padding: var(--sp-1) var(--sp-4) var(--sp-4) !important;
+}
+
+/* 1105f · 도움말 창 */
+#modal-help { z-index: 270; }
+.help-box { width: min(480px, calc(100% - 32px)) !important; max-height: calc(var(--vh, 1vh) * 86) !important; padding: 0 var(--sp-4) var(--sp-4) !important; gap: 0 !important; }
+.help-head { position: sticky; top: 0; z-index: 1; background: var(--bg-panel); padding: var(--sp-3) 0 var(--sp-1) !important; }
+.help-head > span { font-size: 1.06rem; font-weight: 800; color: var(--text-title); }
+.help-lead { margin: 0 0 var(--sp-2); font-size: 0.86rem; color: var(--text-meta); }
+.help-list { display: flex; flex-direction: column; }
+.help-item { border-bottom: 1px solid var(--line); }
+.help-item:last-child { border-bottom: 0; }
+.help-item summary {
+  list-style: none; display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2);
+  min-height: 48px; padding: var(--sp-2) var(--sp-1); cursor: pointer;
+  font-size: 0.95rem; font-weight: 700; color: var(--text-title);
+}
+.help-item summary::-webkit-details-marker { display: none; }
+.help-item summary:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 8px; }
+.help-chev { flex: 0 0 auto; color: var(--text-meta); transition: transform 0.15s; }
+.help-item[open] .help-chev { transform: rotate(180deg); }
+.help-item p { margin: 0; padding: 0 var(--sp-1) var(--sp-3); font-size: 0.9rem; line-height: 1.6; color: var(--text-body); }
+@media (prefers-reduced-motion: reduce) { .help-chev { transition: none; } }
+
+/* 1105f · 다듬기: 문제 알림 머리줄 꽉 차게, 낱말 중간 줄바꿈 막기 */
+body.ui-mode-mobile.mobile-step-build[data-active-mtab="errors"] #error-code-dock .issues-head { align-self: stretch; width: 100%; box-sizing: border-box; }
+body.ui-mode-mobile.mobile-step-build[data-active-mtab="errors"] #error-code-dock .error-code-body { align-self: stretch; }
+.help-box:focus { outline: none; }
+.help-item p, .help-lead, .drag-guide-list li, .alert-item { word-break: keep-all; overflow-wrap: break-word; }
+
+/* 1105g · 칸별 금액: 닫기 버튼은 아래 가운데 (위 저장·구매 버튼을 가리지 않게) */
+.cost-overlay-close {
+  pointer-events: auto;
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--sp-4) + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  min-height: 48px;
+  padding: 0 var(--sp-6);
+  border: none;
+  border-radius: 999px;
+  background: var(--clay-17);
+  color: var(--white);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px var(--text-title-a14);
+  cursor: pointer;
+}
+.cost-overlay-close:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.cost-overlay-empty .cob-name { margin: 0; }
+/* 저장·구매: 파트너스 안내 */
+.export-partner-note { margin-top: calc(-1 * var(--sp-1)); word-break: keep-all; }
+#export-cost-note { margin: var(--sp-2) 0 0; word-break: keep-all; }

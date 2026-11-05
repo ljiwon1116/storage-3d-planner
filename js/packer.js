@@ -526,12 +526,13 @@ window.PackerEngine = (function () {
           messages.push({ boxId: a.id, severity: 'error', text: msg });
         } else if (overlapX && overlapY) {
           // 서랍형(front_drawer) 앞에 다른 상자가 놓여 서랍을 열 수 없는 경우 검사
-          if (modA.accessType === 'front_drawer' && b.z >= a.z + dimA.d - 4) {
+          // 서랍 깊이의 절반 이상 떨어져 있으면 서랍을 반쯤은 열 수 있어서 괜찮음
+          if (modA.accessType === 'front_drawer' && b.z >= a.z + dimA.d - 4 && b.z - (a.z + dimA.d) < dimA.d * 0.5 - 2) {
             boxStatuses[a.id].severity = 'error';
             const msg = `[서랍 못 엶] '${modA.name}' 바로 앞에 '${modB.name}'이 있어서 서랍을 열 수 없어요.`;
             boxStatuses[a.id].issues.push(msg);
             messages.push({ boxId: a.id, severity: 'error', text: msg });
-          } else if (modB.accessType === 'front_drawer' && a.z >= b.z + dimB.d - 4) {
+          } else if (modB.accessType === 'front_drawer' && a.z >= b.z + dimB.d - 4 && a.z - (b.z + dimB.d) < dimB.d * 0.5 - 2) {
             boxStatuses[b.id].severity = 'error';
             const msg = `[서랍 못 엶] '${modB.name}' 바로 앞에 '${modA.name}'이 있어서 서랍을 열 수 없어요.`;
             boxStatuses[b.id].issues.push(msg);
