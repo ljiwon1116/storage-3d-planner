@@ -5501,7 +5501,8 @@
       if (e.target.id === 'drag-guide') closeDragGuide();
     });
 
-    window.Scene3DManager.init('canvas-wrapper', {
+    // 3D 준비가 실패해도 나머지 화면 준비는 계속 (안 그러면 정리 안 된 화면이 그대로 보임)
+    try { window.Scene3DManager.init('canvas-wrapper', {
       onBoxInteraction: handleBoxInteraction,
       onBoxesMoved: () => {
         saveLocalSoon();
@@ -5516,7 +5517,7 @@
       },
       onBundleScreenPos: handleBundleScreenPos,
       onShelfAnchors: handleShelfAnchors
-    });
+    }); } catch (err) { console.error(err); }
 
     bindEvents();
 

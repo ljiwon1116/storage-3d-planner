@@ -1,5 +1,23 @@
 // Three.js 3D 메인 뷰포트 (자동 위로 적층, 모바일 터치 조작, Shift+클릭 묶음, 3D 선반 리더라인 투영)
 
+// 휴대폰이 3D 그리기(WebGL)를 막았을 때 대신 쓰는 빈 그리기 도구 → 나머지 화면은 그대로 동작
+window.makeNoGlRenderer = window.makeNoGlRenderer || function () {
+  const c = document.createElement('canvas');
+  return {
+    noGl: true, domElement: c, shadowMap: {},
+    setSize() {}, setPixelRatio() {}, render() {}, forceContextRestore() {}, dispose() {}
+  };
+};
+window.createSafeRenderer = window.createSafeRenderer || function (opts) {
+  try {
+    const r = new THREE.WebGLRenderer(opts);
+    if (!r.getContext()) throw new Error('no gl');
+    return r;
+  } catch (e) {
+    return window.makeNoGlRenderer();
+  }
+};
+
 window.Scene3DManager = (function () {
   let scene, camera, renderer, controls, containerEl;
   let rootGroup, roomEnvGroup, cabinetGroup, drawerStaticGroup, drawerSlidingGroup, boxesGroup;
@@ -227,7 +245,7 @@ window.Scene3DManager = (function () {
     camera = new THREE.PerspectiveCamera(38, w / h, 10, 20000);
     camera.position.set(780, 920, 2200);
 
-    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer = window.createSafeRenderer({ antialias: true });
     renderer.setSize(w, h);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
@@ -238,6 +256,7 @@ window.Scene3DManager = (function () {
     renderer.domElement.setAttribute('aria-label', '수납 공간 3D 화면. 칸 옆 더하기 버튼으로 상자를 넣어요');
     containerEl.innerHTML = '';
     containerEl.appendChild(renderer.domElement);
+    if (renderer.noGl) showReloadNotice(true);
 
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -309,6 +328,13 @@ window.Scene3DManager = (function () {
       if (containerEl) onWindowResize(containerEl);
     });
     window.addEventListener('resize', () => onWindowResize(containerEl));
+    // 다른 앱에 갔다가 돌아왔는데 3D가 끊긴 채면 다시 이어 붙임
+    const tryRestoreOnReturn = () => {
+      if (document.hidden || !contextLost || renderer.noGl) return;
+      try { renderer.forceContextRestore(); } catch (err) {}
+    };
+    document.addEventListener('visibilitychange', tryRestoreOnReturn);
+    window.addEventListener('pageshow', tryRestoreOnReturn);
 
     animate();
   }
@@ -330,7 +356,7 @@ window.Scene3DManager = (function () {
   function animate() {
     requestAnimationFrame(animate);
     if (controls) controls.update();
-    if (renderer && scene && camera && !contextLost) {
+    if (renderer && scene && camera && !contextLost && !renderer.noGl) {
       renderer.render(scene, camera);
       updateBundleFloatingPopupPosition();
       updateShelfCalloutAnchors();
@@ -1589,11 +1615,13 @@ window.Scene3DManager = (function () {
     if (clearPointers) activePointers.clear();
   }
 
-  function showReloadNotice() {
+  function showReloadNotice(blocked) {
     if (!containerEl || containerEl.querySelector('.gl-lost')) return;
     const n = document.createElement('div');
     n.className = 'gl-lost';
-    n.innerHTML = '<div class="gl-lost-card"><div class="gl-lost-t">3D 화면이 잠깐 끊겼어요</div><div class="gl-lost-s">놓은 상자는 저장돼 있어요.</div><button type="button" class="gl-lost-btn">다시 불러오기</button></div>';
+    n.innerHTML = blocked
+      ? '<div class="gl-lost-card"><div class="gl-lost-t">3D 화면을 열지 못했어요</div><div class="gl-lost-s">휴대폰이 3D 그리기를 잠시 멈췄어요. 브라우저를 완전히 껐다가 다시 열어 주세요. 놓은 상자는 저장돼 있어요.</div><button type="button" class="gl-lost-btn">다시 불러오기</button></div>'
+      : '<div class="gl-lost-card"><div class="gl-lost-t">3D 화면이 잠깐 끊겼어요</div><div class="gl-lost-s">놓은 상자는 저장돼 있어요.</div><button type="button" class="gl-lost-btn">다시 불러오기</button></div>';
     n.querySelector('button').addEventListener('click', () => window.location.reload());
     containerEl.appendChild(n);
   }
@@ -1963,7 +1991,7 @@ window.Scene3DManager = (function () {
     cmpCamera = new THREE.PerspectiveCamera(40, w / h, 5, 5000);
     cmpCamera.position.set(420, 340, 480);
 
-    cmpRenderer = new THREE.WebGLRenderer({ antialias: true });
+    cmpRenderer = window.createSafeRenderer({ antialias: true });
     cmpRenderer.setSize(w, h);
     cmpRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     cmpRenderer.domElement.style.touchAction = 'none';
@@ -1987,7 +2015,7 @@ window.Scene3DManager = (function () {
     const animateCmp = () => {
       requestAnimationFrame(animateCmp);
       if (cmpControls) cmpControls.update();
-      if (cmpRenderer && cmpScene && cmpCamera) cmpRenderer.render(cmpScene, cmpCamera);
+      if (cmpRenderer && cmpScene && cmpCamera && !cmpRenderer.noGl) cmpRenderer.render(cmpScene, cmpCamera);
     };
     animateCmp();
   }

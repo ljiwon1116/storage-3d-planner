@@ -147,7 +147,7 @@
   // ---------- 3D ----------
   function initViewer() {
     const host = document.getElementById('box-detail-canvas');
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer = window.createSafeRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     host.appendChild(renderer.domElement);
@@ -285,7 +285,7 @@
     if (thumbCache[item.id]) return thumbCache[item.id];
     thumbCache[item.id] = thumbQ = thumbQ.then(() => loadItem(item)).then((proto) => {
       if (!thumbR) {
-        thumbR = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+        thumbR = window.createSafeRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
         thumbR.setPixelRatio(1);
         thumbR.setSize(112, 112);
         thumbS = new THREE.Scene();
