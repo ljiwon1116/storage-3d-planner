@@ -18,6 +18,15 @@ window.createSafeRenderer = window.createSafeRenderer || function (opts) {
   }
 };
 
+// 장·서랍장 색: 웜 라이트 그레이 (조명이 따뜻한 빛이라 원래 색은 살짝 중립 회색으로 잡음)
+// window.FURNITURE_PALETTE 로 미리보기용 덮어쓰기 가능
+const FURN_PALETTE_DEFAULT = {
+  wood: 0xc6c4c1, back: 0xe4e3e1, edge: 0x8d8984, shelf: 0xc9c7c4, frame: 0xb9b6b2,
+  door: 0xd6d4d1, doorEdge: 0x85817b, handle: 0x57534e,
+  chest: 0xbebcb9, chestLight: 0xbab8b5, chestEdge: 0x85817b, drawerIn: 0xdcdad7, drawerEdge: 0x8d8984, chestHandle: 0x57534e
+};
+const FP = (k) => { const o = window.FURNITURE_PALETTE; return (o && o[k] != null) ? o[k] : FURN_PALETTE_DEFAULT[k]; };
+
 window.Scene3DManager = (function () {
   let scene, camera, renderer, controls, containerEl;
   let rootGroup, roomEnvGroup, cabinetGroup, drawerStaticGroup, drawerSlidingGroup, boxesGroup;
@@ -1024,18 +1033,18 @@ window.Scene3DManager = (function () {
     const cabConst = window.PackerEngine.getCabinetConstraints(spaceConfig);
 
     const woodMat = new THREE.MeshStandardMaterial({
-      color: 0xd8b58d,
+      color: FP('wood'),
       roughness: 0.65,
       transparent: true,
       opacity: xrayMode ? 0.25 : 0.9
     });
     const backPanelMat = new THREE.MeshStandardMaterial({
-      color: 0xf4ead4,
+      color: FP('back'),
       roughness: 0.78,
       transparent: true,
       opacity: xrayMode ? 0.25 : 0.96
     });
-    const edgeMat = new THREE.LineBasicMaterial({ color: 0x9b7955 });
+    const edgeMat = new THREE.LineBasicMaterial({ color: FP('edge') });
 
     const addPanel = (pw, ph, pd, px, py, pz, matOverride) => {
       const g = new THREE.BoxGeometry(pw, ph, pd);
@@ -1057,7 +1066,7 @@ window.Scene3DManager = (function () {
     addPanel(W, H, wallT, 0, H / 2, -D / 2 - wallT / 2, backPanelMat);
 
     const shelfMat = new THREE.MeshStandardMaterial({
-      color: 0xd0ac84,
+      color: FP('shelf'),
       roughness: 0.6,
       transparent: true,
       opacity: xrayMode ? 0.35 : 0.92
@@ -1083,7 +1092,7 @@ window.Scene3DManager = (function () {
     }
 
     const frameMat = new THREE.MeshStandardMaterial({
-      color: 0xc29c74,
+      color: FP('frame'),
       roughness: 0.55,
       transparent: true,
       opacity: 0.85
@@ -1117,14 +1126,14 @@ window.Scene3DManager = (function () {
       const doorT = 16;
 
       const doorMat = new THREE.MeshStandardMaterial({
-        color: 0xe3c7a2,
+        color: FP('door'),
         roughness: 0.55,
         transparent: true,
         opacity: xrayMode ? 0.16 : 0.48,
         depthWrite: false
       });
-      const doorEdgeMat = new THREE.LineBasicMaterial({ color: 0x8c6239, transparent: true, opacity: 0.85 });
-      const handleMat = new THREE.MeshStandardMaterial({ color: 0x6e4b2a, roughness: 0.4, metalness: 0.15 });
+      const doorEdgeMat = new THREE.LineBasicMaterial({ color: FP('doorEdge'), transparent: true, opacity: 0.85 });
+      const handleMat = new THREE.MeshStandardMaterial({ color: FP('handle'), roughness: 0.4, metalness: 0.15 });
       const hingeMat = new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.3, metalness: 0.7 });
 
       const angleRad = THREE.MathUtils.degToRad(typeof doorOpenAngle === 'number' ? doorOpenAngle : 100);
@@ -1220,16 +1229,16 @@ window.Scene3DManager = (function () {
     const tierH = clearH; // 한 단 높이
 
     const chestWoodMat = new THREE.MeshStandardMaterial({
-      color: 0xc8a47e,
+      color: FP('chest'),
       roughness: 0.65
     });
     const chestTopMat = new THREE.MeshStandardMaterial({
-      color: 0xd2b08c,
+      color: FP('chestLight'),
       roughness: 0.55,
       transparent: true,
       opacity: xrayMode ? 0.2 : 0.42
     });
-    const chestEdgeMat = new THREE.LineBasicMaterial({ color: 0x8c6d4e });
+    const chestEdgeMat = new THREE.LineBasicMaterial({ color: FP('chestEdge') });
 
     const openTier = getOpenDrawerTier(spaceConfig);
     const openBaseY = drawerTierBaseY(spaceConfig, openTier);
@@ -1238,7 +1247,7 @@ window.Scene3DManager = (function () {
     const lowerGeom = new THREE.BoxGeometry(W + 52, lowerBodyH, D + 30);
     // 아래 단 서랍이 열려 있으면 몸통을 반투명하게 해서 서랍 안쪽(빼지 않은 부분)도 보이게
     const lowerBodyMat = openTier > 0
-      ? new THREE.MeshStandardMaterial({ color: 0xc8a47e, roughness: 0.65, transparent: true, opacity: xrayMode ? 0.15 : 0.3, depthWrite: false })
+      ? new THREE.MeshStandardMaterial({ color: FP('chest'), roughness: 0.65, transparent: true, opacity: xrayMode ? 0.15 : 0.3, depthWrite: false })
       : chestWoodMat;
     const lowerMesh = new THREE.Mesh(lowerGeom, lowerBodyMat);
     lowerMesh.position.set(0, -14 - lowerBodyH / 2, -8);
@@ -1252,8 +1261,8 @@ window.Scene3DManager = (function () {
     // 닫혀 있는 서랍 칸 (앞판 + 손잡이). ＋버튼으로 고른 단(openTier)만 열려요
     const lowFrontH = Math.max(40, clearH - 2);
     const lowFrontZ = -8 + (D + 30) / 2 + 9;
-    const lowFrontMat = new THREE.MeshStandardMaterial({ color: 0xd2b08c, roughness: 0.5 });
-    const lowHandleMat = new THREE.MeshStandardMaterial({ color: 0x6e5034, metalness: 0.2, roughness: 0.4 });
+    const lowFrontMat = new THREE.MeshStandardMaterial({ color: FP('chestLight'), roughness: 0.5 });
+    const lowHandleMat = new THREE.MeshStandardMaterial({ color: FP('chestHandle'), metalness: 0.2, roughness: 0.4 });
     const lowHandleGeom = new THREE.BoxGeometry(Math.min(140, W * 0.32), 14, 22);
     for (let t = 0; t < tiers; t++) {
       if (t === openTier) continue;
@@ -1288,7 +1297,7 @@ window.Scene3DManager = (function () {
 
     // 서랍장 몸통의 옆판·뒤판 (반투명): 서랍 칸이 옆으로 뚫려 보이지 않게
     const chestSideMat = new THREE.MeshStandardMaterial({
-      color: 0xd2b08c,
+      color: FP('chestLight'),
       roughness: 0.6,
       transparent: true,
       opacity: xrayMode ? 0.12 : 0.3,
@@ -1315,12 +1324,12 @@ window.Scene3DManager = (function () {
     drawerSlidingGroup.position.set(0, openBaseY, slideOffsetZ);
 
     const drawerWallMat = new THREE.MeshStandardMaterial({
-      color: 0xe6d7c3,
+      color: FP('drawerIn'),
       roughness: 0.55,
       transparent: true,
       opacity: xrayMode ? 0.3 : 0.85
     });
-    const drawerEdgeMat = new THREE.LineBasicMaterial({ color: 0x9c8267 });
+    const drawerEdgeMat = new THREE.LineBasicMaterial({ color: FP('drawerEdge') });
     const wallT = 14;
 
     const addDrawerPart = (pw, ph, pd, px, py, pz, matOverride) => {
@@ -1343,7 +1352,7 @@ window.Scene3DManager = (function () {
     // 앞판(손잡이 쪽 벽)도 높이를 따라 올라가요
     const frontPanelH = Math.max(wallH, clearH - 2);
     const frontPanelMat = new THREE.MeshStandardMaterial({
-      color: 0xd2b08c,
+      color: FP('chestLight'),
       roughness: 0.5,
       transparent: true,
       opacity: xrayMode ? 0.25 : 0.72
@@ -1351,7 +1360,7 @@ window.Scene3DManager = (function () {
     addDrawerPart(W + 44, frontPanelH, 18, 0, frontPanelH / 2, D / 2 + 9, frontPanelMat);
 
     const handleW = Math.min(140, W * 0.32);
-    const handleMat = new THREE.MeshStandardMaterial({ color: 0x6e5034, metalness: 0.2, roughness: 0.4 });
+    const handleMat = new THREE.MeshStandardMaterial({ color: FP('chestHandle'), metalness: 0.2, roughness: 0.4 });
     addDrawerPart(handleW, 14, 22, 0, frontPanelH * 0.58, D / 2 + 26, handleMat);
 
     if (exposedD > 0) {
