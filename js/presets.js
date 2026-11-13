@@ -1,7 +1,7 @@
 // 브랜드별/사이즈별 기본 수납함 카탈로그 데이터 (단위: mm), 기본 저장 조합 및 제품 예시 일러스트 생성기
 
-// 루틴랩 구매 링크 (3L·6L·9L 공통) — 공동구매 링크가 정해지면 여기 한 곳만 바꾸면 됨
-const ROUTINELAB_URL = 'https://smartstore.naver.com/nuber/products/13818484744';
+// 루틴랩 구매 링크 (3L·6L·9L 공통) — 공동구매(공구) 링크. 바뀌면 여기 한 곳만 바꾸면 됨
+const ROUTINELAB_URL = 'https://mkt.shopping.naver.com/link/6ad889041d48673046837c47';
 
 // 아이리스 BC 시리즈 구매 링크 (전 사이즈 공통)
 // 아이리스 제품별 구매 링크 (쿠팡). 없으면 네이버 브랜드스토어 링크
