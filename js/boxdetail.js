@@ -31,9 +31,11 @@
   function orientsOf(it) {
     const dims = [it.wTop, it.h, it.dTop];          // x, y(높이), z
     const H = Math.PI / 2;
+    // 앞뒤로 눕힐 때(X축) 돌리는 방향: frontUp 물건은 앞면(상표)이 위를 보게 반대로 돌림
+    const X = it.frontUp ? -H : H;
     const eulers = it.upright
       ? [[0, 0, 0], [0, H, 0]]
-      : [[0, 0, 0], [0, H, 0], [H, 0, 0], [0, 0, H], [H, H, 0], [H, 0, H], [0, H, H], [H, H, H]];
+      : [[0, 0, 0], [0, H, 0], [X, 0, 0], [0, 0, H], [X, H, 0], [X, 0, H], [0, H, H], [X, H, H]];
     const out = [], seen = new Set();
     eulers.forEach((e) => {
       const el = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(e[0], e[1], e[2])).elements;
@@ -46,19 +48,48 @@
     return out;
   }
 
+  // 여러 물건: 넣는 순서를 바꿔 가며 해 보고, 고른 물건이 가장 많이 들어가고 가장 꽉 찬 배치를 고름
   function pack(inner, picks) {
     const all = window.HOUSEHOLD_ITEMS || [];
-    const types = (picks || []).map((id) => all.find((m) => m.id === id)).filter(Boolean)
+    const base = (picks || []).map((id) => all.find((m) => m.id === id)).filter(Boolean)
       .map((it) => ({ it, os: orientsOf(it) }))
       .sort((a, b) => (b.it.wTop * b.it.dTop * b.it.h) - (a.it.wTop * a.it.dTop * a.it.h));
+    const orders = [base];
+    if (base.length > 1) {
+      // 큰 것부터(기본) + 하나씩 앞으로 당긴 순서 + 작은 것부터
+      for (let i = 1; i < base.length; i++) orders.push([base[i], ...base.filter((_, j) => j !== i)]);
+      orders.push([...base].reverse());
+    }
+    let best = null;
+    orders.forEach((order) => {
+      const r = packOrder(inner, order);
+      const kinds = Object.keys(r.counts).length;
+      const score = kinds * 1000 + r.fill;
+      if (!best || score > best.score) best = { r, score };
+    });
+    return best.r;
+  }
+
+  function packOrder(inner, types) {
     const placed = [];
     const used = {};
     const fits = (t, s) => t.os.some((o) => o.w <= s.W && o.h <= s.H && o.d <= s.D);
+    // 여러 물건을 고르면 물건마다 공간을 나눠 개수를 정해 둠 (한 물건이 다 차지하지 않게)
+    const innerVol = inner.w * inner.h * inner.d;
+    const quota = {};
+    const cnt = {};
+    types.forEach((t) => {
+      const v = t.it.wTop * t.it.dTop * t.it.h;
+      quota[t.it.id] = types.length > 1 ? Math.max(1, Math.floor((innerVol / types.length) * 0.9 / v)) : Infinity;
+      cnt[t.it.id] = 0;
+    });
+    const remaining = (t) => quota[t.it.id] - cnt[t.it.id];
 
     function fill(s, depth) {
       if (depth > 10 || placed.length >= MAX_PIECES || s.W < 1 || s.H < 1 || s.D < 1) return;
-      // 큰 물건부터: 이 빈 곳에 들어가는 것 중 가장 큰 물건을 고름
-      const t = types.find((tt) => fits(tt, s));
+      // 큰 물건부터: 아직 정한 개수를 못 채운 물건 중 이 빈 곳에 들어가는 가장 큰 것
+      // (모두 다 채웠으면 남은 틈은 들어가는 아무 물건으로)
+      const t = types.find((tt) => remaining(tt) > 0 && fits(tt, s)) || types.find((tt) => fits(tt, s));
       if (!t) return;
 
       let best = null;
@@ -71,7 +102,16 @@
       });
       if (!best) return;
 
-      const { o, nx, ny, nz } = best;
+      const { o } = best;
+      let { nx, ny, nz } = best;
+      // 정한 개수까지만: 바닥 한 층(가로×깊이)을 먼저 채우고, 모자라면 깊이, 가로 순으로 줄임
+      const q = remaining(t);
+      if (q > 0 && nx * ny * nz > q) {
+        if (q >= nx * nz) ny = Math.floor(q / (nx * nz));
+        else if (q >= nx) { ny = 1; nz = Math.floor(q / nx); }
+        else { ny = 1; nz = 1; nx = q; }
+      }
+      cnt[t.it.id] += nx * ny * nz;
       used[t.it.id] = (used[t.it.id] || 0) + 1;
       for (let iy = 0; iy < ny; iy++)
         for (let iz = 0; iz < nz; iz++)
@@ -105,7 +145,26 @@
         (g) => {
           // 받은 모델은 크기·기준점이 제각각 → 표 크기(w x d x h)에 맞추고 바닥 가운데로 옮김
           const model = g.scene;
-          model.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+          model.traverse((o) => {
+            if (!o.isMesh) return;
+            o.castShadow = true; o.receiveShadow = true;
+            // 금속 캔·사발면은 비춰 줄 주변이 없어 어둡게 나옴 → 금속 느낌을 줄이고 상표 그림을 조금 빛나게
+            if (item.brighten) {
+              (Array.isArray(o.material) ? o.material : [o.material]).forEach((m, i, arr) => {
+                if (!m) return;
+                const mm = m.clone();
+                // 스티로폼처럼 광택 없는 물건(matte)은 금속 느낌 없이 거칠게
+                if ('metalness' in mm) mm.metalness = item.matte ? 0 : Math.min(mm.metalness, 0.25);
+                if ('roughness' in mm) mm.roughness = item.matte ? 0.9 : Math.max(mm.roughness, 0.45);
+                if (mm.emissive) {
+                  mm.emissive = new THREE.Color(0xffffff);
+                  mm.emissiveMap = mm.map || null;
+                  mm.emissiveIntensity = mm.map ? item.brighten : 0.12;
+                }
+                if (Array.isArray(o.material)) arr[i] = mm; else o.material = mm;
+              });
+            }
+          });
           const turn = new THREE.Group();
           if (item.glbRot) model.rotation.set(item.glbRot[0], item.glbRot[1], item.glbRot[2]);
           turn.add(model);

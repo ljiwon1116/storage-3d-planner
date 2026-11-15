@@ -6,18 +6,18 @@
  */
 (function () {
   const ITEMS = [
-    // [id, 이름, itemShape, w, d, h, 쌓기, {upright: 세워서만, glbRot: 받은 모델 먼저 돌리기}]
+    // [id, 이름, itemShape, w, d, h, 쌓기, {upright: 세워서만, glbRot: 받은 모델 먼저 돌리기, frontUp: 눕히면 앞면(상표)이 위, brighten: 어두운 모델 밝게}]
     // 크기: 사용자 제공 실측 표 (2026-10-31). 범위로 적힌 값은 가운데 값
     ['tshirt', '접은 티셔츠 6장', 'tshirt', 215, 280, 200, true, { upright: true, noGlb: true }],
     ['tuna-can', '참치캔 135g', 'tuna', 86, 86, 35, true],
     ['water-2l', '생수 500ml', 'water', 63, 63, 210, true],
     ['wet-wipes', '물티슈 캡형 100매', 'wipes', 200, 115, 68, true],
-    ['spam-340', '스팸 340g', 'spam', 100, 55, 85, true],
+    ['spam-340', '스팸 340g', 'spam', 100, 55, 85, true, { frontUp: true }],
     ['shin-ramyun', '신라면 봉지', 'ramen-bag', 140, 140, 38, true, { glbRot: [-Math.PI / 2, 0, 0] }],
-    ['yukgaejang-cup', '육개장 사발면', 'cup-noodle', 145, 145, 75, true, { upright: true }],
-    ['coke-355', '코카콜라 뚱캔 355ml', 'coke', 66, 66, 122, true],
+    ['yukgaejang-cup', '육개장 사발면', 'cup-noodle', 145, 145, 75, true, { upright: true, brighten: 0.25, matte: true }],   // 스티로폼 용기: 광택 없음
+    ['coke-355', '코카콜라 뚱캔 355ml', 'coke', 66, 66, 122, true, { brighten: true }],
     ['toilet-roll', '두루마리 휴지', 'roll', 115, 115, 99, true],
-    ['guinness-440', '기네스 드래프트 캔 440ml', 'coke', 66, 66, 150, true],
+    ['guinness-440', '기네스 드래프트 캔 440ml', 'coke', 66, 66, 150, true, { brighten: 0.6 }],
     ['gochujang-1kg', '노브랜드 고추장 1kg', 'tissue', 155, 115, 105, true],
     ['cereal-box', '시리얼 박스', 'tissue', 195, 65, 280, false],
     ['jin-cup-small', '진라면 작은컵', 'cup-noodle', 100, 100, 105, true, { upright: true }],
@@ -27,6 +27,9 @@
 
   window.HOUSEHOLD_ITEMS = ITEMS.map(([id, name, itemShape, w, d, h, stack, opt = {}]) => ({
     upright: !!opt.upright,
+    matte: !!opt.matte,
+    frontUp: !!opt.frontUp,
+    brighten: opt.brighten === true ? 0.35 : (Number(opt.brighten) || 0),   // 상표 그림을 빛나게 하는 정도
     noGlb: !!opt.noGlb,
     glbRot: opt.glbRot || null,
     id: 'item-' + id,
