@@ -5634,3 +5634,11 @@ body.ui-mode-mobile .app-toast.show { transform: translate(-50%, 0); }
 @media (max-width: 360px) { .wiz-options-grid .wiz-option-sub { display: none; } .wiz-options-grid .wiz-option { min-height: 56px; } }
 /* '손 닿기 힘든 곳' 체크도 누르는 높이 44px */
 body .hud-pill-bar > label.checkbox-row { min-height: 44px !important; height: 44px !important; display: inline-flex !important; align-items: center; }
+
+/* 공구 가격: 정상가(가운데 줄) → 공구가 · 할인율, 배송비 안내 */
+.list-price { color: var(--text-muted); font-weight: 400; text-decoration: line-through; }
+.gb-price { color: var(--text-title); font-weight: 700; }
+.gb-off { color: var(--danger); font-weight: 700; }
+.pick-row-ship { margin-top: 2px; font-size: 0.75rem; color: var(--text-meta); line-height: 1.4; }
+.export-ship-note { margin: 0 0 var(--sp-2); font-size: 0.75rem; line-height: 1.5; color: var(--text-meta); }
+.pick-row-price { margin-top: 2px; font-size: 0.8125rem; line-height: 1.4; white-space: nowrap; }

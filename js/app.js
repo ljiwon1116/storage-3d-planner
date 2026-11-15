@@ -550,6 +550,10 @@
       const model = state.modelsMap[clickedBox.modelId];
       if (model && window.BoxDetail && window.HOUSEHOLD_ITEMS) {
         document.body.classList.remove('mobile-setup-open', 'mobile-shelfh-open', 'mobile-shelf-sheet-open');
+        // 칸별 금액 보기가 켜져 있으면 닫음 (자세히 보기 화면 위에 금액이 겹치지 않게)
+        state.costOverlayOpen = false;
+        const co = document.getElementById('cost-overlay');
+        if (co) co.style.display = 'none';
         window.BoxDetail.open(clickedBox, model);
       }
       return;
@@ -744,6 +748,19 @@
   }
   // 공동구매 상품 표시
   const groupBuyBadge = (m) => (m && m.groupBuy ? '<span class="gb-badge">공구</span>' : '');
+  const won = (n) => `${Math.round(Number(n) || 0).toLocaleString('ko-KR')}원`;
+  // 가격: 공구 상품은 정상가(가운데 줄) → 공구가 · 할인율
+  function priceHtml(m) {
+    const p = Number(m && m.price) || 0;
+    const lp = Number(m && m.listPrice) || 0;
+    if (m && m.groupBuy && lp > p && p > 0) {
+      return `<s class="list-price">${won(lp)}</s> <b class="gb-price">${won(p)}</b> <span class="gb-off">${Math.round((1 - p / lp) * 100)}%</span>`;
+    }
+    return won(p);
+  }
+  // 배송비 안내 (예: 루틴랩은 4개까지 묶음 배송 3,000원)
+  const shipInfoText = (m) => (m && m.shipFee ? `${m.shipPer || 1}개당 배송비 ${won(m.shipFee)}` : '');
+  const shipCost = (m, count) => (m && m.shipFee ? Math.ceil(count / Math.max(1, m.shipPer || 1)) * m.shipFee : 0);
 
   // 앞으로 꺼내는 상자(서랍형 · 앞 손잡이 바구니)는 돌리지 않음 → 여는 쪽이 항상 문을 봄
   function opensFromFront(m) {
@@ -3358,11 +3375,13 @@
           </div>
           <div class="pick-row-main">
             <div class="pick-row-top">
-              <span class="pick-row-brand">${groupBuyBadge(model)}${model.brand}${model.price ? ` · ${Number(model.price).toLocaleString('ko-KR')}원${model.packQty > 1 ? ` (${model.packQty}개 묶음)` : ''}` : ''}</span>
+              <span class="pick-row-brand">${groupBuyBadge(model)}${model.brand}${model.price && !model.groupBuy ? ` · ${priceHtml(model)}${model.packQty > 1 ? ` (${model.packQty}개 묶음)` : ''}` : ''}</span>
               <span class="picker-fit-badge ${fitInfo.ok ? 'fit-ok' : 'fit-warn'}">${fitInfo.reason}</span>
             </div>
             <div class="pick-row-name" title="${model.name}">${shortModelName(model)}</div>
+            ${model.groupBuy && model.price ? `<div class="pick-row-price">${priceHtml(model)}</div>` : ''}
             <div class="pick-row-size" title="가로×깊이×높이">${sizeLine} cm</div>
+            ${model.shipFee ? `<div class="pick-row-ship">${shipInfoText(model)}</div>` : ''}
           </div>
           <div class="pick-row-qty">
             <button class="pick-minus" title="1개 줄이기" aria-label="1개 줄이기">−</button>
@@ -6044,8 +6063,22 @@
           (costTotalEl.closest('.export-cost-row') || costTotalEl).insertAdjacentElement('afterend', note);
         }
         const hasPack = boxes.some((b) => Number(state.modelsMap[b.modelId]?.packQty) > 1);
-        note.textContent = hasPack ? '묶음 상품은 묶음째 사는 값으로 더했어요.' : '';
-        note.style.display = hasPack ? '' : 'none';
+        const notes = [];
+        if (hasPack) notes.push('묶음 상품은 묶음째 사는 값으로 더했어요.');
+        // 배송비가 정해진 브랜드: 총액에는 넣지 않고 따로 알려 줌 (루틴랩 4개까지 3,000원)
+        const shipByBrand = new Map();
+        boxes.forEach((b) => {
+          const m = state.modelsMap[b.modelId];
+          if (!m || !m.shipFee) return;
+          const e = shipByBrand.get(m.brand) || { m, n: 0 };
+          e.n += 1;
+          shipByBrand.set(m.brand, e);
+        });
+        shipByBrand.forEach(({ m, n }, brand) => {
+          notes.push(`${brand} 배송비 ${won(shipCost(m, n))} 별도 (${m.shipPer || 1}개당 ${won(m.shipFee)})`);
+        });
+        note.innerHTML = notes.join('<br>');
+        note.style.display = notes.length ? '' : 'none';
       }
 
       // 링크 카드 가격 줄: 개당(또는 묶음당) 가격 · 수량 · 소계
@@ -6056,6 +6089,10 @@
         if (pack > 1) {
           const packs = Math.ceil(count / pack);
           return `${pack}개 묶음 ${price.toLocaleString('ko-KR')}원 × ${packs}<br><b>${(price * packs).toLocaleString('ko-KR')}원</b>`;
+        }
+        const lp = Number(model.listPrice) || 0;
+        if (model.groupBuy && lp > price) {
+          return `<s class="list-price">${won(lp)}</s><br>${won(price)} × ${count}개<br><b>${won(price * count)}</b>`;
         }
         return `${price.toLocaleString('ko-KR')}원 × ${count}개<br><b>${(price * count).toLocaleString('ko-KR')}원</b>`;
       }
@@ -6096,6 +6133,15 @@
 
             const itemsEl = document.createElement('div');
             itemsEl.className = 'export-brand-items';
+            // 배송비가 정해진 브랜드(루틴랩): 몇 개 단위로 붙는지와 지금 배송비
+            const shipModel = [...modelGroup.values()].map((g) => g.model).find((m) => m.shipFee);
+            let shipEl = null;
+            if (shipModel) {
+              const n = [...modelGroup.values()].reduce((s2, g) => s2 + g.count, 0);
+              shipEl = document.createElement('p');
+              shipEl.className = 'export-ship-note';
+              shipEl.textContent = `${shipInfoText(shipModel)} · 지금 ${n}개라 ${won(shipCost(shipModel, n))}이에요`;
+            }
 
             headerEl.addEventListener('click', () => {
               const isOpen = headerEl.classList.toggle('open');
@@ -6127,6 +6173,7 @@
             });
 
             groupEl.appendChild(headerEl);
+            if (shipEl) groupEl.appendChild(shipEl);
             groupEl.appendChild(itemsEl);
             linksListEl.appendChild(groupEl);
           });

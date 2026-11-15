@@ -552,7 +552,9 @@ window.DEFAULT_STORAGE_MODELS = [
     stackingOffset: 2,
     hasFrontHandle: true,
     color: '#eef6fb',
-    price: 12500,
+    price: 6900,   // 공구가 (실제 주문 화면 기준)
+    listPrice: 12500,   // 정상가 (일반 판매가)
+    shipFee: 3000, shipPer: 4,   // 배송비 3,000원, 4개까지 묶음 배송
     url: ROUTINELAB_URL,
     image: 'img/routinelab/routinelab-drawer-3l.png'
   },
@@ -570,7 +572,9 @@ window.DEFAULT_STORAGE_MODELS = [
     stackingOffset: 2,
     hasFrontHandle: true,
     color: '#e5f1f8',
-    price: 19900,
+    price: 13500,   // 공구가
+    listPrice: 19900,
+    shipFee: 3000, shipPer: 4,
     url: ROUTINELAB_URL,
     image: 'img/routinelab/routinelab-drawer-6l.png'
   },
@@ -588,7 +592,9 @@ window.DEFAULT_STORAGE_MODELS = [
     stackingOffset: 2,
     hasFrontHandle: true,
     color: '#dcecf6',
-    price: 21900,
+    price: 16000,   // 공구가
+    listPrice: 21900,
+    shipFee: 3000, shipPer: 4,
     url: ROUTINELAB_URL,
     image: 'img/routinelab/routinelab-drawer-9l.png'
   },
