@@ -996,9 +996,66 @@
   }
 
   // 서랍형만으로 채우기: 바닥 줄은 칸 너비를 가장 꽉 채우는 조합, 그 위로는 윗면이 같은 상자끼리 이어서 쌓기
+  // 루틴랩만으로 채울 때: 폭이 딱 맞는 묶음 단위로 채움 (아래·위층 가장자리가 정확히 같게)
+  //   51cm  : 9L×3 | 6L×2 | 6L+3L×2 | 3L×4
+  //   25.5cm: 6L | 3L×2
+  //   17cm  : 9L
+  //   12.75cm: 3L
+  // 칸 너비는 이 묶음으로 가장 꽉 차게 나누고, 묶음마다 아래부터 칸 높이까지 층을 쌓음
+  function fillRoutinelabGroups(compIdx, comp, models, rng, o) {
+    const m3 = models.find((m) => m.id === 'routinelab-drawer-3l');
+    const m6 = models.find((m) => m.id === 'routinelab-drawer-6l');
+    const m9 = models.find((m) => m.id === 'routinelab-drawer-9l');
+    const layer = (list) => (list.every(Boolean) ? { boxes: list, h: Math.max(...list.map((m) => m.h)), small: list.filter((m) => m === m3).length } : null);
+    const groups = [
+      { id: 'g510', opts: [layer([m9, m9, m9]), layer([m6, m6]), layer([m6, m3, m3]), layer([m3, m3, m6]), layer([m3, m3, m3, m3])] },
+      { id: 'g255', opts: [layer([m6]), layer([m3, m3])] },
+      { id: 'g170', opts: [layer([m9])] },
+      { id: 'g128', opts: [layer([m3])] }
+    ].map((g) => {
+      const opts = g.opts.filter(Boolean);
+      return opts.length ? { id: g.id, wTop: opts[0].boxes.reduce((s2, m) => s2 + m.wTop, 0), opts } : null;
+    }).filter(Boolean);
+    if (!groups.length) return [];
+    const mode = o.size || (o.mixSizes ? 'mix' : 'any');
+    // 넓은 묶음을 조금 더 좋아하게 (이음새가 적게), '섞어서'는 매번 조금씩 다르게
+    const val = {};
+    groups.forEach((g) => { val[g.id] = (1 + (g.wTop >= 500 ? 0.02 : 0)) * (mode === 'mix' ? 0.9 + rng() * 0.2 : 1); });
+    const boxes = [];
+    let id = nextBoxIdBase();
+    const OFF = (m9 || m6 || m3).stackingOffset || 0;
+    freeIntervals(o.xStart, o.xEnd, o.blocked).forEach(([a, b]) => {
+      spreadInRow(bestWidthCombo(groups, b - a, (g) => g.wTop * val[g.id], rng), a, b).forEach(({ m: g, x }) => {
+        let y = 0;
+        for (let k = 0; k < 8; k++) {
+          if (k > 0 && !o.stack) break;
+          const room = o.capH - y;
+          const cands = g.opts.filter((op) => op.h <= room + 0.5);
+          if (!cands.length) break;
+          let op;
+          if (mode === 'big') op = [...cands].sort((p1, p2) => p1.small - p2.small || p2.h - p1.h)[0];
+          else if (mode === 'small') op = [...cands].sort((p1, p2) => p2.small - p1.small)[0];
+          else op = cands[Math.floor(rng() * cands.length)];
+          let bx = x;
+          op.boxes.forEach((m) => {
+            const px = fitX(bx, m.wTop, b);
+            boxes.push({ id: 'box-' + (++id), modelId: m.id, compartmentIndex: compIdx, x: px, y: Math.round(y), z: Math.round(o.atBack ? 0 : comp.d - m.dTop), rot: 0 });
+            bx += m.wTop;
+          });
+          y += op.h - OFF;
+        }
+      });
+    });
+    return boxes;
+  }
+
   function fillDrawersModular(compIdx, comp, fits, rng, o) {
     const usable = fits.filter((m) => m.dTop <= comp.d && m.h <= o.capH);
     if (!usable.length) return [];
+    if (usable.every((m) => m.brand === '루틴랩')) {
+      const grouped = fillRoutinelabGroups(compIdx, comp, usable, rng, o);
+      if (grouped.length) return grouped;
+    }
     const maxD = Math.max(...usable.map((m) => m.dTop));
     // 칸 깊이를 비슷하게 채우는 상자끼리 ('섞어서'는 크고 작은 상자가 같이 들어가게 범위를 넓힘)
     const pool = usable.filter((m) => m.dTop >= maxD * (o.mixSizes ? 0.6 : 0.85));
@@ -1202,7 +1259,7 @@
 
     // 서랍형만 채울 때: 크기가 맞물리는 조합으로 바닥을 꽉, 위로도 윗면 높이를 맞춰 쌓기
     if (fits.length && fits.every((m) => m.accessType === 'front_drawer') && state.spaceConfig.type !== 'drawer') {
-      const modular = fillDrawersModular(compIdx, comp, fits, rng, { xStart, xEnd, blocked, capH: comp.clearH, stack: opts.stack, mixSizes: opts.mixSizes });
+      const modular = fillDrawersModular(compIdx, comp, fits, rng, { xStart, xEnd, blocked, capH: comp.clearH, stack: opts.stack, mixSizes: opts.mixSizes, size: opts.size });
       if (modular.length) return modular;
     }
 
@@ -1548,6 +1605,7 @@
     // 서랍형(drawer)이거나 장/팬트리 선반에서 서랍형을 채울 때는 앞뒤 이중 쌓임(multiRow) 금지
     const opts = {
       mixSizes: size === 'mix',
+      size,
       stack: isCab || isPan,
       multiRow: !isCab && !isDrawerKind,
       levelRows: !isCab && !isPan && !isDrawerKind
