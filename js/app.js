@@ -1716,6 +1716,127 @@
     announce(first);
   }
 
+  // ===== 여러 칸 한 번에 채우기 =====
+  // 채울 수 있는 칸 (비워 두기로 한 칸은 뺌)
+  function fillableComps() {
+    return window.PackerEngine.getCompartments(state.spaceConfig).filter((c) => !c.reserved);
+  }
+  const boxCountIn = (idx) => getActivePlan().boxes.filter((b) => b.compartmentIndex === idx).length;
+
+  // 마지막 단계: 이 칸만 · 빈 칸 모두 · 모든 칸 · 칸 직접 고르기
+  function renderTargetChoice(compIdx, title, onPick, onBack) {
+    const body = document.getElementById('mobile-shelf-sheet-body');
+    const comps = fillableComps();
+    const empty = comps.filter((c) => boxCountIn(c.index) === 0);
+    const filledBoxes = comps.reduce((sum, c) => sum + boxCountIn(c.index), 0);
+    body.innerHTML = '';
+    const head = document.createElement('div');
+    head.className = 'sheet-step-head';
+    head.innerHTML = `<div class="sheet-step-title">${title}</div><div class="sheet-step-hint">고른 칸마다 같은 조건으로 채워요.</div>`;
+    body.appendChild(head);
+    body.appendChild(sheetBtn('이 칸만', '지금 고른 칸만 채워요', 'primary', () => onPick([compIdx])));
+    const emptyBtn = sheetBtn('빈 칸 모두', empty.length ? `상자 없는 칸 ${empty.length}개만 채워요` : '빈 칸이 없어요', '', () => onPick(empty.map((c) => c.index)));
+    if (!empty.length) emptyBtn.disabled = true;
+    body.appendChild(emptyBtn);
+    body.appendChild(sheetBtn('모든 칸', filledBoxes ? `${comps.length}칸 모두, 넣은 상자 ${filledBoxes}개는 바뀌어요` : `${comps.length}칸 모두 채워요`, '', () => onPick(comps.map((c) => c.index))));
+    body.appendChild(sheetBtn('칸 직접 고르기', '채울 칸을 목록에서 골라요', '', () => renderTargetPicker(compIdx, onPick, () => renderTargetChoice(compIdx, title, onPick, onBack))));
+    body.appendChild(sheetBtn('뒤로', '', 'ghost', onBack));
+  }
+
+  // 칸 직접 고르기: 칸 목록에 체크 (지금 고른 칸은 처음부터 체크)
+  function renderTargetPicker(compIdx, onPick, onBack) {
+    const body = document.getElementById('mobile-shelf-sheet-body');
+    const comps = fillableComps();
+    const picked = new Set([compIdx]);
+    body.innerHTML = '';
+    const head = document.createElement('div');
+    head.className = 'sheet-step-head';
+    head.innerHTML = '<div class="sheet-step-title">채울 칸을 골라 주세요</div><div class="sheet-step-hint">상자가 있는 칸을 고르면 새 상자로 바뀌어요.</div>';
+    body.appendChild(head);
+    const allBtn = document.createElement('button');
+    allBtn.type = 'button';
+    allBtn.className = 'target-all-btn';
+    body.appendChild(allBtn);
+    const list = document.createElement('div');
+    list.className = 'target-list';
+    body.appendChild(list);
+    const goBtn = sheetBtn('칸 채우기', '', 'primary', () => {
+      if (picked.size) onPick(comps.map((c) => c.index).filter((i) => picked.has(i)));
+    });
+    const sync = () => {
+      allBtn.textContent = picked.size === comps.length ? '모두 빼기' : '모두 고르기';
+      list.querySelectorAll('input').forEach((inp) => { inp.checked = picked.has(Number(inp.value)); });
+      goBtn.querySelector('.sheet-btn-text > span').textContent = picked.size ? `${picked.size}칸 채우기` : '칸을 골라 주세요';
+      goBtn.disabled = !picked.size;
+    };
+    comps.forEach((c) => {
+      const n = boxCountIn(c.index);
+      const row = document.createElement('label');
+      row.className = 'target-row';
+      row.innerHTML = `<input type="checkbox" value="${c.index}"><span class="target-name">${c.name}</span><span class="target-sub">${n ? `상자 ${n}개` : '비어 있음'}</span>`;
+      row.querySelector('input').addEventListener('change', (e) => {
+        if (e.target.checked) picked.add(c.index); else picked.delete(c.index);
+        sync();
+      });
+      list.appendChild(row);
+    });
+    allBtn.addEventListener('click', () => {
+      if (picked.size === comps.length) picked.clear(); else comps.forEach((c) => picked.add(c.index));
+      sync();
+    });
+    body.appendChild(goBtn);
+    body.appendChild(sheetBtn('뒤로', '', 'ghost', onBack));
+    sync();
+  }
+
+  // 고른 칸들을 같은 조건으로 채우고 [되돌리기] [다른 조합] 알림 (한 칸이면 지금 방식 그대로)
+  async function runFillTargets(targets, brand, kind, size, onEmpty) {
+    if (!targets.length) return;
+    if (targets.length === 1) { runAutofillWithUndo(targets[0], brand, kind, onEmpty, size); return; }
+    const plan = getActivePlan();
+    const existing = targets.reduce((sum, i) => sum + boxCountIn(i), 0);
+    if (existing > 0) {
+      const ok = await confirmDialog({
+        title: '고른 칸 상자를 바꿀까요?',
+        message: `고른 칸에 있던 상자 ${existing}개가 새 상자로 바뀌어요.`,
+        ok: '바꾸기'
+      });
+      if (!ok) return;
+    }
+    const before = JSON.parse(JSON.stringify(plan.boxes));
+    // 무작위 채우기는 모든 칸이 같은 크기 순서로 (큰 상자 → 큰·작은 상자 → 작은 상자)
+    const runOnce = () => {
+      const fillAll = (sz) => {
+        let n = 0, filled = 0;
+        targets.forEach((i) => { const k = runTypeFill(i, brand, kind, sz); n += k; if (k > 0) filled += 1; });
+        return { n, filled };
+      };
+      if (size !== 'cycle') return Object.assign(fillAll(size), { label: '상자' });
+      state.quickFillStep = state.quickFillStep || {};
+      for (let k = 0; k < QUICK_SIZE_CYCLE.length; k++) {
+        const i = (state.quickFillStep.multi || 0) % QUICK_SIZE_CYCLE.length;
+        state.quickFillStep.multi = i + 1;
+        const r = fillAll(QUICK_SIZE_CYCLE[i][0]);
+        if (r.n > 0) return Object.assign(r, { label: QUICK_SIZE_CYCLE[i][1] });
+      }
+      return { n: 0, filled: 0, label: '상자' };
+    };
+    const first = runOnce();
+    if (first.n === 0) { if (onEmpty) onEmpty(); return; }
+    closeShelfSheet();
+    refreshAll();
+    const announce = (r) => {
+      const skipped = targets.length - r.filled;
+      showToast(`${r.filled}칸에 ${r.label} ${r.n}개를 넣었어요${skipped ? ` (${skipped}칸은 맞는 상자가 없어요)` : ''}`, {
+        actions: [
+          { label: '되돌리기', onClick: () => { getActivePlan().boxes = before; state.selectedBoxIds = []; refreshAll(); showToast('채우기 전으로 돌렸어요'); } },
+          { label: '다른 조합', onClick: () => { const r2 = runOnce(); refreshAll(); announce(r2.n ? r2 : r); } }
+        ]
+      });
+    };
+    announce(first);
+  }
+
   function sheetBtn(label, sub, cls, onClick) {
     const b = document.createElement('button');
     b.type = 'button';
@@ -1790,9 +1911,11 @@
     body.appendChild(head);
 
     const go = (size) => {
-      runAutofillWithUndo(compIdx, brand, kind, () => {
+      const fillNow = (targets) => runFillTargets(targets, brand, kind, size, () => {
         head.querySelector('.sheet-step-hint').textContent = '이 칸에 들어가는 상자가 없어요.';
-      }, size);
+      });
+      if (fillableComps().length <= 1) { fillNow([compIdx]); return; }
+      renderTargetChoice(compIdx, '어느 칸에 채울까요?', fillNow, () => renderSizeChoice(compIdx, brand, kind, onBack));
     };
     const rows = [
       ['big', '큰 상자 위주', '큰 상자 몇 개로 넓게 채워요'],
@@ -1873,7 +1996,9 @@
       if (comp.reserved) { showToast('맨 아래 칸은 비워두기로 했어요. "기둥·선반"에서 바꿀 수 있어요', { duration: 3500 }); return; }
       const t = state.spaceConfig.type;
       const quickKind = (t === 'pantry' || t === 'fridge') ? 'mix' : undefined;
-      runAutofillWithUndo(compIdx, null, quickKind, () => showToast('이 칸에 들어가는 상자가 없어요', { type: 'warn', duration: 3000 }), 'cycle');
+      const fillNow = (targets) => runFillTargets(targets, null, quickKind, 'cycle', () => showToast('이 칸에 들어가는 상자가 없어요', { type: 'warn', duration: 3000 }));
+      if (fillableComps().length <= 1) { fillNow([compIdx]); return; }
+      renderTargetChoice(compIdx, '어느 칸을 무작위로 채울까요?', fillNow, () => openShelfSheet(compIdx));
     }, '누를 때마다 큰 상자, 섞어서, 작은 상자 순서로 채워요'));
 
     // 3. 상자 넣기 (고르기 창 열기)
@@ -3866,9 +3991,24 @@
     const tools = document.getElementById('corner-tools');
     const setup = document.getElementById('btn-mobile-edit-setup');
     if (!tools || !setup || setup.offsetParent === null) return;
-    tools.style.left = `${setup.offsetLeft + setup.offsetWidth + 8}px`;
-    tools.style.top = `${setup.offsetTop}px`;
-    tools.style.setProperty('--ct-size', `${Math.max(40, setup.offsetHeight)}px`);
+    let left = setup.offsetLeft + setup.offsetWidth + 8;
+    let size = Math.max(40, setup.offsetHeight);
+    let gap = 8;
+    // 아주 좁은 폰: 오른쪽 '선반 높이'·'기둥·선반' 버튼과 겹치면 간격과 크기를 줄임
+    const right = document.getElementById('btn-mobile-shelf-height');
+    const n = tools.children.length || 3;
+    if (right && right.offsetParent !== null) {
+      const avail = right.offsetLeft - 6 - left;
+      if (n * size + (n - 1) * gap > avail) {
+        left -= 2;
+        gap = 4;
+        size = Math.max(34, Math.floor((avail + 2 - (n - 1) * gap) / n));
+      }
+    }
+    tools.style.left = `${left}px`;
+    tools.style.top = `${setup.offsetTop + (setup.offsetHeight - size) / 2}px`;
+    tools.style.gap = `${gap}px`;
+    tools.style.setProperty('--ct-size', `${size}px`);
   }
 
   // '여러 개 고르기'를 처음 켰을 때 한 번만 사용법
