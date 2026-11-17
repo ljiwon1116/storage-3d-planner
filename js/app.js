@@ -721,6 +721,76 @@
     return state.catalogModels.filter((m) => window.getModelKind(m) === want);
   }
 
+  // 큰 상자 / 작은 상자 나누기 (sizeFilterPool 과 같은 기준). 상자 종류가 3개보다 적으면 나누지 않음
+  function sizeHalves(models) {
+    if (!models || models.length < 3) return null;
+    const area = (m) => m.wTop * m.dTop;
+    const sorted = [...models].sort((a, b) => area(a) - area(b));
+    const mid = area(sorted[Math.floor(sorted.length / 2)]);
+    return { big: new Set(models.filter((m) => area(m) >= mid).map((m) => m.id)), small: new Set(models.filter((m) => area(m) < mid).map((m) => m.id)) };
+  }
+
+  // 쌓은 상자 정리: 위층 상자는 아래 상자가 바닥의 85% 이상을 받쳐야 하고,
+  // 한 층 위의 상자들 폭을 모두 더한 값이 바로 아래층보다 넓으면 안 됨
+  // (아래에 작은 상자를 띄엄띄엄 두고 위에 긴 상자를 걸쳐 놓는 일이 없게) → 어긋나는 위층 상자는 뺌
+  function trimUnsupportedStacks(list) {
+    const P = window.PackerEngine;
+    const mm = state.modelsMap;
+    for (let guard = 0; guard < 60; guard++) {
+      const info = list.map((b) => {
+        const m = mm[b.modelId];
+        return m ? { b, m, d: P.getOrientedDims(m, b.rot || 0), y: b.y || 0 } : null;
+      }).filter(Boolean);
+      const supportersOf = (a) => info.filter((o) => {
+        if (o === a || o.b.compartmentIndex !== a.b.compartmentIndex) return false;
+        const top = o.y + o.d.h - P.stackOffsetBetween(o.m, a.m);
+        if (Math.abs(top - a.y) > 4) return false;
+        const ox = Math.min(a.b.x + a.d.w, o.b.x + o.d.w) - Math.max(a.b.x, o.b.x);
+        const oz = Math.min(a.b.z + a.d.d, o.b.z + o.d.d) - Math.max(a.b.z, o.b.z);
+        return ox > 0 && oz > 0;
+      });
+      // 1) 받침이 모자란 상자
+      let bad = info.find((a) => {
+        if (a.y < 5) return false;
+        const area = supportersOf(a).reduce((sum, o) => {
+          const ox = Math.min(a.b.x + a.d.w, o.b.x + o.d.w) - Math.max(a.b.x, o.b.x);
+          const oz = Math.min(a.b.z + a.d.d, o.b.z + o.d.d) - Math.max(a.b.z, o.b.z);
+          return sum + ox * oz;
+        }, 0);
+        return area < a.d.w * a.d.d * 0.85;
+      });
+      // 2) 층별 폭 합: 위층이 아래층보다 넓으면 그 층에서 가장 높이 있는 상자부터 뺌
+      if (!bad) {
+        const layer = new Map();
+        [...info].sort((a, b) => a.y - b.y).forEach((a) => {
+          if (a.y < 5) { layer.set(a, 0); return; }
+          const sup = supportersOf(a);
+          layer.set(a, 1 + Math.max(0, ...sup.map((o) => (layer.has(o) ? layer.get(o) : 0))));
+        });
+        const byComp = {};
+        info.forEach((a) => {
+          const c = (byComp[a.b.compartmentIndex] = byComp[a.b.compartmentIndex] || {});
+          const L = layer.get(a);
+          (c[L] = c[L] || []).push(a);
+        });
+        Object.values(byComp).some((c) => {
+          const levels = Object.keys(c).map(Number).sort((a, b) => a - b);
+          for (let k = 1; k < levels.length; k++) {
+            const sumW = (L) => c[L].reduce((s2, a) => s2 + a.d.w, 0);
+            if (levels[k] - levels[k - 1] === 1 && sumW(levels[k]) > sumW(levels[k - 1]) + 2) {
+              bad = [...c[levels[k]]].sort((a, b) => b.y - a.y || b.d.w - a.d.w)[0];
+              return true;
+            }
+          }
+          return false;
+        });
+      }
+      if (!bad) break;
+      list = list.filter((b) => b !== bad.b);
+    }
+    return list;
+  }
+
   // 자동 채우기 크기 고르기: 'big' 큰 상자 위주 / 'small' 작은 상자 여러 개 / 'mix'(또는 없음) 섞어서
   // 이 칸에 들어가는 상자들을 바닥 넓이 순으로 줄 세워 큰 쪽 절반 / 작은 쪽 절반만 씀
   function sizeFilterPool(models, size) {
@@ -930,12 +1000,16 @@
     const usable = fits.filter((m) => m.dTop <= comp.d && m.h <= o.capH);
     if (!usable.length) return [];
     const maxD = Math.max(...usable.map((m) => m.dTop));
-    const pool = usable.filter((m) => m.dTop >= maxD * 0.85);   // 칸 깊이를 비슷하게 채우는 상자끼리
+    // 칸 깊이를 비슷하게 채우는 상자끼리 ('섞어서'는 크고 작은 상자가 같이 들어가게 범위를 넓힘)
+    const pool = usable.filter((m) => m.dTop >= maxD * (o.mixSizes ? 0.6 : 0.85));
+    // '섞어서'는 매번 상자마다 조금씩 다른 점수를 줘서 한 가지 상자만 고르지 않게
+    const jitter = {};
+    pool.forEach((m) => { jitter[m.id] = o.mixSizes ? 0.85 + rng() * 0.3 : 1; });
     const boxes = [];
     const layer = [];
     let id = nextBoxIdBase();
     freeIntervals(o.xStart, o.xEnd, o.blocked).forEach(([a, b]) => {
-      spreadInRow(bestWidthCombo(pool, b - a, (m) => m.wTop, rng), a, b).forEach(({ m, x }) => {
+      spreadInRow(bestWidthCombo(pool, b - a, (m) => m.wTop * jitter[m.id], rng), a, b).forEach(({ m, x }) => {
         const z = o.atBack ? 0 : comp.d - m.dTop;
         const bx = fitX(x, m.wTop, b);
         boxes.push({ id: 'box-' + (++id), modelId: m.id, compartmentIndex: compIdx, x: bx, y: 0, z: Math.round(z), rot: 0 });
@@ -1128,7 +1202,7 @@
 
     // 서랍형만 채울 때: 크기가 맞물리는 조합으로 바닥을 꽉, 위로도 윗면 높이를 맞춰 쌓기
     if (fits.length && fits.every((m) => m.accessType === 'front_drawer') && state.spaceConfig.type !== 'drawer') {
-      const modular = fillDrawersModular(compIdx, comp, fits, rng, { xStart, xEnd, blocked, capH: comp.clearH, stack: opts.stack });
+      const modular = fillDrawersModular(compIdx, comp, fits, rng, { xStart, xEnd, blocked, capH: comp.clearH, stack: opts.stack, mixSizes: opts.mixSizes });
       if (modular.length) return modular;
     }
 
@@ -1397,7 +1471,9 @@
     if (fillComp && fillComp.reserved) return 0;   // 팬트리 '맨 아래 비워두기' 칸은 채우지 않음
     let pool = typeFillPool(kind);
     if (brand) pool = pool.filter((m) => m.brand === brand);
-    if (fillComp) pool = sizeFilterPool(pool.filter((m) => m.h <= fillComp.clearH), size);
+    if (fillComp) pool = pool.filter((m) => m.h <= fillComp.clearH);
+    const halves = (size === 'mix' && state.spaceConfig.type !== 'fridge') ? sizeHalves(pool) : null;
+    if (fillComp) pool = sizeFilterPool(pool, size);
     const isCab = state.spaceConfig.type === 'cabinet';
     const isPan = state.spaceConfig.type === 'pantry' || state.spaceConfig.type === 'fridge';
     const isDrawerKind = kind === 'drawer' || (!kind && isCab);
@@ -1407,6 +1483,7 @@
     let boxes = [];
     // 서랍형(drawer)이거나 장/팬트리 선반에서 서랍형을 채울 때는 앞뒤 이중 쌓임(multiRow) 금지
     const opts = {
+      mixSizes: size === 'mix',
       stack: isCab || isPan,
       multiRow: !isCab && !isDrawerKind,
       levelRows: !isCab && !isPan && !isDrawerKind
@@ -1430,17 +1507,21 @@
     // 일정 수준(목표 70%) 이상 채운 조합이 나올 때까지 여러 번 뽑고, 안 되면 가장 많이 채운 조합
     const TARGET = 0.7;
     let best = null, bestRate = -1;
-    for (let attempt = 0; attempt < 18; attempt++) {
+    for (let attempt = 0; attempt < (halves ? 30 : 18); attempt++) {
       const rng = seededRng(Math.floor(Math.random() * 1e9));
       const cand = state.spaceConfig.type === 'fridge'
         ? fridgeFillCompartment(compIdx, kind, brand, rng, size)
         : randomFillCompartment(compIdx, pool, rng, opts);
       if (!cand.length) continue;
-      lowBasketRowsFront(cand);
-      const rate = fillRate(cand);
-      const same = sig(cand) === prevSig;
-      if (!same && rate >= TARGET) { best = cand; bestRate = rate; break; }
-      if (rate > bestRate && (!same || !best)) { best = cand; bestRate = rate; }
+      const kept = trimUnsupportedStacks(cand);
+      if (!kept.length) continue;
+      lowBasketRowsFront(kept);
+      // '섞어서'는 큰 상자와 작은 상자가 모두 들어가야 함 (아니면 뒤로 미룸)
+      const mixOk = !halves || (kept.some((b) => halves.big.has(b.modelId)) && kept.some((b) => halves.small.has(b.modelId)));
+      const rate = fillRate(kept) - (mixOk ? 0 : 1);
+      const same = sig(kept) === prevSig;
+      if (!same && mixOk && rate >= TARGET) { best = kept; bestRate = rate; break; }
+      if (rate > bestRate && (!same || !best)) { best = kept; bestRate = rate; }
     }
     boxes = best || [];
     if (boxes.length > 0) {
@@ -1449,6 +1530,8 @@
     }
     return boxes.length;
   }
+
+  const QUICK_SIZE_CYCLE = [['big', '큰 상자'], ['mix', '큰·작은 상자'], ['small', '작은 상자']];
 
   // 한 번에 채우기 실행: 이미 상자가 있으면 묻고, 채운 뒤 [되돌리기] [다른 조합] 알림
   async function runAutofillWithUndo(compIdx, brand, kind, onEmpty, size) {
@@ -1463,17 +1546,29 @@
       if (!ok) return;
     }
     const before = JSON.parse(JSON.stringify(plan.boxes));
-    const n = runTypeFill(compIdx, brand, kind, size);
-    if (n === 0) { if (onEmpty) onEmpty(); return; }
+    // size === 'cycle' (무작위 채우기): 큰 상자 → 큰·작은 상자 → 작은 상자 → 큰 상자… 칸마다 순서를 기억
+    const runOnce = () => {
+      if (size !== 'cycle') return { n: runTypeFill(compIdx, brand, kind, size), label: '상자' };
+      state.quickFillStep = state.quickFillStep || {};
+      for (let k = 0; k < QUICK_SIZE_CYCLE.length; k++) {
+        const i = (state.quickFillStep[compIdx] || 0) % QUICK_SIZE_CYCLE.length;
+        state.quickFillStep[compIdx] = i + 1;
+        const n2 = runTypeFill(compIdx, brand, kind, QUICK_SIZE_CYCLE[i][0]);
+        if (n2 > 0) return { n: n2, label: QUICK_SIZE_CYCLE[i][1] };
+      }
+      return { n: 0, label: '상자' };
+    };
+    const first = runOnce();
+    if (first.n === 0) { if (onEmpty) onEmpty(); return; }
     closeShelfSheet();
     refreshAll();
-    const announce = (count) => showToast(`상자 ${count}개를 넣었어요`, {
+    const announce = (r) => showToast(`${r.label} ${r.n}개를 넣었어요`, {
       actions: [
         { label: '되돌리기', onClick: () => { getActivePlan().boxes = before; state.selectedBoxIds = []; refreshAll(); showToast('채우기 전으로 돌렸어요'); } },
-        { label: '다른 조합', onClick: () => { const m = runTypeFill(compIdx, brand, kind, size); refreshAll(); announce(m || count); } }
+        { label: '다른 조합', onClick: () => { const r2 = runOnce(); refreshAll(); announce(r2.n ? r2 : r); } }
       ]
     });
-    announce(n);
+    announce(first);
   }
 
   function sheetBtn(label, sub, cls, onClick) {
@@ -1623,8 +1718,21 @@
       return b;
     };
 
-    // 1. 상자 넣기 (고르기 창 열기)
-    body.appendChild(makeBtn('', '상자 넣기', 'primary', () => {
+    // 1. 골라서 채우기: 브랜드 → 종류 → 크기
+    body.appendChild(makeBtn('', '골라서 채우기', 'primary', () => {
+      renderAutofillChoice(compIdx);
+    }, '브랜드, 상자 종류, 크기를 골라서 채워요'));
+
+    // 2. 무작위 채우기: 누를 때마다 큰 상자 → 큰·작은 상자 → 작은 상자 순서로 돌아가며 채움
+    body.appendChild(makeBtn('', '무작위 채우기', '', () => {
+      if (comp.reserved) { showToast('맨 아래 칸은 비워두기로 했어요. "기둥·선반"에서 바꿀 수 있어요', { duration: 3500 }); return; }
+      const t = state.spaceConfig.type;
+      const quickKind = (t === 'pantry' || t === 'fridge') ? 'mix' : undefined;
+      runAutofillWithUndo(compIdx, null, quickKind, () => showToast('이 칸에 들어가는 상자가 없어요', { type: 'warn', duration: 3000 }), 'cycle');
+    }, '누를 때마다 큰 상자, 섞어서, 작은 상자 순서로 채워요'));
+
+    // 3. 상자 넣기 (고르기 창 열기)
+    body.appendChild(makeBtn('', '상자 넣기', '', () => {
       closeShelfSheet();
       state.pickerBrand = 'ALL';
       state.pickerCart = {};
@@ -1634,24 +1742,13 @@
       document.getElementById('modal-box-picker').classList.add('open');
     }, '원하는 상자를 직접 골라 넣어요'));
 
-    // 2. 저장한 묶음 넣기
+    // 4. 저장한 묶음 넣기
     body.appendChild(makeBtn('', '저장한 묶음 넣기', '', () => {
       closeShelfSheet();
       state.pickerBrand = 'COMBOS';
       renderPickerModalContent();
       document.getElementById('modal-box-picker').classList.add('open');
     }, '전에 저장해 둔 상자 묶음을 그대로 넣어요'));
-
-    // 3. 한 번에 채우기: 누르면 바로 기본 조합으로 / 골라서 채우기: 브랜드 → 종류 → 크기
-    body.appendChild(makeBtn('', '한 번에 채우기', '', () => {
-      if (comp.reserved) { showToast('맨 아래 칸은 비워두기로 했어요. "기둥·선반"에서 바꿀 수 있어요', { duration: 3500 }); return; }
-      const t = state.spaceConfig.type;
-      const quickKind = (t === 'pantry' || t === 'fridge') ? 'mix' : undefined;
-      runAutofillWithUndo(compIdx, null, quickKind, () => showToast('이 칸에 들어가는 상자가 없어요', { type: 'warn', duration: 3000 }), 'mix');
-    }, '누르면 바로 알아서 채워요. 마음에 안 들면 \'다른 조합\''));
-    body.appendChild(makeBtn('', '골라서 채우기', '', () => {
-      renderAutofillChoice(compIdx);
-    }, '브랜드, 상자 종류, 크기를 골라서 채워요'));
 
     // 4. 지금 놓은 것: 같은 상자는 한 줄로 묶고 개수로 보여 줘요
     if (compBoxes.length > 0) {
