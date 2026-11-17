@@ -1435,27 +1435,91 @@
     return boxes;
   }
 
-  // 첫 설정의 3D 예시: 장은 가운데 칸에 서랍형, 서랍은 바구니형
+  // 첫 설정의 3D 예시 (처음 들어왔을 때 보이는 샘플 상자)
+  // - 문 달린 장: 맨 위·맨 아래 칸을 뺀 칸 중 최대 2칸에 루틴랩 크고 작은 상자 섞어서
+  // - 빼는 서랍: 다이소 바구니 위주
+  // - 팬트리: 띄엄띄엄 3~5칸에 루틴랩 섞어서
+  // - 냉장고: 냉동실 1~2칸에 루틴랩 섞어서 (안 들어가면 냉장고용 상자)
+  function routinelabPool() {
+    return state.catalogModels.filter((m) => m.brand === '루틴랩');
+  }
+  // 루틴랩 크고 작은 상자가 같이 들어간 채우기 (3L 과 6L·9L 이 모두 보이게 몇 번 시도)
+  function previewRoutinelabFill(compIdx, rng, stack) {
+    const comp = window.PackerEngine.getCompartments(state.spaceConfig)[compIdx];
+    if (!comp || comp.reserved) return [];
+    const pool = routinelabPool().filter((m) => m.h <= comp.clearH && m.dTop <= comp.d);
+    if (!pool.length) return [];
+    let best = [];
+    for (let k = 0; k < 8; k++) {
+      const list = trimUnsupportedStacks(randomFillCompartment(compIdx, pool, rng, { stack, multiRow: false, mixSizes: true }));
+      const small = list.some((b) => b.modelId === 'routinelab-drawer-3l');
+      const big = list.some((b) => b.modelId !== 'routinelab-drawer-3l');
+      if (small && big) return list;
+      if (list.length > best.length) best = list;
+    }
+    return best;
+  }
+  function shuffleWith(rng, arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }
+
   function applyPreviewFill() {
     const plan = getActivePlan();
     const rng = seededRng(state.previewSeed);
-    const isCab = state.spaceConfig.type === 'cabinet';
-    if (state.spaceConfig.type === 'fridge') {
-      // 냉장고 예시: 냉장실 가운데 칸에 바구니
-      const comps = window.PackerEngine.getCompartments(state.spaceConfig).filter((c) => c.zoneKind === 'fridge');
-      const mid = comps[Math.floor(comps.length / 2)];
-      plan.boxes = mid ? fridgeFillCompartment(mid.index, 'mix', null, rng) : [];
-    } else if (state.spaceConfig.type === 'pantry') {
-      const comps = window.PackerEngine.getCompartments(state.spaceConfig);
-      plan.boxes = [];
-      comps.filter((c) => c.level === 1).forEach((c) => {
-        plan.boxes = plan.boxes.concat(randomFillCompartment(c.index, typeFillPool('basket'), rng, { stack: false, multiRow: false, levelRows: false }));
+    const type = state.spaceConfig.type;
+    const comps = window.PackerEngine.getCompartments(state.spaceConfig);
+    plan.boxes = [];
+    if (type === 'fridge') {
+      const fz = shuffleWith(rng, comps.filter((c) => c.zoneKind === 'freezer'));
+      const want = rng() < 0.5 ? 1 : 2;
+      let filled = 0;
+      for (const c of fz) {
+        if (filled >= want) break;
+        let list = previewRoutinelabFill(c.index, rng, false);
+        if (!list.length) list = fridgeFillCompartment(c.index, 'mix', null, rng);
+        if (list.length) { plan.boxes = plan.boxes.concat(list); filled++; }
+      }
+    } else if (type === 'pantry') {
+      // 띄엄띄엄: 같은 기둥 칸의 바로 위·아래 칸, 같은 벽 같은 층의 바로 옆 칸은 피함
+      const want = 3 + Math.floor(rng() * 3);
+      const picked = [];
+      const near = (a, b) => a.wall === b.wall && (
+        (a.col === b.col && Math.abs(a.level - b.level) <= 1) ||
+        (a.level === b.level && Math.abs((a.col || 0) - (b.col || 0)) <= 1));
+      const cand = shuffleWith(rng, comps.filter((c) => !c.reserved));
+      [true, false].forEach((strict) => {
+        cand.forEach((c) => {
+          if (picked.length >= want || picked.includes(c)) return;
+          if (strict && picked.some((q) => near(q, c))) return;
+          const list = previewRoutinelabFill(c.index, rng, true);
+          if (!list.length) return;
+          picked.push(c);
+          plan.boxes = plan.boxes.concat(list);
+        });
       });
-    } else if (isCab) {
-      const count = window.PackerEngine.getCompartments(state.spaceConfig).length;
-      plan.boxes = randomFillCompartment(Math.floor(count / 2), typeFillPool(), rng, { stack: true, multiRow: false });
+    } else if (type === 'cabinet') {
+      // 맨 위·맨 아래 칸은 빼고 최대 2칸 (가운데 칸이 없으면 맨 아래 칸 하나)
+      const middle = comps.slice(1, -1);
+      const targets = middle.length ? shuffleWith(rng, middle).slice(0, Math.min(2, middle.length)) : comps.slice(0, 1);
+      targets.forEach((c) => { plan.boxes = plan.boxes.concat(previewRoutinelabFill(c.index, rng, true)); });
     } else {
-      plan.boxes = randomFillCompartment(0, typeFillPool(), rng, { stack: false, multiRow: true, levelRows: true });
+      // 빼는 서랍: 다이소 바구니 위주 (다이소가 모자라면 전체 바구니)
+      const all = typeFillPool();
+      const daiso = all.filter((m) => m.brand === '다이소');
+      // 몇 번 채워 보고 바닥을 가장 많이 덮은 조합 (너무 듬성듬성하지 않게)
+      const comp0 = comps[0];
+      const cover = (list) => list.reduce((sum, b) => {
+        const m = state.modelsMap[b.modelId];
+        return sum + ((b.y || 0) < 5 && m ? window.PackerEngine.getOrientedDims(m, b.rot || 0).w * window.PackerEngine.getOrientedDims(m, b.rot || 0).d : 0);
+      }, 0) / Math.max(1, comp0.w * comp0.d);
+      let bestList = [];
+      for (let k = 0; k < 4; k++) {
+        const list = randomFillCompartment(0, daiso.length >= 3 ? daiso : all, rng, { stack: false, multiRow: true, levelRows: true });
+        if (cover(list) > cover(bestList)) bestList = list;
+      }
+      plan.boxes = bestList;
     }
     // 예시 상자는 경고 없는 자리만 (기본값으로 진행했는데 '문제 알림'이 뜨지 않게)
     const v = window.PackerEngine.validatePlan(state.spaceConfig, plan.boxes, state.modelsMap);
