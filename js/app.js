@@ -1003,11 +1003,12 @@
   //   12.75cm: 3L
   // 칸 너비는 이 묶음으로 가장 꽉 차게 나누고, 묶음마다 아래부터 칸 높이까지 층을 쌓음
   function fillRoutinelabGroups(compIdx, comp, models, rng, o) {
-    const m3 = models.find((m) => m.id === 'routinelab-drawer-3l');
-    const m6 = models.find((m) => m.id === 'routinelab-drawer-6l');
-    const m9 = models.find((m) => m.id === 'routinelab-drawer-9l');
-    const layer = (list) => (list.every(Boolean) ? { boxes: list, h: Math.max(...list.map((m) => m.h)), small: list.filter((m) => m === m3).length } : null);
-    const groups = [
+    const findIn = (list, k) => list.find((m) => m.id === 'routinelab-drawer-' + k);
+    const m3 = findIn(models, '3l');
+    const m6 = findIn(models, '6l');
+    const m9 = findIn(models, '9l');
+    const layer = (list) => (list.every(Boolean) ? { boxes: list, h: Math.max(...list.map((m) => m.h)), small: list.filter((m) => m.id === 'routinelab-drawer-3l').length } : null);
+    const makeGroups = (m3, m6, m9) => [
       { id: 'g510', opts: [layer([m9, m9, m9]), layer([m6, m6]), layer([m6, m3, m3]), layer([m3, m3, m6]), layer([m3, m3, m3, m3])] },
       { id: 'g255', opts: [layer([m6]), layer([m3, m3])] },
       { id: 'g170', opts: [layer([m9])] },
@@ -1016,36 +1017,58 @@
       const opts = g.opts.filter(Boolean);
       return opts.length ? { id: g.id, wTop: opts[0].boxes.reduce((s2, m) => s2 + m.wTop, 0), opts } : null;
     }).filter(Boolean);
+    const groups = makeGroups(m3, m6, m9);
     if (!groups.length) return [];
+    // 남는 윗공간 채우기는 크기 고르기와 상관없이 루틴랩 전부 사용 (큰 상자 위주여도 9L 위 빈 곳엔 3L)
+    const all = state.catalogModels.filter((m) => m.brand === '루틴랩' && m.dTop <= comp.d);
+    const fill = (k, own) => own || findIn(all, k);
+    const topGroups = makeGroups(fill('3l', m3), fill('6l', m6), fill('9l', m9));
     const mode = o.size || (o.mixSizes ? 'mix' : 'any');
     // 넓은 묶음을 조금 더 좋아하게 (이음새가 적게), '섞어서'는 매번 조금씩 다르게
     const val = {};
-    groups.forEach((g) => { val[g.id] = (1 + (g.wTop >= 500 ? 0.02 : 0)) * (mode === 'mix' ? 0.9 + rng() * 0.2 : 1); });
+    ['g510', 'g255', 'g170', 'g128'].forEach((gid) => { val[gid] = (gid === 'g510' ? 1.02 : 1) * (mode === 'mix' ? 0.9 + rng() * 0.2 : 1); });
     const boxes = [];
     let id = nextBoxIdBase();
     const OFF = (m9 || m6 || m3).stackingOffset || 0;
-    freeIntervals(o.xStart, o.xEnd, o.blocked).forEach(([a, b]) => {
-      spreadInRow(bestWidthCombo(groups, b - a, (g) => g.wTop * val[g.id], rng), a, b).forEach(({ m: g, x }) => {
-        let y = 0;
+    const pickOpt = (cands) => {
+      if (mode === 'big') return [...cands].sort((p1, p2) => p1.small - p2.small || p2.h - p1.h)[0];
+      if (mode === 'small') return [...cands].sort((p1, p2) => p2.small - p1.small)[0];
+      return cands[Math.floor(rng() * cands.length)];
+    };
+    // [x0, x1] 구간의 높이 y 위에 묶음을 놓고 쌓음. 더 못 쌓은 묶음 윗면은 옆과 이어서 다시 채움
+    // (9L 두 개 위 34cm → 6L 또는 3L 두 개, 9L 하나 위 17cm → 3L 하나: 버리는 공간이 없게)
+    const fillSpan = (x0, x1, y0, limit, depth) => {
+      if (depth > 4) return;
+      if (y0 > 0 && !o.stack) return;
+      const fitGroups = (depth > 0 ? topGroups : groups).map((g) => ({ ...g, opts: g.opts.filter((op) => op.h <= o.capH - y0 + 0.5) })).filter((g) => g.opts.length);
+      if (!fitGroups.length) return;
+      const tops = [];
+      spreadInRow(bestWidthCombo(fitGroups, x1 - x0, (g) => g.wTop * val[g.id], rng), x0, x1).forEach(({ m: g, x }) => {
+        let y = y0;
         for (let k = 0; k < 8; k++) {
-          if (k > 0 && !o.stack) break;
-          const room = o.capH - y;
-          const cands = g.opts.filter((op) => op.h <= room + 0.5);
+          if (y > 0 && !o.stack) break;
+          const cands = g.opts.filter((op) => op.h <= o.capH - y + 0.5);
           if (!cands.length) break;
-          let op;
-          if (mode === 'big') op = [...cands].sort((p1, p2) => p1.small - p2.small || p2.h - p1.h)[0];
-          else if (mode === 'small') op = [...cands].sort((p1, p2) => p2.small - p1.small)[0];
-          else op = cands[Math.floor(rng() * cands.length)];
+          const op = pickOpt(cands);
           let bx = x;
           op.boxes.forEach((m) => {
-            const px = fitX(bx, m.wTop, b);
-            boxes.push({ id: 'box-' + (++id), modelId: m.id, compartmentIndex: compIdx, x: px, y: Math.round(y), z: Math.round(o.atBack ? 0 : comp.d - m.dTop), rot: 0 });
+            boxes.push({ id: 'box-' + (++id), modelId: m.id, compartmentIndex: compIdx, x: fitX(bx, m.wTop, limit), y: Math.round(y), z: Math.round(o.atBack ? 0 : comp.d - m.dTop), rot: 0 });
             bx += m.wTop;
           });
           y += op.h - OFF;
         }
+        if (y > y0) tops.push({ x0: x, x1: x + g.wTop, y });
       });
-    });
+      // 윗면 높이가 같은 이웃끼리 이어서 그 위를 다시 채움
+      const spans = [];
+      tops.sort((p1, p2) => p1.x0 - p2.x0).forEach((t) => {
+        const sp = spans[spans.length - 1];
+        if (sp && Math.abs(sp.y - t.y) <= 3 && t.x0 - sp.x1 <= 6) { sp.x1 = t.x1; sp.y = Math.max(sp.y, t.y); }
+        else spans.push({ ...t });
+      });
+      spans.forEach((sp) => fillSpan(sp.x0, Math.min(sp.x1, limit), sp.y, Math.min(sp.x1, limit) + 0.5, depth + 1));
+    };
+    freeIntervals(o.xStart, o.xEnd, o.blocked).forEach(([a, b]) => fillSpan(a, b, 0, b, 0));
     return boxes;
   }
 
