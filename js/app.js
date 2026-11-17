@@ -4470,7 +4470,10 @@
     const items = document.querySelectorAll('#drag-guide .drag-guide-list li');
     if (items.length < 3) return;
     items[0].innerHTML = wide ? '<b>마우스로 끌기</b> 장을 이리저리 돌려요' : '<b>한 손가락으로 끌기</b> 장을 이리저리 돌려요';
-    items[1].innerHTML = wide ? '<b>마우스 휠 굴리기</b> 크게·작게 봐요' : '<b>두 손가락 벌리기·모으기</b> 크게·작게 봐요';
+    // 크게·작게 보기는 화면 크기가 아니라 손가락으로 쓰는 기기인지로 나눔 (넓은 태블릿도 손가락 안내)
+    let touch = true;
+    try { touch = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0; } catch (e) {}
+    items[1].innerHTML = touch ? '<b>두 손가락 벌리기·모으기</b> 크게·작게 봐요' : '<b>마우스 휠 굴리기</b> 크게·작게 봐요';
   }
   function maybeShowDragGuide() {
     let seen = false;
