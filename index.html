@@ -8,16 +8,24 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-  <!-- 방문자 통계 (Vercel Web Analytics, 쿠키 없음) -->
-  <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
-  <script defer src="/_vercel/insights/script.js"></script>
-  <!-- 사용 흐름 통계 (Microsoft Clarity): 화면을 누른 위치·이동을 익명으로 모아 불편한 곳을 찾는 데 씀 -->
+  <!-- 방문 통계: 진짜 주소로 사람이 들어왔을 때만 기록
+       (업로드 때마다 생기는 확인용 주소, Vercel 미리보기 사진을 찍는 자동 브라우저는 빼요)
+       - Vercel Web Analytics: 방문 수 (쿠키 없음)
+       - Microsoft Clarity: 화면을 누른 위치·이동을 익명으로 모아 불편한 곳을 찾는 데 씀 -->
   <script>
-    (function (c, l, a, r, i, t, y) {
-      c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments); };
-      t = l.createElement(r); t.async = 1; t.src = "https://www.clarity.ms/tag/" + i;
-      y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
-    })(window, document, "clarity", "script", "zfmia7qf7j");
+    (function () {
+      var real = location.hostname === 'storage3dplanner.vercel.app' &&
+        !navigator.webdriver && !/HeadlessChrome|bot|crawl|spider/i.test(navigator.userAgent);
+      if (!real) return;
+      window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+      var v = document.createElement('script'); v.defer = true; v.src = '/_vercel/insights/script.js';
+      document.head.appendChild(v);
+      (function (c, l, a, r, i, t, y) {
+        c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments); };
+        t = l.createElement(r); t.async = 1; t.src = "https://www.clarity.ms/tag/" + i;
+        y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
+      })(window, document, "clarity", "script", "zfmia7qf7j");
+    })();
   </script>
   <meta name="description" content="옷장, 서랍, 팬트리, 냉장고 크기를 넣으면 3D로 수납함을 미리 놓아 보고, 필요한 상자와 가격을 한눈에 볼 수 있어요." />
   <meta property="og:title" content="수납공간 시뮬레이터 by 조쉬리빙" />
@@ -31,7 +39,7 @@
   <meta property="og:image:alt" content="수납공간 시뮬레이터: 팬트리 선반에 서랍형·바구니형 정리함을 3D로 넣어 본 화면" />
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <link rel="stylesheet" href="styles.css?v=1117k" />
+  <link rel="stylesheet" href="styles.css?v=1117l" />
   <script>
     // 실제로 보이는 화면 높이를 --vh 로 넣어요 (주소창·툴바가 생기고 없어질 때마다).
     // 브라우저마다 100vh 가 툴바를 포함해서 위아래가 잘리는 문제를 막아요.
@@ -896,12 +904,12 @@
   </div>
 
   <!-- 애플리케이션 스크립트 로드 -->
-  <script src="js/units.js?v=1117k"></script>
-  <script src="js/presets.js?v=1117k"></script>
-  <script src="js/items.js?v=1117k"></script>
-  <script src="js/packer.js?v=1117k"></script>
-  <script src="js/scene3d.js?v=1117k"></script>
-  <script src="js/app.js?v=1117k"></script>
+  <script src="js/units.js?v=1117l"></script>
+  <script src="js/presets.js?v=1117l"></script>
+  <script src="js/items.js?v=1117l"></script>
+  <script src="js/packer.js?v=1117l"></script>
+  <script src="js/scene3d.js?v=1117l"></script>
+  <script src="js/app.js?v=1117l"></script>
 
   <!-- 보관함 자세히 보기: 뒤는 흐리게, 고른 보관함만 크게 + 물건 넣기 -->
   <div id="box-detail" class="box-detail" aria-hidden="true">
@@ -927,6 +935,6 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="js/boxdetail.js?v=1117k"></script>
+  <script src="js/boxdetail.js?v=1117l"></script>
 </body>
 </html>
