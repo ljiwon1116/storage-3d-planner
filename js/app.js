@@ -4376,8 +4376,13 @@
   }
 
   function savePhoto() {
+    // 3D를 지금 다시 그리고 바로 옮겨 담음 (그림 파일을 따로 불러오는 기다림 없이, 누른 순간 안에서 끝나게)
     const url = window.Scene3DManager.snapshot && window.Scene3DManager.snapshot();
-    if (!url) return;
+    const src = document.querySelector('#canvas-wrapper canvas[role="img"]');
+    if (!url || !src || !src.width) {
+      showToast('사진을 만들지 못했어요. 3D 화면이 보이는지 확인해 주세요', { type: 'warn', duration: 3500 });
+      return;
+    }
     const { show: showMargins, dirs: marginDirs } = getSelectedMarginDirs();
     const activePlan = getActivePlan();
     const allMargins = window.PackerEngine.getCompartmentMargins
@@ -4386,13 +4391,12 @@
     const occupiedMargins = allMargins.filter((m) => m.boxCount > 0);
     const targetMargins = occupiedMargins.length > 0 ? occupiedMargins : allMargins.slice(0, 1);
 
-    const img = new Image();
-    img.onload = () => {
+    {
       const cv = document.createElement('canvas');
-      cv.width = img.width;
-      cv.height = img.height;
+      cv.width = src.width;
+      cv.height = src.height;
       const g = cv.getContext('2d');
-      g.drawImage(img, 0, 0);
+      g.drawImage(src, 0, 0);
 
       const fontFamily = `Pretendard, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif`;
 
@@ -4448,24 +4452,32 @@
         }
 
         // 2) 좌측 상단 요약 카드: 칸별 상·좌·우·전·후 남은 공간 일람표
-        const cardFs = Math.max(13, Math.round(Math.min(cv.width, cv.height) * 0.023));
-        const lineH = Math.round(cardFs * 1.55);
-        const cardPad = Math.round(cardFs * 0.95);
         const headerText = '남는 공간 (cm)';
         const rows = targetMargins.slice(0, 8).map((m) => ({
           name: `${m.name} (${window.Units.cm(m.compW)}×${window.Units.cm(m.compD)}×${window.Units.cm(m.compH)})`,
           vals: formatMarginLine(m, marginDirs)
         }));
-
-        g.font = `700 ${cardFs}px ${fontFamily}`;
-        let maxRowW = g.measureText(headerText).width;
-        rows.forEach((r) => {
-          g.font = `700 ${Math.round(cardFs * 0.9)}px ${fontFamily}`;
-          const nw = g.measureText(r.name).width;
-          g.font = `600 ${Math.round(cardFs * 0.92)}px ${fontFamily}`;
-          const vw = g.measureText(r.vals).width;
-          maxRowW = Math.max(maxRowW, nw + vw + cardFs * 1.2);
-        });
+        // 표가 사진 폭을 넘으면 글자를 줄여서 오른쪽이 잘리지 않게
+        let cardFs = Math.max(13, Math.round(Math.min(cv.width, cv.height) * 0.023));
+        const measureCard = (fsz) => {
+          g.font = `700 ${fsz}px ${fontFamily}`;
+          let w = g.measureText(headerText).width;
+          rows.forEach((r) => {
+            g.font = `700 ${Math.round(fsz * 0.9)}px ${fontFamily}`;
+            const nw = g.measureText(r.name).width;
+            g.font = `600 ${Math.round(fsz * 0.92)}px ${fontFamily}`;
+            const vw = g.measureText(r.vals).width;
+            w = Math.max(w, nw + vw + fsz * 1.2);
+          });
+          return w;
+        };
+        let maxRowW = measureCard(cardFs);
+        for (let k = 0; k < 12 && cardFs > 8 && maxRowW + Math.round(cardFs * 0.95) * 2 + Math.round(cardFs * 0.9) * 2 > cv.width; k++) {
+          cardFs = Math.max(8, Math.floor(cardFs * 0.9));
+          maxRowW = measureCard(cardFs);
+        }
+        const lineH = Math.round(cardFs * 1.55);
+        const cardPad = Math.round(cardFs * 0.95);
 
         const cardW = Math.min(cv.width - 24, maxRowW + cardPad * 2);
         const cardH = cardPad * 1.8 + lineH * (1 + rows.length);
@@ -4515,14 +4527,79 @@
 
       const d = new Date();
       const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`;
-      const a = document.createElement('a');
-      a.href = cv.toDataURL('image/png');
-      a.download = `수납공간-${stamp}.png`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    };
-    img.src = url;
+      deliverPhoto(cv.toDataURL('image/png'), `수납공간-${stamp}.png`);
+    }
+  }
+
+  // 사진 전달 (브라우저마다 되는 방법이 달라서 나눔)
+  // - 앱 안 브라우저(인스타그램·쓰레드·카카오톡·네이버 앱·페이스북·라인·밴드 등): 내려받기가 막혀 있어 사진을 띄우고 길게 눌러 저장
+  // - 아이폰·아이패드(사파리·크롬·웨일): 공유 창 → '이미지 저장'으로 사진 앱에 저장 (안 되면 길게 눌러 저장)
+  // - 안드로이드 크롬·삼성 인터넷·웨일, 컴퓨터: 바로 내려받기
+  function photoSaveMode() {
+    const ua = navigator.userAgent || '';
+    const inApp = /Instagram|Barcelona|Threads|KAKAOTALK|FBAN|FBAV|FB_IAB|NAVER\(inapp|Line\/|DaumApps|BAND\/|everytimeApp|; wv\)/i.test(ua);
+    const iOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (inApp) return 'hold';
+    if (iOS) return 'share';
+    return 'download';
+  }
+  function deliverPhoto(dataUrl, name) {
+    const bin = atob(dataUrl.split(',')[1]);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const blob = new Blob([bytes], { type: 'image/png' });
+    const mode = photoSaveMode();
+    if (mode === 'hold') { showPhotoOverlay(dataUrl); return; }
+    if (mode === 'share') {
+      let file = null;
+      try { file = new File([blob], name, { type: 'image/png' }); } catch (e) { file = null; }
+      let ok = false;
+      try { ok = !!(file && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })); } catch (e) { ok = false; }
+      if (!ok) { showPhotoOverlay(dataUrl); return; }
+      navigator.share({ files: [file] }).catch((err) => {
+        if (err && err.name === 'AbortError') return;   // 공유 창을 그냥 닫음
+        showPhotoOverlay(dataUrl);
+      });
+      return;
+    }
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = href;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 10000);
+    let touch = false;
+    try { touch = window.matchMedia('(pointer: coarse)').matches; } catch (e) { /* 그대로 */ }
+    showToast(touch ? '사진을 저장했어요. 갤러리나 다운로드 폴더를 확인해 주세요' : '사진을 저장했어요. 다운로드 폴더를 확인해 주세요', { duration: 3500 });
+  }
+
+  // 내려받기가 막힌 브라우저용: 사진을 크게 띄우고 길게 눌러 저장
+  function showPhotoOverlay(dataUrl) {
+    document.getElementById('photo-save-overlay')?.remove();
+    const ov = document.createElement('div');
+    ov.id = 'photo-save-overlay';
+    ov.className = 'photo-save-overlay';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.setAttribute('aria-label', '사진 저장');
+    ov.innerHTML = `
+      <div class="pso-card">
+        <p class="pso-title">사진을 길게 눌러 저장해 주세요</p>
+        <p class="pso-sub">'이미지 저장' 또는 '사진에 추가'를 고르면 돼요</p>
+        <img class="pso-img" alt="내 수납 3D 배치 사진" />
+        <p class="pso-sub">저장이 안 되면 오른쪽 위 메뉴에서 '다른 브라우저로 열기'를 누른 뒤 다시 저장해 주세요</p>
+        <button type="button" class="pso-close">닫기</button>
+      </div>`;
+    ov.querySelector('.pso-img').src = dataUrl;
+    const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    ov.querySelector('.pso-close').addEventListener('click', close);
+    ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(ov);
+    ov.querySelector('.pso-close').focus();
   }
 
   // ---------- 고르는 창 맨 위 손잡이: 잡고 위아래로 끌면 창 높이가 바뀜 ----------
