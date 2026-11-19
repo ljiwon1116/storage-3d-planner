@@ -5675,3 +5675,8 @@ body.ui-mode-mobile .app-header .brand-title > span {
 .pso-img { display: block; max-width: 100%; max-height: 62vh; border-radius: 10px; -webkit-touch-callout: default; user-select: auto; }
 .pso-close { min-height: 44px; min-width: 120px; padding: 0 20px; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--bg-panel); color: var(--text-main); font: inherit; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
 .pso-close:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.pso-open { min-height: 48px; width: 100%; max-width: 320px; padding: 0 20px; border: none; border-radius: 999px; background: var(--accent); color: #fff; font: inherit; font-size: 0.9375rem; font-weight: 700; cursor: pointer; }
+.pso-open:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.pso-note { font-size: 0.75rem; }
+.pso-card { overflow-y: auto; }
+.pso-card.is-inapp .pso-img { max-height: 34vh; }

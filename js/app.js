@@ -258,10 +258,32 @@
     if (encodedState) {
       try {
         const decoded = JSON.parse(decodeURIComponent(escape(atob(encodedState))));
+        // 같이 넘어온 '내 상자'는 이 기기 목록에도 넣어 둠 (안 그러면 그 상자가 안 보임)
+        if (Array.isArray(decoded.customModels) && decoded.customModels.length) {
+          try {
+            const mine = JSON.parse(localStorage.getItem(STORAGE_KEY_CUSTOM_MODELS) || '[]');
+            const have = new Set(mine.map((m) => m.id));
+            decoded.customModels.forEach((m) => { if (m && m.id && !have.has(m.id)) mine.push(m); });
+            localStorage.setItem(STORAGE_KEY_CUSTOM_MODELS, JSON.stringify(mine));
+          } catch (e2) { /* 저장 공간을 못 쓰면 그냥 넘어감 */ }
+          loadCatalogAndCombos();
+        }
         if (decoded.spaceConfig) state.spaceConfig = decoded.spaceConfig;
         if (decoded.plans) state.plans = decoded.plans;
         if (decoded.activePlanId) state.activePlanId = decoded.activePlanId;
         refreshAll();
+        saveLocalNow();
+        // 주소에서 긴 state 를 지움: 이후 새로고침하면 이 기기에 저장된(고친) 내용으로 열려요
+        const then = params.get('then');
+        params.delete('state');
+        params.delete('then');
+        history.replaceState(null, '', window.location.pathname + (params.toString() ? '?' + params : '') + window.location.hash);
+        if (then === 'photo') {
+          setTimeout(() => {
+            document.getElementById('btn-export')?.click();
+            showToast("'사진 저장'을 눌러 저장해 주세요", { duration: 4000 });
+          }, 700);
+        }
       } catch (e) {
         console.warn('URL state 복원 실패:', e);
       }
@@ -310,6 +332,31 @@
       if (badgeEl) {
         badgeEl.textContent = '내 기기에 저장';
       }
+    }
+  }
+
+  // 지금 배치를 통째로 담은 주소 (?state=...). 다른 브라우저로 넘어가도 짠 그대로 열려요
+  function stateLinkUrl(extra) {
+    const usedIds = new Set();
+    state.plans.forEach((pl) => (pl.boxes || []).forEach((b) => usedIds.add(b.modelId)));
+    const customModels = Object.values(state.modelsMap || {}).filter((m) => m && String(m.id).startsWith('custom-') && usedIds.has(m.id));
+    const payload = { spaceConfig: state.spaceConfig, plans: state.plans, activePlanId: state.activePlanId };
+    if (customModels.length) payload.customModels = customModels;
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+    return `${window.location.origin}${window.location.pathname}?state=${encodeURIComponent(encoded)}${extra || ''}`;
+  }
+
+  // 앱 안 브라우저(인스타그램·카카오톡 등)에서 휴대폰 기본 브라우저로 열기
+  function openInExternalBrowser(url) {
+    const ua = navigator.userAgent || '';
+    // 앱 메뉴의 '외부 브라우저로 열기'를 눌러도 짠 그대로 넘어가게 지금 주소도 바꿔 둠
+    try { history.replaceState(null, '', url.replace(window.location.origin, '')); } catch (e) { /* 그대로 */ }
+    if (/KAKAOTALK/i.test(ua)) {
+      window.location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url);
+    } else if (/Android/i.test(ua)) {
+      window.location.href = 'intent://' + url.replace(/^https?:\/\//, '') + '#Intent;scheme=https;S.browser_fallback_url=' + encodeURIComponent(url) + ';end';
+    } else {
+      window.location.href = 'x-safari-' + url;   // 아이폰: 사파리로 (iOS 17 이상)
     }
   }
 
@@ -4578,24 +4625,38 @@
   // 내려받기가 막힌 브라우저용: 사진을 크게 띄우고 길게 눌러 저장
   function showPhotoOverlay(dataUrl) {
     document.getElementById('photo-save-overlay')?.remove();
+    const inApp = /Instagram|Barcelona|Threads|KAKAOTALK|FBAN|FBAV|FB_IAB|NAVER\(inapp|Line\/|DaumApps|BAND\/|everytimeApp|; wv\)/i.test(navigator.userAgent || '');
     const ov = document.createElement('div');
     ov.id = 'photo-save-overlay';
     ov.className = 'photo-save-overlay';
     ov.setAttribute('role', 'dialog');
     ov.setAttribute('aria-modal', 'true');
     ov.setAttribute('aria-label', '사진 저장');
-    ov.innerHTML = `
+    ov.innerHTML = inApp ? `
+      <div class="pso-card is-inapp">
+        <p class="pso-title">이 앱 안에서는 사진 저장이 막혀 있어요</p>
+        <p class="pso-sub">휴대폰 브라우저에서 열면 바로 저장돼요. 짠 것 그대로 열려요</p>
+        <button type="button" class="pso-open">다른 브라우저에서 열기</button>
+        <p class="pso-sub pso-note">안 열리면 오른쪽 위 메뉴(⋯)에서 '외부 브라우저로 열기'를 눌러 주세요</p>
+        <p class="pso-sub">또는 아래 사진을 길게 눌러 저장해 보세요</p>
+        <img class="pso-img" alt="내 수납 3D 배치 사진" />
+        <button type="button" class="pso-close">닫기</button>
+      </div>` : `
       <div class="pso-card">
         <p class="pso-title">사진을 길게 눌러 저장해 주세요</p>
         <p class="pso-sub">'이미지 저장' 또는 '사진에 추가'를 고르면 돼요</p>
         <img class="pso-img" alt="내 수납 3D 배치 사진" />
-        <p class="pso-sub">저장이 안 되면 오른쪽 위 메뉴에서 '다른 브라우저로 열기'를 누른 뒤 다시 저장해 주세요</p>
         <button type="button" class="pso-close">닫기</button>
       </div>`;
     ov.querySelector('.pso-img').src = dataUrl;
     const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
     const onKey = (e) => { if (e.key === 'Escape') close(); };
     ov.querySelector('.pso-close').addEventListener('click', close);
+    ov.querySelector('.pso-open')?.addEventListener('click', () => {
+      let url = '';
+      try { url = stateLinkUrl('&then=photo'); } catch (e) { url = window.location.origin + window.location.pathname; }
+      openInExternalBrowser(url);
+    });
     ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
     document.addEventListener('keydown', onKey);
     document.body.appendChild(ov);
