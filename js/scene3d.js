@@ -663,15 +663,17 @@ window.Scene3DManager = (function () {
 
     // 방 양옆 벽: 선반이 벽에 딱 붙어 보이게
     // - 옆 선반 쪽 벽은 불투명, 입구 쪽 벽은 보는 쪽이라 거의 투명
+    const hasSide = window.PackerEngine.pantryHasSide(p);
+    const isI = p.doorSide === 'straight';
     {
       const wallHgt = Math.max(2400, H + 300);
       const rightX = p.roomW / 2 + 12, leftX = -p.roomW / 2 - 12;
       const bOnLeft = p.doorSide === 'right';
-      const bWall = new THREE.Mesh(new THREE.BoxGeometry(24, wallHgt, p.roomD + 24), p.wallB === false ? nearWallMat : sideWallMat);
+      const bWall = new THREE.Mesh(new THREE.BoxGeometry(24, wallHgt, p.roomD + 24), !hasSide ? nearWallMat : sideWallMat);
       bWall.position.set(bOnLeft ? leftX : rightX, wallHgt / 2 - 2, -12);
       bWall.receiveShadow = true;
       roomEnvGroup.add(bWall);
-      const nWall = new THREE.Mesh(new THREE.BoxGeometry(24, wallHgt, p.roomD + 24), isU && p.wallB !== false ? sideWallMat : nearWallMat);
+      const nWall = new THREE.Mesh(new THREE.BoxGeometry(24, wallHgt, p.roomD + 24), isU && hasSide ? sideWallMat : nearWallMat);
       nWall.position.set(bOnLeft ? rightX : leftX, wallHgt / 2 - 2, -12);
       roomEnvGroup.add(nWall);
       // 벽과 바닥·뒷벽이 만나는 선: 선반이 벽에 붙은 게 잘 보이게
@@ -712,8 +714,8 @@ window.Scene3DManager = (function () {
       addPart(postW, H, postW, back.x, H / 2, back.z, 0, postMat);
     };
     [postW / 2, ...postsA, p.roomW - postW / 2].forEach((s) => postAt('A', s));
-    if (p.wallB !== false) [startB + postW / 2, ...postsB, p.roomD - postW / 2].forEach((s) => postAt('B', s));
-    if (p.wallB !== false && isU) [startB + postW / 2, ...postsC, p.roomD - postW / 2].forEach((s) => postAt('C', s));
+    if (hasSide) [startB + postW / 2, ...postsB, p.roomD - postW / 2].forEach((s) => postAt('B', s));
+    if (hasSide && isU) [startB + postW / 2, ...postsC, p.roomD - postW / 2].forEach((s) => postAt('C', s));
 
     // 구석 (옆 선반에 막혀 손 닿기 힘든 곳): 빨간색으로 옅게 (ㄷ자는 양쪽)
     if (showDeadzones) window.PackerEngine.getPantryCorners(spaceConfig).forEach((corner) => {
@@ -747,7 +749,7 @@ window.Scene3DManager = (function () {
       const pts = [];
       const fA0 = wallPoint('A', 0, p.depthA + 2), fA1 = wallPoint('A', p.roomW, p.depthA + 2);
       pts.push(new THREE.Vector3(fA0.x, reachY, fA0.z), new THREE.Vector3(fA1.x, reachY, fA1.z));
-      if (p.wallB !== false) {
+      if (hasSide) {
         const fB0 = wallPoint('B', startB, p.depthB + 2), fB1 = wallPoint('B', p.roomD, p.depthB + 2);
         pts.push(new THREE.Vector3(fB0.x, reachY, fB0.z), new THREE.Vector3(fB1.x, reachY, fB1.z));
         if (isU) {
@@ -783,7 +785,7 @@ window.Scene3DManager = (function () {
     const walk = window.PackerEngine.getPantryWalkway(spaceConfig);
     if (!walk.ok) {
       const wz0 = -p.roomD / 2 + p.depthA;
-      const sd = p.wallB === false ? 0 : p.depthB;
+      const sd = !hasSide ? 0 : p.depthB;
       const wx0 = isU || leftSide ? -p.roomW / 2 + sd : -p.roomW / 2;
       const wx1 = isU || !leftSide ? p.roomW / 2 - sd : p.roomW / 2;
       const floorWarn = new THREE.Mesh(
@@ -795,12 +797,12 @@ window.Scene3DManager = (function () {
     }
 
     // 바닥에 입구 표시 (입구 쪽 앞)
-    const doorW = Math.max(300, Math.min(p.doorW || 800, p.roomW - p.depthB * (isU ? 2 : 1) - 50));
+    const doorW = Math.max(300, Math.min(p.doorW || 800, p.roomW - (hasSide ? p.depthB * (isU ? 2 : 1) : 0) - 50));
     const doorLine = new THREE.Mesh(
       new THREE.BoxGeometry(doorW, 2, 30),
       new THREE.MeshBasicMaterial({ color: 0xb08d63, transparent: true, opacity: 0.5 })
     );
-    const doorX = isU ? 0 : leftSide ? p.roomW / 2 - doorW / 2 - 40 : -p.roomW / 2 + doorW / 2 + 40;
+    const doorX = isU || isI ? 0 : leftSide ? p.roomW / 2 - doorW / 2 - 40 : -p.roomW / 2 + doorW / 2 + 40;
     doorLine.position.set(doorX, 1, p.roomD / 2 - 15);
     cabinetGroup.add(doorLine);
 
@@ -1971,9 +1973,10 @@ window.Scene3DManager = (function () {
       // 팬트리: 입구(왼쪽 앞)에서 안쪽 구석을 비스듬히 내려다봄
       // ㄷ자: 가운데 입구에서 살짝 비껴 정면을 봄
       const ds = currentSpaceConfig.pantry && currentSpaceConfig.pantry.doorSide;
-      const mir = ds === 'right' ? -1 : ds === 'center' ? 0 : 1;
+      const mid = ds === 'center' || ds === 'straight';   // ㄷ자 · I자: 가운데 입구
+      const mir = ds === 'right' ? -1 : mid ? 0 : 1;
       controls.target.set(mir * W * 0.12, H * 0.45, -D * 0.1);
-      camera.position.set(ds === 'center' ? W * 0.3 : -mir * W * 0.9, H * 1.1, D * 1.4 + 2400);
+      camera.position.set(mid ? W * 0.3 : -mir * W * 0.9, H * 1.1, D * 1.4 + 2400);
       controls.update();
       return;
     }

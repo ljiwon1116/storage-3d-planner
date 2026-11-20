@@ -42,9 +42,10 @@ window.PackerEngine = (function () {
     const postsA = makeWall('A', p.roomW, p.postsA, 0);
     const startB = Math.min(p.roomD - 100, p.depthA);
     const isU = p.doorSide === 'center';
-    const postsB = p.wallB === false ? [] : makeWall('B', p.roomD, p.postsB, startB);
-    const postsC = p.wallB === false || !isU ? [] : makeWall('C', p.roomD, p.postsC || p.postsB, startB);
-    if (p.wallB === false) {
+    const hasSide = pantryHasSide(p);
+    const postsB = !hasSide ? [] : makeWall('B', p.roomD, p.postsB, startB);
+    const postsC = !hasSide || !isU ? [] : makeWall('C', p.roomD, p.postsC || p.postsB, startB);
+    if (!hasSide) {
       for (let i = bays.length - 1; i >= 0; i--) if (bays[i].wall !== 'A') bays.splice(i, 1);
     }
     bays.forEach((b) => {
@@ -73,11 +74,16 @@ window.PackerEngine = (function () {
     return { bays, postsA, postsB, postsC, startB, isU };
   }
 
+  // 팬트리 옆 벽에 선반이 있는지 (I자 = 안쪽 벽만)
+  function pantryHasSide(p) {
+    return !!p && p.wallB !== false && p.doorSide !== 'straight';
+  }
+
   // 0-2. 팬트리 구석: 안쪽 벽 선반 중 옆 선반에 막혀 손이 잘 안 닿는 구간 (안쪽 벽 왼쪽 끝 기준 mm)
   // ㄷ자는 양쪽 구석 두 곳
   function getPantryCorners(spaceConfig) {
     const p = spaceConfig.pantry;
-    if (!p || p.wallB === false) return [];
+    if (!pantryHasSide(p)) return [];
     const left = { s0: 0, s1: p.depthB }, right = { s0: p.roomW - p.depthB, s1: p.roomW };
     if (p.doorSide === 'center') return [left, right];
     return [p.doorSide === 'right' ? left : right];
@@ -90,7 +96,7 @@ window.PackerEngine = (function () {
   function getPantryWalkway(spaceConfig) {
     const p = spaceConfig.pantry;
     const front = p.roomD - p.depthA;                          // 안쪽 선반 앞에서 입구까지
-    const sides = p.wallB === false ? 0 : (p.doorSide === 'center' ? 2 : 1);
+    const sides = !pantryHasSide(p) ? 0 : (p.doorSide === 'center' ? 2 : 1);
     const side = p.roomW - p.depthB * sides; // 옆 선반 앞에서 맞은편 벽(ㄷ자는 맞은편 선반)까지
     return { front, side, min: Math.min(front, side), ok: Math.min(front, side) >= 600 };
   }
@@ -935,6 +941,7 @@ window.PackerEngine = (function () {
     getCabinetConstraints,
     getDrawerConstraints,
     getDrawerTierHeights,
+    pantryHasSide,
     checkModelFitForCompartment,
     validatePlan,
     computeStackingY,

@@ -2288,7 +2288,7 @@
         <div class="pp-h">선반 깊이 · 기둥 굵기</div>
         <div class="pp-grid2">
           <label class="pp-field"><span>안쪽 벽 깊이</span><input id="pp-depth-a" type="number" data-unit="mm" class="input-box" step="10" value="${p.depthA}"></label>
-          <label class="pp-field"><span>${isU ? '양쪽 벽 깊이' : '옆 벽 깊이'}</span><input id="pp-depth-b" type="number" data-unit="mm" class="input-box" step="10" value="${p.depthB}" ${p.wallB === false ? 'disabled' : ''}></label>
+          <label class="pp-field"><span>${isU ? '양쪽 벽 깊이' : '옆 벽 깊이'}</span><input id="pp-depth-b" type="number" data-unit="mm" class="input-box" step="10" value="${p.depthB}" ${!window.PackerEngine.pantryHasSide(p) ? 'disabled' : ''}></label>
           <label class="pp-field"><span>기둥 굵기</span><input id="pp-post-w" type="number" data-unit="mm" class="input-box" step="5" value="${p.postW}"></label>
         </div>
       </div>`;
@@ -2304,7 +2304,7 @@
       after();
     });
     const doorEl = body.querySelector('#pp-door');
-    [['left', 'ㄱ자, 왼쪽 입구'], ['right', 'ㄱ자, 오른쪽 입구'], ['center', 'ㄷ자, 가운데 입구']].forEach(([v, label]) => {
+    [['left', 'ㄱ자, 왼쪽 입구'], ['right', 'ㄱ자, 오른쪽 입구'], ['center', 'ㄷ자, 가운데 입구'], ['straight', 'I자, 안쪽 벽만']].forEach(([v, label]) => {
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = 'sp-chip' + ((p.doorSide || 'left') === v ? ' selected' : '');
@@ -2312,6 +2312,7 @@
       chip.addEventListener('click', () => {
         snapPantryComps();
         if (v === 'center' && !p.postsC) p.postsC = [...(p.postsB || [])];
+        if (p.doorSide === 'straight' && v !== 'straight') p.wallB = true;
         p.doorSide = v;
         clampPantryBoxes();
         after();
@@ -2394,7 +2395,7 @@
     // 기둥 위치
     const postsEl = body.querySelector('#pp-posts');
     const wallRow = (wall) => {
-      if (wall !== 'A' && p.wallB === false) return;
+      if (wall !== 'A' && !window.PackerEngine.pantryHasSide(p)) return;
       if (wall === 'C' && !isU) return;
       const key = 'posts' + wall;
       if (!p[key]) p[key] = [];
@@ -5168,7 +5169,7 @@
       options: [
         { value: 'cabinet', label: '문 달린 장', sub: '옷장·벽장·주방장' },
         { value: 'drawer', label: '빼는 서랍', sub: '당겨 여는 서랍장' },
-        { value: 'pantry', label: '팬트리', sub: 'ㄱ자·ㄷ자 수납방' },
+        { value: 'pantry', label: '팬트리', sub: 'I자·ㄱ자·ㄷ자 수납방' },
         { value: 'fridge', label: '냉장고', sub: '양문형·4도어' }
       ],
       get: () => state.spaceConfig.type,
@@ -5253,12 +5254,14 @@
           options: [
             { value: 'left', label: 'ㄱ자, 왼쪽 입구', sub: '선반은 안쪽 벽과 오른쪽 벽' },
             { value: 'right', label: 'ㄱ자, 오른쪽 입구', sub: '선반은 안쪽 벽과 왼쪽 벽' },
-            { value: 'center', label: 'ㄷ자, 가운데 입구', sub: '선반은 안쪽 벽과 양쪽 벽' }
+            { value: 'center', label: 'ㄷ자, 가운데 입구', sub: '선반은 안쪽 벽과 양쪽 벽' },
+            { value: 'straight', label: 'I자, 일자형', sub: '선반은 안쪽 벽만' }
           ],
           get: () => p.doorSide || 'left',
           set: (v) => {
             snapPantryComps();
             if (v === 'center' && !p.postsC) p.postsC = [...(p.postsB || [])];
+            if (p.doorSide === 'straight' && v !== 'straight') p.wallB = true;
             p.doorSide = v;
             clampPantryBoxes();
           }
@@ -5273,7 +5276,7 @@
           set: (v) => { p.roomW = v; setPantryCols('A', bayCount('A')); }
         }),
         num({
-          title: '옆 벽은<br>몇 cm인가요?',
+          title: p.doorSide === 'straight' ? '방 깊이는<br>몇 cm인가요?' : '옆 벽은<br>몇 cm인가요?',
           measure: WIZ_MEASURE.panD,
           caption: '방 깊이 (옆 벽 길이)',
           hint: () => '안쪽 벽에서 입구까지 재요.',
@@ -5311,7 +5314,7 @@
           get: () => bayCount('A'),
           set: (v) => setPantryCols('A', v)
         }),
-        num({
+        p.doorSide === 'straight' ? null : num({
           title: '옆 벽은 기둥으로<br>몇 칸이 나뉘나요?',
           measure: WIZ_MEASURE.panCols,
           unit: '칸', step: 1, min: 0, max: 6,
@@ -5327,7 +5330,7 @@
           get: () => pantryShelfCount() + 1,
           set: (v) => setPantryLevels(v - 1)
         })
-      ];
+      ].filter(Boolean);
     }
 
     if (state.spaceConfig.type === 'cabinet') {
