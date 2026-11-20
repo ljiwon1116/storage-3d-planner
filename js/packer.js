@@ -215,10 +215,11 @@ window.PackerEngine = (function () {
     }
     if (spaceConfig.type === 'drawer') {
       const d = spaceConfig.drawer;
-      const clearH = d.clearanceH && d.clearanceH > 0 ? d.clearanceH : d.h;
-      const tiers = Math.min(6, Math.max(1, Math.round(Number(d.tiers) || 2)));
+      const heights = getDrawerTierHeights(spaceConfig);
+      const tiers = heights.length;
       const out = [];
       for (let t = 0; t < tiers; t++) {
+        const clearH = heights[t];
         out.push({
           index: t,
           name: tiers === 1 ? '서랍 안 공간' : `서랍 ${t + 1}단`,
@@ -226,7 +227,7 @@ window.PackerEngine = (function () {
           yStart: 0,
           yEnd: clearH,
           clearH: clearH,
-          wallH: d.h,
+          wallH: Math.min(d.h, clearH),
           w: d.w,
           d: d.d
         });
@@ -319,6 +320,21 @@ window.PackerEngine = (function () {
   }
 
   // 4. 슬라이딩 서랍의 노출 깊이 / 안쪽 미노출 깊이 계산
+  // 서랍장 칸(단)마다 상자를 넣을 수 있는 높이 (mm). 1단 = 맨 위(열린 서랍)
+  // drawer.tierH[t] 가 있으면 그 값, 없으면 모든 칸 공통 높이(clearanceH)
+  function getDrawerTierHeights(spaceConfig) {
+    const d = spaceConfig.drawer || {};
+    const tiers = Math.min(6, Math.max(1, Math.round(Number(d.tiers) || 2)));
+    const base = Number(d.clearanceH) > 0 ? Number(d.clearanceH) : (Number(d.h) || 140);
+    const list = Array.isArray(d.tierH) ? d.tierH : [];
+    const out = [];
+    for (let t = 0; t < tiers; t++) {
+      const v = Number(list[t]);
+      out.push(v > 0 ? Math.max(40, Math.min(600, v)) : base);
+    }
+    return out;
+  }
+
   function getDrawerConstraints(spaceConfig) {
     const d = spaceConfig.drawer;
     const exposedD = Math.min(d.d, Math.max(0, Number(d.exposedD) || d.d));
@@ -918,6 +934,7 @@ window.PackerEngine = (function () {
     getOrientedDims,
     getCabinetConstraints,
     getDrawerConstraints,
+    getDrawerTierHeights,
     checkModelFitForCompartment,
     validatePlan,
     computeStackingY,

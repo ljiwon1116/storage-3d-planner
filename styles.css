@@ -5680,3 +5680,9 @@ body.ui-mode-mobile .app-header .brand-title > span {
 .pso-note { font-size: 0.75rem; }
 .pso-card { overflow-y: auto; }
 .pso-card.is-inapp .pso-img { max-height: 34vh; }
+
+/* 서랍장: 오른쪽 위 '서랍 높이' 버튼 + 칸마다 높이 창 */
+body.ui-mode-mobile.mobile-step-build.space-drawer .mobile-shelfh-btn { display: inline-flex; }
+.drwh-item { display: flex; align-items: center; gap: 10px; }
+.drwh-name { flex: 1; white-space: nowrap; font-weight: 600; }
+.drwh-item .drwh-in { width: 88px; }

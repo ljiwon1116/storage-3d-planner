@@ -554,9 +554,10 @@
     document.body.classList.toggle('space-pantry', state.spaceConfig.type === 'pantry');
     document.body.classList.toggle('space-fridge', state.spaceConfig.type === 'fridge');
     const shBtn = document.getElementById('btn-mobile-shelf-height');
-    if (shBtn) shBtn.textContent = state.spaceConfig.type === 'pantry' ? '기둥·선반' : '선반 높이';
+    const shName = state.spaceConfig.type === 'pantry' ? '기둥·선반' : state.spaceConfig.type === 'drawer' ? '서랍 높이' : '선반 높이';
+    if (shBtn) shBtn.textContent = shName;
     const shHead = document.querySelector('#mobile-shelfh-popup .mobile-shelfh-head > span');
-    if (shHead) shHead.textContent = state.spaceConfig.type === 'pantry' ? '기둥·선반' : '선반 높이';
+    if (shHead) shHead.textContent = shName;
     renderLeftAccordionCards();
     renderPlanTabs();
     renderShelfCalloutCards();
@@ -2147,6 +2148,10 @@
       body.innerHTML = `<div class="hint-text">냉장고 선반 수는 '크기·설정'에서 바꿔요.</div>`;
       return;
     }
+    if (state.spaceConfig.type === 'drawer') {
+      renderDrawerHeightPopup(body);
+      return;
+    }
     if (state.spaceConfig.type !== 'cabinet') {
       body.innerHTML = `<div class="hint-text">서랍은 선반이 없어요.</div>`;
       return;
@@ -2202,6 +2207,45 @@
       c.shelves.push({ id: 'sh-' + Date.now(), bottomY: Math.max(80, nextY), thickness: 18 });
       refreshAll();
       renderShelfHeightPopup();
+    });
+  }
+
+  // ===== 서랍장: 칸(단)마다 상자를 넣을 수 있는 높이 (3D 화면의 '서랍 높이' 창) =====
+  function renderDrawerHeightPopup(body) {
+    const d = state.spaceConfig.drawer;
+    const hs = window.PackerEngine.getDrawerTierHeights(state.spaceConfig);
+    const n = hs.length;
+    const label = (t) => (n === 1 ? '서랍' : t === 0 ? '1단 (맨 위)' : t === n - 1 ? `${t + 1}단 (맨 아래)` : `${t + 1}단`);
+    body.innerHTML = `
+      <div class="sub-block-title" style="margin-bottom:8px;"><span>칸마다 넣을 수 있는 높이 (cm)</span></div>
+      <div class="shelf-list drwh-list">
+        ${hs.map((h, t) => `
+          <div class="shelf-item drwh-item">
+            <span class="drwh-name">${label(t)}</span>
+            <input type="number" data-unit="mm" class="input-box drwh-in" data-idx="${t}" value="${h}" step="5" aria-label="${label(t)} 높이" />
+          </div>`).join('')}
+      </div>
+      <div class="hint-text" style="margin-top:8px;">서랍 바닥에서 위 판까지 재요. 칸 수는 '크기·설정'에서 바꿔요.</div>
+      ${n > 1 ? '<button type="button" id="drwh-same" class="btn btn-sm" style="margin-top:8px;">모든 칸을 1단 높이로</button>' : ''}
+    `;
+    const step = { min: 40, max: 600, unit: 'mm' };
+    body.querySelectorAll('.drwh-in').forEach((inp) => {
+      inp.addEventListener('change', () => {
+        const t = Number(inp.dataset.idx);
+        const v = clampStepValue(step, inp.value, (x) => { inp.value = x; inp.dispatchEvent(new Event('change')); });
+        const next = window.PackerEngine.getDrawerTierHeights(state.spaceConfig);
+        next[t] = v;
+        d.tierH = next;
+        inp.value = v;
+        refreshAll();
+      });
+    });
+    body.querySelector('#drwh-same')?.addEventListener('click', () => {
+      d.clearanceH = hs[0];
+      delete d.tierH;
+      refreshAll();
+      renderShelfHeightPopup();
+      showToast(`모든 칸을 ${window.Units.len(hs[0])}로 맞췄어요`);
     });
   }
 
@@ -5374,14 +5418,6 @@
         set: (v) => { d.exposedD = Math.min(v, d.d); }
       }),
       num({
-        title: '상자를 얼마나 높게<br>넣을 수 있나요?',
-          measure: WIZ_MEASURE.drwClear,
-        hint: () => '서랍 바닥에서 위 판까지의 높이예요.',
-        min: 40, max: 600, step: 5,
-        get: () => d.clearanceH,
-        set: (v) => { d.clearanceH = v; }
-      }),
-      num({
         title: '서랍은 모두<br>몇 칸인가요?',
         measure: WIZ_MEASURE.drwTiers,
         unit: '칸', step: 1, min: 1, max: 6,
@@ -5398,6 +5434,14 @@
           }));
           if (state.activeCompartmentIdx >= nt) state.activeCompartmentIdx = nt - 1;
         }
+      }),
+      num({
+        title: '서랍 한 칸에 상자를<br>얼마나 높게 넣을 수 있나요?',
+          measure: WIZ_MEASURE.drwClear,
+        hint: () => '서랍 바닥에서 위 판까지예요. 칸마다 다르면 3D 화면에서 따로 바꿔요.',
+        min: 40, max: 600, step: 5,
+        get: () => d.clearanceH,
+        set: (v) => { d.clearanceH = v; delete d.tierH; }
       })
     ];
   }
@@ -5975,6 +6019,7 @@
       const el = document.getElementById(id);
       el.addEventListener('input', () => {
         state.spaceConfig.drawer[key] = Math.max(0, Number(el.value) || 0);
+        if (key === 'clearanceH') delete state.spaceConfig.drawer.tierH;   // 모든 칸 같게
         refreshAll();
       });
     };

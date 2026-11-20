@@ -537,19 +537,21 @@ window.Scene3DManager = (function () {
   }
 
   // 서랍장: t단 서랍 바닥의 높이 (1단 = 0, 아래 단일수록 낮아짐)
+  // 칸마다 높이가 달라도 됨: 위에서부터 칸 높이를 차례로 쌓아 내려감
   function drawerTierBaseY(spaceConfig, t) {
     if (!t) return 0;
-    const clearH = window.PackerEngine.getDrawerConstraints(spaceConfig).clearanceH;
-    const lowFrontH = Math.max(40, clearH - 2);
-    return -14 - 8 - (t - 1) * (clearH + 8) - lowFrontH;
+    const hs = window.PackerEngine.getDrawerTierHeights(spaceConfig);
+    let y = -14 - 8;
+    for (let k = 1; k < t; k++) y -= (hs[k] || hs[0]) + 8;
+    return y - Math.max(40, (hs[t] || hs[0]) - 2);
   }
 
   function drawerLowerBodyH(spaceConfig) {
     const d = (spaceConfig && spaceConfig.drawer) || {};
-    const tiers = Math.min(6, Math.max(1, Math.round(Number(d.tiers) || 2)));
-    const clearH = window.PackerEngine.getDrawerConstraints(spaceConfig).clearanceH;
-    const closedTiers = Math.max(0, tiers - 1);
-    return closedTiers * (clearH + 8) + 56;
+    const hs = window.PackerEngine.getDrawerTierHeights(spaceConfig);
+    let sum = 0;
+    for (let k = 1; k < hs.length; k++) sum += hs[k] + 8;
+    return sum + 56;
   }
 
   function buildWarmHomeRoomEnvironment(spaceConfig) {
@@ -1222,7 +1224,9 @@ window.Scene3DManager = (function () {
     const tiers = Math.min(6, Math.max(1, Math.round(Number(d.tiers) || 2)));
     const W = d.w, D = d.d;
     const drwConst = window.PackerEngine.getDrawerConstraints(spaceConfig);
-    const clearH = drwConst.clearanceH;
+    const tierHs = window.PackerEngine.getDrawerTierHeights(spaceConfig);
+    const topH = tierHs[0];                                   // 맨 위 칸 높이 (몸통 윗부분)
+    const clearH = tierHs[getOpenDrawerTier(spaceConfig)];    // 지금 열린 칸 높이
     const exposedD = drwConst.exposedD;
     const unexposedD = drwConst.unexposedD;
     // 서랍 벽 높이는 '넣을 수 있는 높이'를 따라가요 (높이를 올리면 벽·앞판도 같이 올라감)
@@ -1260,13 +1264,13 @@ window.Scene3DManager = (function () {
     drawerStaticGroup.add(lowerLine);
 
     // 닫혀 있는 서랍 칸 (앞판 + 손잡이). ＋버튼으로 고른 단(openTier)만 열려요
-    const lowFrontH = Math.max(40, clearH - 2);
     const lowFrontZ = -8 + (D + 30) / 2 + 9;
     const lowFrontMat = new THREE.MeshStandardMaterial({ color: FP('chestLight'), roughness: 0.5 });
     const lowHandleMat = new THREE.MeshStandardMaterial({ color: FP('chestHandle'), metalness: 0.2, roughness: 0.4 });
     const lowHandleGeom = new THREE.BoxGeometry(Math.min(140, W * 0.32), 14, 22);
     for (let t = 0; t < tiers; t++) {
       if (t === openTier) continue;
+      const lowFrontH = Math.max(40, tierHs[t] - 2);
       const lowFrontY = drawerTierBaseY(spaceConfig, t) + lowFrontH / 2;
       const lowFrontGeom = new THREE.BoxGeometry(W + 44, lowFrontH, 18);
       const lowFront = new THREE.Mesh(lowFrontGeom, lowFrontMat);
@@ -1284,7 +1288,7 @@ window.Scene3DManager = (function () {
 
     const topCoverGeom = new THREE.BoxGeometry(W + 56, 20, D + 34);
     const topCoverMesh = new THREE.Mesh(topCoverGeom, chestTopMat);
-    topCoverMesh.position.set(0, clearH + 10, -8);
+    topCoverMesh.position.set(0, topH + 10, -8);
     drawerStaticGroup.add(topCoverMesh);
     const topCoverLine = new THREE.LineSegments(new THREE.EdgesGeometry(topCoverGeom), chestEdgeMat);
     topCoverLine.position.copy(topCoverMesh.position);
@@ -1317,9 +1321,9 @@ window.Scene3DManager = (function () {
       el.position.copy(m.position);
       drawerStaticGroup.add(el);
     };
-    addChestPart(sideT, clearH + 14, D + 30, -chestInnerHalf + sideT / 2, (clearH - 14) / 2, -8);
-    addChestPart(sideT, clearH + 14, D + 30, chestInnerHalf - sideT / 2, (clearH - 14) / 2, -8);
-    addChestPart(W + 52, clearH + 14, sideT, 0, (clearH - 14) / 2, -8 - (D + 30) / 2 + sideT / 2);
+    addChestPart(sideT, topH + 14, D + 30, -chestInnerHalf + sideT / 2, (topH - 14) / 2, -8);
+    addChestPart(sideT, topH + 14, D + 30, chestInnerHalf - sideT / 2, (topH - 14) / 2, -8);
+    addChestPart(W + 52, topH + 14, sideT, 0, (topH - 14) / 2, -8 - (D + 30) / 2 + sideT / 2);
 
     const slideOffsetZ = drawerOpenRatio * exposedD;
     drawerSlidingGroup.position.set(0, openBaseY, slideOffsetZ);
